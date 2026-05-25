@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sudi_diamond_job_type_list" model="ir.ui.view">
+        <field name="name">sudi.diamond.job.type.list</field>
+        <field name="model">sudi.diamond.job.type</field>
+        <field name="arch" type="xml">
+            <list string="Diamond Job Types" default_order="sequence, name">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="service_product_id"/>
+                <field name="invoice_basis"/>
+                <field name="base_price"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sudi_diamond_job_type_form" model="ir.ui.view">
+        <field name="name">sudi.diamond.job.type.form</field>
+        <field name="model">sudi.diamond.job.type</field>
+        <field name="arch" type="xml">
+            <form string="Diamond Job Type">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="active" invisible="1"/>
+                            <field name="name"/>
+                            <field name="sequence"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="service_product_id"/>
+                            <field name="invoice_basis"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="base_price"/>
+                            <field name="tax_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sudi_diamond_job_type_search" model="ir.ui.view">
+        <field name="name">sudi.diamond.job.type.search</field>
+        <field name="model">sudi.diamond.job.type</field>
+        <field name="arch" type="xml">
+            <search string="Diamond Job Types">
+                <field name="name"/>
+                <field name="service_product_id"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <group name="groupby">
+                    <filter string="Invoice Basis" name="group_invoice_basis" context="{'group_by': 'invoice_basis'}"/>
+                    <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_sudi_diamond_job_type" model="ir.actions.act_window">
+        <field name="name">Diamond Job Types</field>
+        <field name="res_model">sudi.diamond.job.type</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure diamond job-work services and base prices.
+            </p>
+        </field>
+    </record>
+</odoo>

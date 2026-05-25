@@ -1,0 +1,248 @@
+from odoo import Command, _, api, fields, models
+from odoo.exceptions import UserError, ValidationError
+from odoo.tools.float_utils import float_is_zero
+
+
+class StockPicking(models.Model):
+    _inherit = "stock.picking"
+
+    sudi_is_diamond_job_work = fields.Boolean(
+        string="Diamond Job Work",
+        copy=True,
+        tracking=True,
+    )
+    sudi_origin_receipt_id = fields.Many2one(
+        "stock.picking",
+        string="Origin Receipt",
+        copy=True,
+        index=True,
+    )
+    sudi_delivery_ids = fields.One2many(
+        "stock.picking",
+        "sudi_origin_receipt_id",
+        string="Diamond Deliveries",
+    )
+    sudi_delivery_count = fields.Integer(compute="_compute_sudi_counts")
+    sudi_invoice_ids = fields.Many2many(
+        "account.move",
+        compute="_compute_sudi_invoice_ids",
+        string="Diamond Invoices",
+    )
+    sudi_invoice_count = fields.Integer(compute="_compute_sudi_invoice_ids")
+    sudi_pickup_user_id = fields.Many2one(
+        "res.users",
+        string="Pickup Person",
+        tracking=True,
+    )
+    sudi_pickup_datetime = fields.Datetime(string="Pickup Date/Time", tracking=True)
+    sudi_customer_contact = fields.Char(string="Customer Contact")
+    sudi_internal_notes = fields.Text(string="Job Work Notes")
+
+    @api.depends("sudi_delivery_ids")
+    def _compute_sudi_counts(self):
+        for picking in self:
+            picking.sudi_delivery_count = len(picking.sudi_delivery_ids)
+
+    def _compute_sudi_invoice_ids(self):
+        AccountMove = self.env["account.move"]
+        for picking in self:
+            if picking.picking_type_code == "incoming":
+                invoices = AccountMove.search([("sudi_receipt_id", "=", picking.id)])
+            else:
+                invoices = AccountMove.search([("sudi_delivery_ids", "in", picking.ids)])
+            picking.sudi_invoice_ids = invoices
+            picking.sudi_invoice_count = len(invoices)
+
+    def _pre_action_done_hook(self):
+        res = super()._pre_action_done_hook()
+        if res is not True:
+            return res
+        self._sudi_validate_job_work_pickings()
+        return True
+
+    def _action_done(self):
+        res = super()._action_done()
+        self.filtered(
+            lambda picking: picking.sudi_is_diamond_job_work
+            and picking.picking_type_id.code == "incoming"
+            and picking.state == "done"
+            and not picking.sudi_delivery_ids
+        )._sudi_create_delivery_from_receipt()
+        return res
+
+    def _sudi_validate_job_work_pickings(self):
+        for picking in self.filtered("sudi_is_diamond_job_work"):
+            if not picking.partner_id:
+                raise ValidationError(_("A diamond job-work transfer must have a customer."))
+            for move in picking.move_ids.filtered(lambda m: m.state != "cancel"):
+                if not move.product_id:
+                    raise ValidationError(_("Every diamond job-work line must have a product."))
+                if not move.sudi_job_type_id:
+                    raise ValidationError(_("Every diamond job-work line must have a job type."))
+                if move.sudi_pcs_qty < 0 or move.sudi_carats < 0:
+                    raise ValidationError(_("Pieces/Qty and Carats must be zero or positive."))
+
+    def _sudi_create_delivery_from_receipt(self):
+        for receipt in self:
+            delivery_type = receipt._sudi_get_delivery_picking_type()
+            source_location = delivery_type.default_location_src_id or receipt.location_dest_id
+            destination_location = (
+                delivery_type.default_location_dest_id
+                or self.env.ref("stock.stock_location_customers", raise_if_not_found=False)
+            )
+            if not source_location or not destination_location:
+                raise UserError(_("Please configure source and destination locations on the delivery operation type."))
+
+            move_commands = []
+            for move in receipt.move_ids.filtered(lambda m: m.state == "done"):
+                quantity = move.quantity or move.product_uom_qty
+                if float_is_zero(quantity, precision_rounding=move.product_uom.rounding):
+                    continue
+                move_commands.append(Command.create({
+                    "name": move.name,
+                    "description_picking": move.description_picking,
+                    "product_id": move.product_id.id,
+                    "product_uom_qty": quantity,
+                    "product_uom": move.product_uom.id,
+                    "location_id": source_location.id,
+                    "location_dest_id": destination_location.id,
+                    "partner_id": receipt.partner_id.id,
+                    "company_id": receipt.company_id.id,
+                    "move_orig_ids": [Command.link(move.id)],
+                    "sudi_sr": move.sudi_sr,
+                    "sudi_size": move.sudi_size,
+                    "sudi_pcs_qty": move.sudi_pcs_qty or quantity,
+                    "sudi_carats": move.sudi_carats,
+                    "sudi_job_type_id": move.sudi_job_type_id.id,
+                    "sudi_remarks": move.sudi_remarks,
+                    "sudi_origin_receipt_move_id": move.id,
+                }))
+
+            if not move_commands:
+                continue
+
+            delivery = self.create({
+                "partner_id": receipt.partner_id.id,
+                "picking_type_id": delivery_type.id,
+                "location_id": source_location.id,
+                "location_dest_id": destination_location.id,
+                "origin": receipt.name,
+                "company_id": receipt.company_id.id,
+                "scheduled_date": fields.Datetime.now(),
+                "sudi_is_diamond_job_work": True,
+                "sudi_origin_receipt_id": receipt.id,
+                "sudi_pickup_user_id": receipt.sudi_pickup_user_id.id,
+                "sudi_customer_contact": receipt.sudi_customer_contact,
+                "sudi_internal_notes": receipt.sudi_internal_notes,
+                "move_ids": move_commands,
+            })
+            delivery.action_confirm()
+            delivery.action_assign()
+
+    def _sudi_get_delivery_picking_type(self):
+        self.ensure_one()
+        warehouse = self.picking_type_id.warehouse_id or self.env["stock.warehouse"].search(
+            [("company_id", "=", self.company_id.id)],
+            limit=1,
+        )
+        delivery_type = warehouse.out_type_id if warehouse else self.env["stock.picking.type"]
+        if not delivery_type:
+            delivery_type = self.env["stock.picking.type"].search(
+                [("code", "=", "outgoing"), ("company_id", "in", [False, self.company_id.id])],
+                limit=1,
+            )
+        if not delivery_type:
+            raise UserError(_("No outgoing delivery operation type is configured for this company."))
+        return delivery_type
+
+    def action_sudi_view_deliveries(self):
+        self.ensure_one()
+        return self._sudi_action_view_pickings(self.sudi_delivery_ids, _("Diamond Deliveries"))
+
+    def action_sudi_view_origin_receipt(self):
+        self.ensure_one()
+        return self._sudi_action_view_pickings(self.sudi_origin_receipt_id, _("Origin Receipt"))
+
+    def action_sudi_view_invoices(self):
+        self.ensure_one()
+        action = self.env["ir.actions.actions"]._for_xml_id("account.action_move_out_invoice")
+        invoices = self.sudi_invoice_ids
+        action["domain"] = [("id", "in", invoices.ids)]
+        if len(invoices) == 1:
+            action["views"] = [(False, "form")]
+            action["res_id"] = invoices.id
+        return action
+
+    def action_sudi_create_invoice(self):
+        self.ensure_one()
+        receipt = self if self.picking_type_code == "incoming" else self.sudi_origin_receipt_id
+        delivery_pickings = self.sudi_delivery_ids if self.picking_type_code == "incoming" else self
+        delivery_pickings = delivery_pickings.filtered(
+            lambda picking: picking.sudi_is_diamond_job_work
+            and picking.picking_type_code == "outgoing"
+            and picking.state == "done"
+        )
+        invoiceable_moves = delivery_pickings.move_ids.filtered(
+            lambda move: move.state == "done"
+            and move.sudi_job_type_id
+            and not move.sudi_invoice_line_id
+        )
+        if not invoiceable_moves:
+            raise UserError(_("There are no delivered uninvoiced diamond job-work lines."))
+
+        partner = (receipt or self).partner_id.commercial_partner_id
+        line_commands = []
+        for move in invoiceable_moves:
+            job_type = move.sudi_job_type_id
+            quantity = move._sudi_get_invoice_quantity()
+            if float_is_zero(quantity, precision_rounding=move.product_uom.rounding):
+                continue
+            product = job_type.service_product_id
+            if not product:
+                raise UserError(_("Please configure a service product on job type %s.") % job_type.display_name)
+            line_vals = {
+                "product_id": product.id,
+                "name": move._sudi_get_invoice_line_name(),
+                "quantity": quantity,
+                "product_uom_id": product.uom_id.id,
+                "price_unit": job_type._get_price_for_partner(partner, move.company_id),
+                "sudi_stock_move_id": move.id,
+            }
+            if job_type.tax_ids:
+                line_vals["tax_ids"] = [Command.set(job_type.tax_ids.ids)]
+            line_commands.append(Command.create(line_vals))
+
+        if not line_commands:
+            raise UserError(_("The delivered diamond job-work lines have zero invoice quantity."))
+
+        invoice = self.env["account.move"].create({
+            "move_type": "out_invoice",
+            "partner_id": partner.id,
+            "partner_shipping_id": (receipt or self).partner_id.id,
+            "invoice_origin": receipt.name if receipt else ", ".join(delivery_pickings.mapped("name")),
+            "ref": ", ".join(delivery_pickings.mapped("name")),
+            "company_id": (receipt or self).company_id.id,
+            "sudi_is_diamond_job_work_invoice": True,
+            "sudi_receipt_id": receipt.id if receipt else False,
+            "sudi_delivery_ids": [Command.set(delivery_pickings.ids)],
+            "invoice_line_ids": line_commands,
+        })
+        for line in invoice.invoice_line_ids.filtered("sudi_stock_move_id"):
+            line.sudi_stock_move_id.sudi_invoice_line_id = line
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Diamond Job Work Invoice"),
+            "res_model": "account.move",
+            "res_id": invoice.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def _sudi_action_view_pickings(self, pickings, name):
+        action = self.env["ir.actions.actions"]._for_xml_id("stock.action_picking_tree_all")
+        action["name"] = name
+        action["domain"] = [("id", "in", pickings.ids)]
+        if len(pickings) == 1:
+            action["views"] = [(False, "form")]
+            action["res_id"] = pickings.id
+        return action

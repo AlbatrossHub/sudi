@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_sudi_diamond_prices" model="ir.ui.view">
+        <field name="name">res.partner.form.sudi.diamond.prices</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <page name="sales_purchases" position="after">
+                <page string="Diamond Service Prices" name="sudi_diamond_service_prices">
+                    <field name="sudi_diamond_service_price_ids" context="{'default_partner_id': id}">
+                        <list editable="bottom">
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="job_type_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" column_invisible="True"/>
+                            <field name="price"/>
+                        </list>
+                    </field>
+                </page>
+            </page>
+        </field>
+    </record>
+</odoo>

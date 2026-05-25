@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="product_customer_diamond_parcel" model="product.product">
+        <field name="name">Customer Diamond Parcel</field>
+        <field name="default_code">SUDI-DIAMOND-PARCEL</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+
+    <record id="product_service_laser_inscription" model="product.product">
+        <field name="name">Laser Inscription</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_natts_process" model="product.product">
+        <field name="name">Natts Process</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_photo_inscription" model="product.product">
+        <field name="name">Photo Inscription</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_hard_process" model="product.product">
+        <field name="name">Hard Process</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_white_hole_drilling" model="product.product">
+        <field name="name">White Hole Drilling</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_socking" model="product.product">
+        <field name="name">Socking</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_cvd_testing_certificate" model="product.product">
+        <field name="name">CVD Diamond Testing with Certificate</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_red_process" model="product.product">
+        <field name="name">Red Process</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_ultra_sonic_boiling" model="product.product">
+        <field name="name">Ultra Sonic Boiling</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_laser_drilling" model="product.product">
+        <field name="name">Laser Drilling</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_cold_luster_process" model="product.product">
+        <field name="name">Cold Luster Process</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_cracking" model="product.product">
+        <field name="name">Cracking</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_export_boiling" model="product.product">
+        <field name="name">Export Boiling</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_special_boiling" model="product.product">
+        <field name="name">Special Boiling</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+    <record id="product_service_laser_engraving_metal" model="product.product">
+        <field name="name">Laser Engraving on Metal</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+</odoo>

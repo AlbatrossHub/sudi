@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sudi_diamond_job_type_user,sudi.diamond.job.type.user,model_sudi_diamond_job_type,stock.group_stock_user,1,1,1,0
+access_sudi_diamond_job_type_manager,sudi.diamond.job.type.manager,model_sudi_diamond_job_type,stock.group_stock_manager,1,1,1,1
+access_sudi_diamond_partner_service_price_user,sudi.diamond.partner.service.price.user,model_sudi_diamond_partner_service_price,account.group_account_invoice,1,1,1,1
+access_sudi_diamond_partner_service_price_stock_manager,sudi.diamond.partner.service.price.stock.manager,model_sudi_diamond_partner_service_price,stock.group_stock_manager,1,1,1,1

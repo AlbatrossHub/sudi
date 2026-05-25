@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_sudi_diamond" model="ir.ui.view">
+        <field name="name">stock.picking.form.sudi.diamond</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='button_validate'][1]" position="after">
+                <button name="action_sudi_create_invoice"
+                        string="Create Diamond Invoice"
+                        type="object"
+                        class="btn-primary"
+                        groups="account.group_account_invoice"
+                        invisible="not sudi_is_diamond_job_work or state != 'done' or picking_type_code not in ['incoming', 'outgoing']"/>
+            </xpath>
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_sudi_view_deliveries"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-truck"
+                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or sudi_delivery_count == 0">
+                    <field name="sudi_delivery_count" widget="statinfo" string="Deliveries"/>
+                </button>
+                <button name="action_sudi_view_origin_receipt"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-sign-in"
+                        invisible="not sudi_origin_receipt_id">
+                    <div class="o_form_field o_stat_info">
+                        <span class="o_stat_text">Receipt</span>
+                    </div>
+                </button>
+                <button name="action_sudi_view_invoices"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-pencil-square-o"
+                        invisible="not sudi_is_diamond_job_work or sudi_invoice_count == 0">
+                    <field name="sudi_invoice_count" widget="statinfo" string="Invoices"/>
+                </button>
+            </xpath>
+
+            <xpath expr="//field[@name='partner_id'][@nolabel='1']" position="after">
+                <field name="sudi_is_diamond_job_work"/>
+                <field name="sudi_origin_receipt_id"
+                       invisible="not sudi_origin_receipt_id"
+                       readonly="1"/>
+            </xpath>
+
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="sudi_pickup_user_id"
+                       invisible="not sudi_is_diamond_job_work"
+                       readonly="state in ['cancel', 'done']"/>
+                <field name="sudi_pickup_datetime"
+                       invisible="not sudi_is_diamond_job_work"
+                       readonly="state in ['cancel', 'done']"/>
+                <field name="sudi_customer_contact"
+                       invisible="not sudi_is_diamond_job_work"
+                       readonly="state in ['cancel', 'done']"/>
+            </xpath>
+
+            <xpath expr="//page[@name='extra']//group[@name='other_infos']" position="after">
+                <group string="Diamond Job Work" name="sudi_diamond_job_work_info" invisible="not sudi_is_diamond_job_work">
+                    <field name="sudi_internal_notes" nolabel="1" placeholder="Internal job-work notes..."/>
+                </group>
+            </xpath>
+
+            <xpath expr="//field[@name='move_ids']/list/field[@name='product_id']" position="before">
+                <field name="sudi_sr" optional="show"/>
+            </xpath>
+            <xpath expr="//field[@name='move_ids']/list/field[@name='description_picking']" position="after">
+                <field name="sudi_size" optional="show"/>
+                <field name="sudi_pcs_qty" optional="show"/>
+                <field name="sudi_carats" optional="show"/>
+                <field name="sudi_job_type_id" optional="show"/>
+                <field name="sudi_remarks" optional="show"/>
+                <field name="sudi_origin_receipt_move_id" column_invisible="True"/>
+                <field name="sudi_invoice_line_id" column_invisible="True"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_picking_list_sudi_diamond" model="ir.ui.view">
+        <field name="name">stock.picking.list.sudi.diamond</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="sudi_is_diamond_job_work" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="action_sudi_diamond_receipts" model="ir.actions.act_window">
+        <field name="name">Diamond Job Work Receipts</field>
+        <field name="res_model">stock.picking</field>
+        <field name="view_mode">list,kanban,form,calendar,activity</field>
+        <field name="domain">[('sudi_is_diamond_job_work', '=', True), ('picking_type_id.code', '=', 'incoming')]</field>
+        <field name="context">{'default_sudi_is_diamond_job_work': True, 'restricted_picking_type_code': 'incoming'}</field>
+    </record>
+
+    <record id="action_sudi_diamond_deliveries" model="ir.actions.act_window">
+        <field name="name">Diamond Job Work Deliveries</field>
+        <field name="res_model">stock.picking</field>
+        <field name="view_mode">list,kanban,form,calendar,activity</field>
+        <field name="domain">[('sudi_is_diamond_job_work', '=', True), ('picking_type_id.code', '=', 'outgoing')]</field>
+        <field name="context">{'default_sudi_is_diamond_job_work': True, 'restricted_picking_type_code': 'outgoing'}</field>
+    </record>
+</odoo>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="job_type_laser_inscription" model="sudi.diamond.job.type">
+        <field name="sequence">10</field>
+        <field name="name">Laser Inscription</field>
+        <field name="service_product_id" ref="diamond.product_service_laser_inscription"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_natts_process" model="sudi.diamond.job.type">
+        <field name="sequence">20</field>
+        <field name="name">Natts Process</field>
+        <field name="service_product_id" ref="diamond.product_service_natts_process"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_photo_inscription" model="sudi.diamond.job.type">
+        <field name="sequence">30</field>
+        <field name="name">Photo Inscription</field>
+        <field name="service_product_id" ref="diamond.product_service_photo_inscription"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_hard_process" model="sudi.diamond.job.type">
+        <field name="sequence">40</field>
+        <field name="name">Hard Process</field>
+        <field name="service_product_id" ref="diamond.product_service_hard_process"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_white_hole_drilling" model="sudi.diamond.job.type">
+        <field name="sequence">50</field>
+        <field name="name">White Hole Drilling</field>
+        <field name="service_product_id" ref="diamond.product_service_white_hole_drilling"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_socking" model="sudi.diamond.job.type">
+        <field name="sequence">60</field>
+        <field name="name">Socking</field>
+        <field name="service_product_id" ref="diamond.product_service_socking"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_cvd_testing_certificate" model="sudi.diamond.job.type">
+        <field name="sequence">70</field>
+        <field name="name">CVD Diamond Testing with Certificate</field>
+        <field name="service_product_id" ref="diamond.product_service_cvd_testing_certificate"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_red_process" model="sudi.diamond.job.type">
+        <field name="sequence">80</field>
+        <field name="name">Red Process</field>
+        <field name="service_product_id" ref="diamond.product_service_red_process"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_ultra_sonic_boiling" model="sudi.diamond.job.type">
+        <field name="sequence">90</field>
+        <field name="name">Ultra Sonic Boiling</field>
+        <field name="service_product_id" ref="diamond.product_service_ultra_sonic_boiling"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_laser_drilling" model="sudi.diamond.job.type">
+        <field name="sequence">100</field>
+        <field name="name">Laser Drilling</field>
+        <field name="service_product_id" ref="diamond.product_service_laser_drilling"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_cold_luster_process" model="sudi.diamond.job.type">
+        <field name="sequence">110</field>
+        <field name="name">Cold Luster Process</field>
+        <field name="service_product_id" ref="diamond.product_service_cold_luster_process"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_cracking" model="sudi.diamond.job.type">
+        <field name="sequence">120</field>
+        <field name="name">Fracture Filling</field>
+        <field name="service_product_id" ref="diamond.product_service_cracking"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_export_boiling" model="sudi.diamond.job.type">
+        <field name="sequence">130</field>
+        <field name="name">Export Boiling</field>
+        <field name="service_product_id" ref="diamond.product_service_export_boiling"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_special_boiling" model="sudi.diamond.job.type">
+        <field name="sequence">140</field>
+        <field name="name">Special Boiling</field>
+        <field name="service_product_id" ref="diamond.product_service_special_boiling"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+    <record id="job_type_laser_engraving_metal" model="sudi.diamond.job.type">
+        <field name="sequence">150</field>
+        <field name="name">Laser Engraving on Metal</field>
+        <field name="service_product_id" ref="diamond.product_service_laser_engraving_metal"/>
+        <field name="invoice_basis">pieces</field>
+    </record>
+</odoo>
+
+
+
+<!-- HSN to be replaced with SAC -->
+<!-- carat basis min /max qty -->
