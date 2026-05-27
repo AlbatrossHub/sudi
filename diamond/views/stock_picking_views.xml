@@ -45,6 +45,10 @@
                 <field name="sudi_origin_receipt_id"
                        invisible="not sudi_origin_receipt_id"
                        readonly="1"/>
+                <field name="sudi_jangad_image"
+                       widget="image"
+                       invisible="not sudi_is_diamond_job_work"
+                       readonly="state in ['cancel', 'done']"/>
             </xpath>
 
             <xpath expr="//field[@name='origin']" position="after">
@@ -76,6 +80,12 @@
                 <field name="sudi_remarks" optional="show"/>
                 <field name="sudi_origin_receipt_move_id" column_invisible="True"/>
                 <field name="sudi_invoice_line_id" column_invisible="True"/>
+            </xpath>
+            <xpath expr="//field[@name='move_ids']/list/field[@name='product_uom_qty']" position="attributes">
+                <attribute name="optional">show</attribute>
+            </xpath>
+            <xpath expr="//field[@name='move_ids']/list/field[@name='quantity']" position="attributes">
+                <attribute name="optional">show</attribute>
             </xpath>
         </field>
     </record>

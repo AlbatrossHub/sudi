@@ -30,10 +30,50 @@ class StockMove(models.Model):
         index=True,
     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        self._sudi_prepare_create_vals(vals_list)
+        return super().create(vals_list)
+
+    @api.model
+    def _sudi_prepare_create_vals(self, vals_list):
+        picking_ids = {vals.get("picking_id") for vals in vals_list if vals.get("picking_id")}
+        pickings = {picking.id: picking for picking in self.env["stock.picking"].browse(picking_ids)}
+        next_sr_by_picking = {}
+
+        for vals in vals_list:
+            picking_id = vals.get("picking_id")
+            picking = pickings.get(picking_id)
+            if picking and picking.sudi_is_diamond_job_work and not vals.get("sudi_sr"):
+                if picking_id not in next_sr_by_picking:
+                    existing_sr = picking.move_ids.mapped("sudi_sr")
+                    next_sr_by_picking[picking_id] = (max(existing_sr) if existing_sr else 0) + 1
+                vals["sudi_sr"] = next_sr_by_picking[picking_id]
+                next_sr_by_picking[picking_id] += 1
+
+            if "sudi_pcs_qty" in vals:
+                vals["product_uom_qty"] = vals["sudi_pcs_qty"]
+                if vals.get("state") not in ("done", "cancel"):
+                    vals["quantity"] = vals["sudi_pcs_qty"]
+
+    @api.onchange("sudi_pcs_qty")
+    def _onchange_sudi_pcs_qty(self):
+        for move in self:
+            if not move.picking_id.sudi_is_diamond_job_work:
+                continue
+            if move.product_uom_qty != move.sudi_pcs_qty:
+                move.product_uom_qty = move.sudi_pcs_qty
+            if move.state not in ("done", "cancel") and move.quantity != move.sudi_pcs_qty:
+                move.quantity = move.sudi_pcs_qty
+
     @api.onchange("product_uom_qty")
     def _onchange_sudi_product_uom_qty(self):
         for move in self:
-            if move.picking_id.sudi_is_diamond_job_work and not move.sudi_pcs_qty:
+            if (
+                move.picking_id.sudi_is_diamond_job_work
+                and not move.sudi_pcs_qty
+                and move.sudi_pcs_qty != move.product_uom_qty
+            ):
                 move.sudi_pcs_qty = move.product_uom_qty
 
     def _prepare_move_split_vals(self, qty):

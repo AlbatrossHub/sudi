@@ -12,6 +12,7 @@
         "mail",
         "product",
         "uom",
+        "website",
     ],
     "data": [
         "security/ir.model.access.csv",
@@ -21,6 +22,7 @@
         "views/res_partner_views.xml",
         "views/stock_picking_views.xml",
         "views/account_move_views.xml",
+        "views/jangad_upload_templates.xml",
         "report/diamond_receipt_report.xml",
         "views/menu_views.xml",
     ],

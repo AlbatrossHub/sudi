@@ -1,3 +1,5 @@
+import re
+
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.float_utils import float_is_zero
@@ -37,6 +39,7 @@ class StockPicking(models.Model):
     sudi_pickup_datetime = fields.Datetime(string="Pickup Date/Time", tracking=True)
     sudi_customer_contact = fields.Char(string="Customer Contact")
     sudi_internal_notes = fields.Text(string="Job Work Notes")
+    sudi_jangad_image = fields.Image(string="Jangad")
 
     @api.depends("sudi_delivery_ids")
     def _compute_sudi_counts(self):
@@ -52,6 +55,79 @@ class StockPicking(models.Model):
                 invoices = AccountMove.search([("sudi_delivery_ids", "in", picking.ids)])
             picking.sudi_invoice_ids = invoices
             picking.sudi_invoice_count = len(invoices)
+
+    @api.model
+    def _sudi_normalize_phone(self, phone):
+        digits = re.sub(r"\D+", "", phone or "")
+        return digits[-10:] if len(digits) > 10 else digits
+
+    @api.model
+    def _sudi_find_partner_by_phone(self, phone):
+        phone_key = self._sudi_normalize_phone(phone)
+        if not phone_key:
+            return self.env["res.partner"]
+
+        Partner = self.env["res.partner"].sudo()
+        phone_fields = [field for field in ("phone", "mobile") if field in Partner._fields]
+        if not phone_fields:
+            return self.env["res.partner"]
+
+        domain = [(phone_fields[0], "!=", False)]
+        for field in phone_fields[1:]:
+            domain = ["|", (field, "!=", False)] + domain
+
+        partners = Partner.search(domain)
+        for partner in partners:
+            partner_numbers = {
+                self._sudi_normalize_phone(partner[field])
+                for field in phone_fields
+                if partner[field]
+            }
+            if phone_key in partner_numbers:
+                return partner.commercial_partner_id
+        return self.env["res.partner"]
+
+    @api.model
+    def _sudi_get_public_receipt_defaults(self):
+        company = self.env.company
+        warehouse = self.env["stock.warehouse"].sudo().search([("company_id", "=", company.id)], limit=1)
+        if not warehouse:
+            warehouse = self.env["stock.warehouse"].sudo().search([], limit=1)
+
+        picking_type = warehouse.in_type_id if warehouse else self.env["stock.picking.type"]
+        if not picking_type:
+            picking_type = self.env["stock.picking.type"].sudo().search([
+                ("code", "=", "incoming"),
+                ("company_id", "in", [False, company.id]),
+            ], limit=1)
+        if not picking_type:
+            raise UserError(_("No incoming receipt operation type is configured."))
+
+        source_location = (
+            picking_type.default_location_src_id
+            or self.env.ref("stock.stock_location_suppliers", raise_if_not_found=False)
+        )
+        destination_location = picking_type.default_location_dest_id or warehouse.lot_stock_id
+        if not source_location or not destination_location:
+            raise UserError(_("Please configure source and destination locations on the receipt operation type."))
+        return picking_type, source_location, destination_location
+
+    @api.model
+    def sudi_create_public_jangad_receipt(self, phone, jangad_image):
+        picking_type, source_location, destination_location = self._sudi_get_public_receipt_defaults()
+        partner = self._sudi_find_partner_by_phone(phone)
+        vals = {
+            "picking_type_id": picking_type.id,
+            "location_id": source_location.id,
+            "location_dest_id": destination_location.id,
+            "company_id": picking_type.company_id.id or self.env.company.id,
+            "sudi_is_diamond_job_work": True,
+            "sudi_customer_contact": phone,
+            "sudi_jangad_image": jangad_image,
+        }
+        if partner:
+            vals["partner_id"] = partner.id
+        return self.sudo().create(vals)
 
     def _pre_action_done_hook(self):
         res = super()._pre_action_done_hook()
@@ -99,8 +175,7 @@ class StockPicking(models.Model):
                 if float_is_zero(quantity, precision_rounding=move.product_uom.rounding):
                     continue
                 move_commands.append(Command.create({
-                    "name": move.name,
-                    "description_picking": move.description_picking,
+                    "description_picking": move.description_picking or move.product_id.display_name,
                     "product_id": move.product_id.id,
                     "product_uom_qty": quantity,
                     "product_uom": move.product_uom.id,
