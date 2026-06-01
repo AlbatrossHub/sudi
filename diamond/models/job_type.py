@@ -37,6 +37,11 @@ class SudiDiamondJobType(models.Model):
         required=True,
         help="Controls which delivered diamond quantity is used on invoice lines.",
     )
+    invoice_description = fields.Text(
+        string="Invoice Description",
+        translate=True,
+        help="Exact description to use on invoice lines for this job type.",
+    )
     base_price = fields.Monetary(
         currency_field="currency_id",
         default=0.0,

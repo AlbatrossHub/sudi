@@ -266,7 +266,21 @@ class StockPicking(models.Model):
             raise UserError(_("There are no delivered uninvoiced diamond job-work lines."))
 
         partner = (receipt or self).partner_id.commercial_partner_id
+        self._sudi_validate_invoice_partner(partner, (receipt or self).partner_id)
+        invoice = self.env["account.move"].create({
+            "move_type": "out_invoice",
+            "partner_id": partner.id,
+            "partner_shipping_id": (receipt or self).partner_id.id,
+            "invoice_origin": receipt.name if receipt else ", ".join(delivery_pickings.mapped("name")),
+            "ref": ", ".join(delivery_pickings.mapped("name")),
+            "company_id": (receipt or self).company_id.id,
+            "sudi_is_diamond_job_work_invoice": True,
+            "sudi_receipt_id": receipt.id if receipt else False,
+            "sudi_delivery_ids": [Command.set(delivery_pickings.ids)],
+        })
+
         line_commands = []
+        custom_tax_by_move = {}
         for move in invoiceable_moves:
             job_type = move.sudi_job_type_id
             quantity = move._sudi_get_invoice_quantity()
@@ -284,24 +298,19 @@ class StockPicking(models.Model):
                 "sudi_stock_move_id": move.id,
             }
             if job_type.tax_ids:
-                line_vals["tax_ids"] = [Command.set(job_type.tax_ids.ids)]
+                custom_tax_by_move[move.id] = invoice.fiscal_position_id.map_tax(
+                    job_type.tax_ids._filter_taxes_by_company(invoice.company_id)
+                )
             line_commands.append(Command.create(line_vals))
 
         if not line_commands:
+            invoice.unlink()
             raise UserError(_("The delivered diamond job-work lines have zero invoice quantity."))
 
-        invoice = self.env["account.move"].create({
-            "move_type": "out_invoice",
-            "partner_id": partner.id,
-            "partner_shipping_id": (receipt or self).partner_id.id,
-            "invoice_origin": receipt.name if receipt else ", ".join(delivery_pickings.mapped("name")),
-            "ref": ", ".join(delivery_pickings.mapped("name")),
-            "company_id": (receipt or self).company_id.id,
-            "sudi_is_diamond_job_work_invoice": True,
-            "sudi_receipt_id": receipt.id if receipt else False,
-            "sudi_delivery_ids": [Command.set(delivery_pickings.ids)],
-            "invoice_line_ids": line_commands,
-        })
+        invoice.write({"invoice_line_ids": line_commands})
+        invoice.action_update_fpos_values()
+        for line in invoice.invoice_line_ids.filtered(lambda invoice_line: invoice_line.sudi_stock_move_id.id in custom_tax_by_move):
+            line.tax_ids = custom_tax_by_move[line.sudi_stock_move_id.id]
         for line in invoice.invoice_line_ids.filtered("sudi_stock_move_id"):
             line.sudi_stock_move_id.sudi_invoice_line_id = line
         return {
@@ -312,6 +321,19 @@ class StockPicking(models.Model):
             "view_mode": "form",
             "target": "current",
         }
+
+    def _sudi_validate_invoice_partner(self, partner, shipping_partner):
+        self.ensure_one()
+        company = self.company_id
+        if company.country_code == "IN" and not company.state_id:
+            raise UserError(_("Please configure a State on the company before creating an Indian GST invoice."))
+        partner_to_check = shipping_partner or partner
+        if (
+            company.country_code == "IN"
+            and (not partner_to_check.country_id or partner_to_check.country_id.code == "IN")
+            and not partner_to_check.state_id
+        ):
+            raise UserError(_("Please configure a State on customer %s before creating an Indian GST invoice.") % partner_to_check.display_name)
 
     def _sudi_action_view_pickings(self, pickings, name):
         action = self.env["ir.actions.actions"]._for_xml_id("stock.action_picking_tree_all")

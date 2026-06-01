@@ -9,6 +9,7 @@
                 <field name="name"/>
                 <field name="service_product_id"/>
                 <field name="invoice_basis"/>
+                <field name="invoice_description" optional="hide"/>
                 <field name="base_price"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="active" widget="boolean_toggle"/>
@@ -37,6 +38,9 @@
                             <field name="base_price"/>
                             <field name="tax_ids" widget="many2many_tags"/>
                         </group>
+                    </group>
+                    <group>
+                        <field name="invoice_description" placeholder="Exact description to print on invoice lines..."/>
                     </group>
                 </sheet>
             </form>

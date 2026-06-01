@@ -130,6 +130,8 @@ class StockMove(models.Model):
 
     def _sudi_get_invoice_line_name(self):
         self.ensure_one()
+        if self.sudi_job_type_id.invoice_description:
+            return self.sudi_job_type_id.invoice_description
         parts = [self.sudi_job_type_id.display_name]
         if self.description_picking:
             parts.append(self.description_picking)

@@ -26,6 +26,11 @@
         "report/diamond_receipt_report.xml",
         "views/menu_views.xml",
     ],
+    "assets": {
+        "web.assets_frontend": [
+            "diamond/static/src/js/jangad_upload.js",
+        ],
+    },
     "installable": True,
     "application": True,
 }

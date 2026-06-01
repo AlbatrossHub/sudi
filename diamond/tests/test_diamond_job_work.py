@@ -110,6 +110,20 @@ class TestSudiDiamondJobWork(TestStockCommon):
         self.assertEqual(invoice.invoice_line_ids.price_unit, 100.0)
         self.assertEqual(invoice.invoice_line_ids.quantity, 10.0)
 
+    def test_job_type_invoice_description_used_exactly(self):
+        description = "Diamond Job Work Charges"
+        self.job_type.invoice_description = description
+        receipt = self._create_receipt(qty=10.0, pcs=10.0, carats=2.5)
+        delivery = receipt.sudi_delivery_ids
+        delivery.move_ids.quantity = 10.0
+        delivery.move_ids.picked = True
+        delivery.button_validate()
+
+        action = receipt.action_sudi_create_invoice()
+        invoice = self.env["account.move"].browse(action["res_id"])
+
+        self.assertEqual(invoice.invoice_line_ids.name, description)
+
     def test_inactive_job_type_can_be_configured(self):
         inactive = self.job_type.copy({"name": "Inactive Laser Inscription", "active": False})
         self.assertFalse(inactive.active)

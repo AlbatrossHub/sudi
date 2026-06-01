@@ -48,15 +48,45 @@ class SudiDiamondJangadController(Controller):
             return self.jangad_upload_form(error=_("Please upload a non-empty Jangad image."), phone=phone)
 
         try:
-            receipt = request.env["stock.picking"].sudo().sudi_create_public_jangad_receipt(
-                phone,
-                base64.b64encode(image_data),
-            )
+            receipt = self._create_receipt_from_upload(phone, image_data)
         except UserError as error:
             return self.jangad_upload_form(error=error.args[0], phone=phone)
 
         return request.render("diamond.jangad_upload_success", {
             "receipt": receipt,
+            "partner_found": bool(receipt.partner_id),
+        })
+
+    @route(
+        "/diamond/jangad/upload/json",
+        type="http",
+        auth="public",
+        website=True,
+        sitemap=False,
+        methods=["POST"],
+    )
+    def jangad_upload_json(self, **post):
+        phone = (post.get("phone") or "").strip()
+        upload = post.get("jangad_image")
+        error = self._validate_upload(phone, upload)
+        if error:
+            return request.make_json_response({"success": False, "error": error}, status=400)
+
+        image_data = upload.read()
+        if not image_data:
+            return request.make_json_response({
+                "success": False,
+                "error": _("Please upload a non-empty Jangad image."),
+            }, status=400)
+
+        try:
+            receipt = self._create_receipt_from_upload(phone, image_data)
+        except UserError as error:
+            return request.make_json_response({"success": False, "error": error.args[0]}, status=400)
+
+        return request.make_json_response({
+            "success": True,
+            "receipt_name": receipt.name,
             "partner_found": bool(receipt.partner_id),
         })
 
@@ -68,3 +98,9 @@ class SudiDiamondJangadController(Controller):
         if upload.mimetype not in ALLOWED_IMAGE_MIMETYPES:
             return _("Please upload a PNG, JPEG, or WebP image.")
         return False
+
+    def _create_receipt_from_upload(self, phone, image_data):
+        return request.env["stock.picking"].sudo().sudi_create_public_jangad_receipt(
+            phone,
+            base64.b64encode(image_data),
+        )
