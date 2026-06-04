@@ -3,3 +3,5 @@ access_sudi_diamond_job_type_user,sudi.diamond.job.type.user,model_sudi_diamond_
 access_sudi_diamond_job_type_manager,sudi.diamond.job.type.manager,model_sudi_diamond_job_type,stock.group_stock_manager,1,1,1,1
 access_sudi_diamond_partner_service_price_user,sudi.diamond.partner.service.price.user,model_sudi_diamond_partner_service_price,account.group_account_invoice,1,1,1,1
 access_sudi_diamond_partner_service_price_stock_manager,sudi.diamond.partner.service.price.stock.manager,model_sudi_diamond_partner_service_price,stock.group_stock_manager,1,1,1,1
+access_sudi_diamond_billing_line_account,sudi.diamond.billing.line.account,model_sudi_diamond_billing_line,account.group_account_invoice,1,0,0,0
+access_sudi_diamond_billing_line_stock_manager,sudi.diamond.billing.line.stock.manager,model_sudi_diamond_billing_line,stock.group_stock_manager,1,1,1,1

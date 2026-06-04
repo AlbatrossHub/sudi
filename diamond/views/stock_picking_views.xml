@@ -12,6 +12,11 @@
                         class="btn-primary"
                         groups="account.group_account_invoice"
                         invisible="not sudi_is_diamond_job_work or state != 'done' or picking_type_code not in ['incoming', 'outgoing']"/>
+                <button name="action_sudi_recompute_billing_details"
+                        string="Recompute Billing Details"
+                        type="object"
+                        groups="stock.group_stock_manager"
+                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"/>
             </xpath>
 
             <xpath expr="//div[@name='button_box']" position="inside">
@@ -67,6 +72,32 @@
                 <group string="Diamond Job Work" name="sudi_diamond_job_work_info" invisible="not sudi_is_diamond_job_work">
                     <field name="sudi_internal_notes" nolabel="1" placeholder="Internal job-work notes..."/>
                 </group>
+            </xpath>
+
+            <xpath expr="//page[@name='operations']" position="after">
+                <page string="Billing Details"
+                      name="sudi_billing_details"
+                      groups="stock.group_stock_manager"
+                      invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'">
+                    <field name="sudi_billing_line_ids" context="{'default_picking_id': id}">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="job_type_id"/>
+                            <field name="service_product_id" readonly="1"/>
+                            <field name="name"/>
+                            <field name="quantity"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" column_invisible="True"/>
+                            <field name="price_unit"/>
+                            <field name="price_subtotal" readonly="1"/>
+                            <field name="price_source" readonly="1"/>
+                            <field name="manual_quantity" optional="hide"/>
+                            <field name="manual_price" optional="hide"/>
+                            <field name="invoice_line_id" readonly="1" optional="show"/>
+                        </list>
+                    </field>
+                </page>
             </xpath>
 
             <xpath expr="//field[@name='move_ids']/list/field[@name='product_id']" position="before">

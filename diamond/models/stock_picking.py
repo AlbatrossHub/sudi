@@ -40,6 +40,12 @@ class StockPicking(models.Model):
     sudi_customer_contact = fields.Char(string="Customer Contact")
     sudi_internal_notes = fields.Text(string="Job Work Notes")
     sudi_jangad_image = fields.Image(string="Jangad")
+    sudi_billing_line_ids = fields.One2many(
+        "sudi.diamond.billing.line",
+        "picking_id",
+        string="Billing Details",
+        copy=False,
+    )
 
     @api.depends("sudi_delivery_ids")
     def _compute_sudi_counts(self):
@@ -129,6 +135,109 @@ class StockPicking(models.Model):
             vals["partner_id"] = partner.id
         return self.sudo().create(vals)
 
+    @api.onchange(
+        "partner_id",
+        "company_id",
+        "move_ids",
+        "move_ids.sudi_job_type_id",
+        "move_ids.sudi_pcs_qty",
+        "move_ids.sudi_carats",
+        "move_ids.quantity",
+        "move_ids.product_uom_qty",
+    )
+    def _onchange_sudi_billing_details_source(self):
+        for picking in self.filtered(
+            lambda record: record.sudi_is_diamond_job_work and record.picking_type_code == "incoming" and not record.id
+        ):
+            picking.sudi_billing_line_ids = [
+                Command.clear(),
+                *[
+                    Command.create(vals)
+                    for vals in picking._sudi_prepare_billing_detail_values()
+                ],
+            ]
+
+    def action_sudi_recompute_billing_details(self):
+        self._sudi_sync_billing_details()
+        return True
+
+    def _sudi_prepare_billing_detail_values(self):
+        self.ensure_one()
+        grouped = {}
+        for index, move in enumerate(
+            self.move_ids.filtered(lambda stock_move: stock_move.state != "cancel" and stock_move.sudi_job_type_id),
+            start=1,
+        ):
+            quantity = move._sudi_get_invoice_quantity()
+            rounding = move.product_uom.rounding if move.product_uom else 0.01
+            if float_is_zero(quantity, precision_rounding=rounding):
+                continue
+            job_type = move.sudi_job_type_id
+            group = grouped.setdefault(
+                job_type.id,
+                {
+                    "job_type": job_type,
+                    "quantity": 0.0,
+                    "sequence": move.sudi_sr or index,
+                },
+            )
+            group["quantity"] += quantity
+            if move.sudi_sr:
+                group["sequence"] = min(group["sequence"], move.sudi_sr)
+
+        values = []
+        partner = self.partner_id.commercial_partner_id
+        for group in sorted(grouped.values(), key=lambda item: (item["sequence"], item["job_type"].display_name)):
+            job_type = group["job_type"]
+            price_unit, price_source = job_type._sudi_get_price_for_partner_with_source(partner, self.company_id)
+            values.append({
+                "sequence": group["sequence"],
+                "job_type_id": job_type.id,
+                "name": job_type.invoice_description or job_type.display_name,
+                "quantity": group["quantity"],
+                "price_unit": price_unit,
+                "price_source": price_source,
+                "active": True,
+            })
+        return values
+
+    def _sudi_sync_billing_details(self):
+        BillingLine = self.env["sudi.diamond.billing.line"].sudo()
+        for receipt in self.filtered(
+            lambda picking: picking.sudi_is_diamond_job_work and picking.picking_type_code == "incoming"
+        ):
+            prepared_values = receipt._sudi_prepare_billing_detail_values()
+            prepared_job_type_ids = {vals["job_type_id"] for vals in prepared_values}
+            existing_lines = receipt.sudi_billing_line_ids.sudo().filtered(lambda line: line.active and not line.invoice_line_id)
+            existing_by_job_type = {line.job_type_id.id: line for line in existing_lines}
+
+            for vals in prepared_values:
+                line = existing_by_job_type.get(vals["job_type_id"])
+                if not line:
+                    BillingLine.create({"picking_id": receipt.id, **vals})
+                    continue
+
+                write_vals = {
+                    "sequence": vals["sequence"],
+                    "name": vals["name"],
+                    "active": True,
+                }
+                if not line.manual_quantity:
+                    write_vals["quantity"] = vals["quantity"]
+                if line.manual_price:
+                    write_vals["price_source"] = "manual"
+                else:
+                    write_vals["price_unit"] = vals["price_unit"]
+                    write_vals["price_source"] = vals["price_source"]
+                line.write(write_vals)
+
+            stale_lines = existing_lines.filtered(
+                lambda line: line.job_type_id.id not in prepared_job_type_ids
+                and not line.manual_quantity
+                and not line.manual_price
+            )
+            stale_lines.write({"active": False})
+
     def _pre_action_done_hook(self):
         res = super()._pre_action_done_hook()
         if res is not True:
@@ -138,12 +247,13 @@ class StockPicking(models.Model):
 
     def _action_done(self):
         res = super()._action_done()
-        self.filtered(
+        diamond_receipts = self.filtered(
             lambda picking: picking.sudi_is_diamond_job_work
             and picking.picking_type_id.code == "incoming"
             and picking.state == "done"
-            and not picking.sudi_delivery_ids
-        )._sudi_create_delivery_from_receipt()
+        )
+        diamond_receipts._sudi_sync_billing_details()
+        diamond_receipts.filtered(lambda picking: not picking.sudi_delivery_ids)._sudi_create_delivery_from_receipt()
         return res
 
     def _sudi_validate_job_work_pickings(self):
@@ -257,16 +367,24 @@ class StockPicking(models.Model):
             and picking.picking_type_code == "outgoing"
             and picking.state == "done"
         )
-        invoiceable_moves = delivery_pickings.move_ids.filtered(
+        delivered_moves = delivery_pickings.move_ids.filtered(
             lambda move: move.state == "done"
             and move.sudi_job_type_id
-            and not move.sudi_invoice_line_id
         )
-        if not invoiceable_moves:
+        if not delivered_moves:
             raise UserError(_("There are no delivered uninvoiced diamond job-work lines."))
 
         partner = (receipt or self).partner_id.commercial_partner_id
         self._sudi_validate_invoice_partner(partner, (receipt or self).partner_id)
+        receipt._sudi_sync_billing_details()
+        billing_lines = receipt.sudi_billing_line_ids.filtered(
+            lambda line: line.active
+            and not line.invoice_line_id
+            and not float_is_zero(line.quantity, precision_rounding=line.service_product_id.uom_id.rounding)
+        )
+        if not billing_lines:
+            raise UserError(_("There are no uninvoiced diamond billing lines."))
+
         invoice = self.env["account.move"].create({
             "move_type": "out_invoice",
             "partner_id": partner.id,
@@ -280,25 +398,22 @@ class StockPicking(models.Model):
         })
 
         line_commands = []
-        custom_tax_by_move = {}
-        for move in invoiceable_moves:
-            job_type = move.sudi_job_type_id
-            quantity = move._sudi_get_invoice_quantity()
-            if float_is_zero(quantity, precision_rounding=move.product_uom.rounding):
-                continue
-            product = job_type.service_product_id
+        custom_tax_by_billing_line = {}
+        for billing_line in billing_lines:
+            job_type = billing_line.job_type_id
+            product = billing_line.service_product_id
             if not product:
                 raise UserError(_("Please configure a service product on job type %s.") % job_type.display_name)
             line_vals = {
                 "product_id": product.id,
-                "name": move._sudi_get_invoice_line_name(),
-                "quantity": quantity,
+                "name": billing_line.name,
+                "quantity": billing_line.quantity,
                 "product_uom_id": product.uom_id.id,
-                "price_unit": job_type._get_price_for_partner(partner, move.company_id),
-                "sudi_stock_move_id": move.id,
+                "price_unit": billing_line.price_unit,
+                "sudi_billing_line_id": billing_line.id,
             }
             if job_type.tax_ids:
-                custom_tax_by_move[move.id] = invoice.fiscal_position_id.map_tax(
+                custom_tax_by_billing_line[billing_line.id] = invoice.fiscal_position_id.map_tax(
                     job_type.tax_ids._filter_taxes_by_company(invoice.company_id)
                 )
             line_commands.append(Command.create(line_vals))
@@ -309,10 +424,14 @@ class StockPicking(models.Model):
 
         invoice.write({"invoice_line_ids": line_commands})
         invoice.action_update_fpos_values()
-        for line in invoice.invoice_line_ids.filtered(lambda invoice_line: invoice_line.sudi_stock_move_id.id in custom_tax_by_move):
-            line.tax_ids = custom_tax_by_move[line.sudi_stock_move_id.id]
-        for line in invoice.invoice_line_ids.filtered("sudi_stock_move_id"):
-            line.sudi_stock_move_id.sudi_invoice_line_id = line
+        for line in invoice.invoice_line_ids.filtered(lambda invoice_line: invoice_line.sudi_billing_line_id.id in custom_tax_by_billing_line):
+            line.tax_ids = custom_tax_by_billing_line[line.sudi_billing_line_id.id]
+        for line in invoice.invoice_line_ids.filtered("sudi_billing_line_id"):
+            billing_line = line.sudi_billing_line_id.sudo()
+            billing_line.invoice_line_id = line
+            delivered_moves.filtered(
+                lambda move: move.sudi_job_type_id == billing_line.job_type_id
+            ).sudi_invoice_line_id = line
         return {
             "type": "ir.actions.act_window",
             "name": _("Diamond Job Work Invoice"),

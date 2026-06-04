@@ -56,3 +56,10 @@ class AccountMoveLine(models.Model):
         index=True,
         ondelete="set null",
     )
+    sudi_billing_line_id = fields.Many2one(
+        "sudi.diamond.billing.line",
+        string="Diamond Billing Line",
+        copy=False,
+        index=True,
+        ondelete="set null",
+    )

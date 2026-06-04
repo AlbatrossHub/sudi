@@ -1,4 +1,5 @@
 from odoo import Command
+from odoo.exceptions import UserError
 from odoo.addons.stock.tests.common import TestStockCommon
 
 
@@ -24,7 +25,23 @@ class TestSudiDiamondJobWork(TestStockCommon):
             lambda line: line.job_type_id == job_type and line.company_id == (job_type.company_id or self.env.company)
         )[:1]
 
-    def _create_receipt(self, qty=100.0, pcs=100.0, carats=25.0, partner=None):
+    def _prepare_receipt_move_command(self, qty=100.0, pcs=100.0, carats=25.0, sr=1, job_type=None):
+        return Command.create({
+            "name": self.product.display_name,
+            "product_id": self.product.id,
+            "product_uom_qty": qty,
+            "product_uom": self.product.uom_id.id,
+            "location_id": self.supplier_location.id,
+            "location_dest_id": self.stock_location.id,
+            "sudi_sr": sr,
+            "sudi_size": "1.00 MM",
+            "sudi_pcs_qty": pcs,
+            "sudi_carats": carats,
+            "sudi_job_type_id": (job_type or self.job_type).id,
+            "sudi_remarks": "Test parcel",
+        })
+
+    def _create_receipt(self, qty=100.0, pcs=100.0, carats=25.0, partner=None, move_commands=None):
         partner = partner or self.partner
         receipt = self.env["stock.picking"].create({
             "partner_id": partner.id,
@@ -32,24 +49,12 @@ class TestSudiDiamondJobWork(TestStockCommon):
             "location_id": self.supplier_location.id,
             "location_dest_id": self.stock_location.id,
             "sudi_is_diamond_job_work": True,
-            "move_ids": [Command.create({
-                "name": self.product.display_name,
-                "product_id": self.product.id,
-                "product_uom_qty": qty,
-                "product_uom": self.product.uom_id.id,
-                "location_id": self.supplier_location.id,
-                "location_dest_id": self.stock_location.id,
-                "sudi_sr": 1,
-                "sudi_size": "1.00 MM",
-                "sudi_pcs_qty": pcs,
-                "sudi_carats": carats,
-                "sudi_job_type_id": self.job_type.id,
-                "sudi_remarks": "Test parcel",
-            })],
+            "move_ids": move_commands or [self._prepare_receipt_move_command(qty, pcs, carats)],
         })
         receipt.action_confirm()
-        receipt.move_ids.quantity = qty
-        receipt.move_ids.picked = True
+        for move in receipt.move_ids:
+            move.quantity = move.product_uom_qty
+            move.picked = True
         receipt.button_validate()
         return receipt
 
@@ -65,6 +70,35 @@ class TestSudiDiamondJobWork(TestStockCommon):
         self.assertEqual(delivery.move_ids.sudi_job_type_id, self.job_type)
         self.assertEqual(delivery.move_ids.sudi_pcs_qty, 100.0)
         self.assertEqual(delivery.move_ids.sudi_carats, 25.0)
+
+    def test_billing_details_group_receipt_lines_by_job_type(self):
+        receipt = self._create_receipt(
+            move_commands=[
+                self._prepare_receipt_move_command(qty=5.0, pcs=5.0, carats=1.0, sr=1),
+                self._prepare_receipt_move_command(qty=7.0, pcs=7.0, carats=2.0, sr=2),
+            ],
+        )
+
+        billing_line = receipt.sudi_billing_line_ids.filtered(lambda line: line.job_type_id == self.job_type)
+
+        self.assertEqual(len(billing_line), 1)
+        self.assertEqual(billing_line.quantity, 12.0)
+        self.assertEqual(billing_line.price_unit, 100.0)
+        self.assertEqual(billing_line.price_source, "partner")
+
+    def test_manual_billing_price_is_preserved_after_recompute(self):
+        receipt = self._create_receipt(qty=10.0, pcs=10.0, carats=2.5)
+        billing_line = receipt.sudi_billing_line_ids.filtered(lambda line: line.job_type_id == self.job_type)
+        billing_line.write({
+            "price_unit": 77.0,
+            "manual_price": True,
+            "price_source": "manual",
+        })
+
+        receipt.action_sudi_recompute_billing_details()
+
+        self.assertEqual(billing_line.price_unit, 77.0)
+        self.assertEqual(billing_line.price_source, "manual")
 
     def test_partial_delivery_preserves_diamond_fields_on_backorder(self):
         receipt = self._create_receipt()
@@ -82,6 +116,24 @@ class TestSudiDiamondJobWork(TestStockCommon):
         self.assertEqual(backorder_move.sudi_pcs_qty, 50.0)
         self.assertEqual(backorder_move.sudi_carats, 12.5)
         self.assertEqual(backorder_move.sudi_job_type_id, self.job_type)
+
+    def test_partial_delivery_invoices_full_billing_line_once(self):
+        receipt = self._create_receipt()
+        delivery = receipt.sudi_delivery_ids
+
+        delivery.move_ids.quantity = 50.0
+        delivery.move_ids.picked = True
+        delivery.button_validate()
+
+        action = receipt.action_sudi_create_invoice()
+        invoice = self.env["account.move"].browse(action["res_id"])
+        billing_line = receipt.sudi_billing_line_ids.filtered(lambda line: line.job_type_id == self.job_type)
+
+        self.assertEqual(invoice.invoice_line_ids.quantity, 100.0)
+        self.assertEqual(invoice.invoice_line_ids.sudi_billing_line_id, billing_line)
+        self.assertEqual(billing_line.invoice_line_id, invoice.invoice_line_ids)
+        with self.assertRaises(UserError):
+            receipt.action_sudi_create_invoice()
 
     def test_partner_special_price_overrides_base_price_on_invoice(self):
         self._get_partner_price_line().price = 80.0

@@ -77,12 +77,11 @@ class SudiDiamondJobType(models.Model):
             if job_type.service_product_id.type != "service":
                 raise ValidationError("The service product must be a service.")
 
-    def _get_price_for_partner(self, partner, company=None):
-        """Return the active customer-specific price, falling back to base price."""
+    def _sudi_get_partner_price_record(self, partner, company=None):
         self.ensure_one()
         company = company or self.company_id or self.env.company
         commercial_partner = partner.commercial_partner_id if partner else self.env["res.partner"]
-        special_price = self.env["sudi.diamond.partner.service.price"].search(
+        return self.env["sudi.diamond.partner.service.price"].search(
             [
                 ("partner_id", "=", commercial_partner.id),
                 ("job_type_id", "=", self.id),
@@ -92,4 +91,18 @@ class SudiDiamondJobType(models.Model):
             order="company_id desc, id desc",
             limit=1,
         )
+
+    def _sudi_get_price_for_partner_with_source(self, partner, company=None):
+        """Return the price and source used for receipt billing details."""
+        self.ensure_one()
+        special_price = self._sudi_get_partner_price_record(partner, company)
+        if special_price:
+            return special_price.price, "partner"
+        return self.base_price, "job_type"
+
+    def _get_price_for_partner(self, partner, company=None):
+        """Return the active customer-specific price, falling back to base price."""
+        self.ensure_one()
+        price, _source = self._sudi_get_price_for_partner_with_source(partner, company)
+        return price
         return special_price.price if special_price else self.base_price
