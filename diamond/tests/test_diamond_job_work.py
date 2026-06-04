@@ -6,20 +6,28 @@ class TestSudiDiamondJobWork(TestStockCommon):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.product = cls.env.ref("sudi.product_customer_diamond_parcel")
+        cls.job_type = cls.env.ref("sudi.job_type_laser_inscription")
+        cls.job_type.base_price = 100.0
         cls.partner = cls.env["res.partner"].create({
             "name": "Diamond Customer",
             "country_id": cls.env.ref("base.in").id,
             "state_id": cls.env.ref("base.state_in_gj").id,
             "l10n_in_gst_treatment": "unregistered",
         })
-        cls.product = cls.env.ref("sudi.product_customer_diamond_parcel")
-        cls.job_type = cls.env.ref("sudi.job_type_laser_inscription")
-        cls.job_type.base_price = 100.0
         cls.picking_type_out.create_backorder = "always"
 
-    def _create_receipt(self, qty=100.0, pcs=100.0, carats=25.0):
+    def _get_partner_price_line(self, partner=None, job_type=None):
+        partner = (partner or self.partner).commercial_partner_id
+        job_type = job_type or self.job_type
+        return partner.sudi_diamond_service_price_ids.filtered(
+            lambda line: line.job_type_id == job_type and line.company_id == (job_type.company_id or self.env.company)
+        )[:1]
+
+    def _create_receipt(self, qty=100.0, pcs=100.0, carats=25.0, partner=None):
+        partner = partner or self.partner
         receipt = self.env["stock.picking"].create({
-            "partner_id": self.partner.id,
+            "partner_id": partner.id,
             "picking_type_id": self.picking_type_in.id,
             "location_id": self.supplier_location.id,
             "location_dest_id": self.stock_location.id,
@@ -76,11 +84,7 @@ class TestSudiDiamondJobWork(TestStockCommon):
         self.assertEqual(backorder_move.sudi_job_type_id, self.job_type)
 
     def test_partner_special_price_overrides_base_price_on_invoice(self):
-        self.env["sudi.diamond.partner.service.price"].create({
-            "partner_id": self.partner.commercial_partner_id.id,
-            "job_type_id": self.job_type.id,
-            "price": 80.0,
-        })
+        self._get_partner_price_line().price = 80.0
         receipt = self._create_receipt()
         delivery = receipt.sudi_delivery_ids
         delivery.move_ids.quantity = 100.0
@@ -98,6 +102,7 @@ class TestSudiDiamondJobWork(TestStockCommon):
         self.assertEqual(delivery.move_ids.sudi_invoice_line_id, invoice.invoice_line_ids)
 
     def test_job_type_base_price_used_without_partner_special_price(self):
+        self._get_partner_price_line().unlink()
         receipt = self._create_receipt(qty=10.0, pcs=10.0, carats=2.5)
         delivery = receipt.sudi_delivery_ids
         delivery.move_ids.quantity = 10.0
@@ -109,6 +114,56 @@ class TestSudiDiamondJobWork(TestStockCommon):
 
         self.assertEqual(invoice.invoice_line_ids.price_unit, 100.0)
         self.assertEqual(invoice.invoice_line_ids.quantity, 10.0)
+
+    def test_company_partner_gets_default_service_prices(self):
+        partner = self.env["res.partner"].create({
+            "name": "Default Price Customer",
+            "is_company": True,
+            "country_id": self.env.ref("base.in").id,
+            "state_id": self.env.ref("base.state_in_gj").id,
+        })
+        active_job_types = self.env["sudi.diamond.job.type"].search([("active", "=", True)])
+
+        self.assertEqual(
+            set(partner.sudi_diamond_service_price_ids.mapped("job_type_id").ids),
+            set(active_job_types.ids),
+        )
+        self.assertEqual(
+            partner.sudi_diamond_service_price_ids.filtered(lambda line: line.job_type_id == self.job_type).price,
+            self.job_type.base_price,
+        )
+
+    def test_child_contact_uses_company_price_rows(self):
+        company_partner = self.env["res.partner"].create({
+            "name": "Parent Diamond Company",
+            "is_company": True,
+            "country_id": self.env.ref("base.in").id,
+            "state_id": self.env.ref("base.state_in_gj").id,
+            "l10n_in_gst_treatment": "unregistered",
+        })
+        self._get_partner_price_line(company_partner).price = 66.0
+        child_partner = self.env["res.partner"].create({
+            "name": "Buyer Contact",
+            "parent_id": company_partner.id,
+            "country_id": self.env.ref("base.in").id,
+            "state_id": self.env.ref("base.state_in_gj").id,
+        })
+
+        self.assertFalse(child_partner.sudi_diamond_service_price_ids)
+        self.assertTrue(company_partner.sudi_diamond_service_price_ids)
+
+        receipt = self._create_receipt(qty=10.0, pcs=10.0, carats=2.5, partner=child_partner)
+        delivery = receipt.sudi_delivery_ids
+        delivery.move_ids.quantity = 10.0
+        delivery.move_ids.picked = True
+        delivery.button_validate()
+
+        action = receipt.action_sudi_create_invoice()
+        invoice = self.env["account.move"].browse(action["res_id"])
+
+        self.assertEqual(invoice.partner_id, company_partner)
+        self.assertEqual(invoice.partner_shipping_id, child_partner)
+        self.assertEqual(invoice.invoice_line_ids.price_unit, 66.0)
 
     def test_job_type_invoice_description_used_exactly(self):
         description = "Diamond Job Work Charges"

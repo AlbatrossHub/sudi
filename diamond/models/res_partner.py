@@ -11,6 +11,41 @@ class ResPartner(models.Model):
         string="Diamond Service Prices",
     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        partners = super().create(vals_list)
+        partners._sudi_ensure_diamond_service_price_lines()
+        return partners
+
+    def _sudi_ensure_diamond_service_price_lines(self):
+        owners = self.env["res.partner"]
+        for partner in self:
+            owners |= partner.commercial_partner_id or partner
+
+        job_types = self.env["sudi.diamond.job.type"].sudo().search([("active", "=", True)])
+        Price = self.env["sudi.diamond.partner.service.price"].sudo()
+        for owner in owners.sudo():
+            for job_type in job_types:
+                company = job_type.company_id or self.env.company
+                existing = Price.search_count([
+                    ("partner_id", "=", owner.id),
+                    ("job_type_id", "=", job_type.id),
+                    ("company_id", "=", company.id),
+                    ("active", "=", True),
+                ])
+                if existing:
+                    continue
+                Price.create({
+                    "partner_id": owner.id,
+                    "job_type_id": job_type.id,
+                    "company_id": company.id,
+                    "price": job_type.base_price,
+                })
+
+    def action_sudi_sync_diamond_service_prices(self):
+        self._sudi_ensure_diamond_service_price_lines()
+        return True
+
 
 class SudiDiamondPartnerServicePrice(models.Model):
     _name = "sudi.diamond.partner.service.price"
