@@ -15,11 +15,13 @@
                         string="Mark READY for Job work"
                         type="object"
                         class="oe_highlight"
+                        icon="fa-flag-checkered"
                         groups="base.group_user"
                         data-hotkey="q"/>
                 <button name="action_sudi_confirm_pickup"
                         string="Confirm Pickup"
                         type="object"
+                        icon="fa-check-square-o"
                         groups="base.group_user"
                         invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state in ['done', 'cancel']"/>
             </xpath>
@@ -89,6 +91,7 @@
                 <field name="sudi_customer_contact"
                        invisible="not sudi_is_diamond_job_work"
                        readonly="state in ['cancel', 'done']"/>
+                <field name="user_id" widget="many2one_avatar_user" domain="[('share', '=', False)]" readonly="state in ['cancel', 'done']"/>
             </xpath>
 
             <xpath expr="//page[@name='extra']//group[@name='other_infos']" position="after">
