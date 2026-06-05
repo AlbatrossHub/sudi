@@ -5,6 +5,25 @@
         <field name="model">stock.picking</field>
         <field name="inherit_id" ref="stock.view_picking_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='action_confirm']" position="attributes">
+                <attribute name="invisible">state != 'draft' or (sudi_is_diamond_job_work and picking_type_code == 'incoming')</attribute>
+            </xpath>
+
+            <xpath expr="//header/button[@name='action_confirm']" position="after">
+                <button name="action_confirm"
+                        invisible="state != 'draft' or not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
+                        string="Mark READY for Job work"
+                        type="object"
+                        class="oe_highlight"
+                        groups="base.group_user"
+                        data-hotkey="q"/>
+                <button name="action_sudi_confirm_pickup"
+                        string="Confirm Pickup"
+                        type="object"
+                        groups="base.group_user"
+                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state in ['done', 'cancel']"/>
+            </xpath>
+
             <xpath expr="//header/button[@name='button_validate'][1]" position="after">
                 <button name="action_sudi_create_invoice"
                         string="Create Diamond Invoice"
@@ -46,7 +65,7 @@
             </xpath>
 
             <xpath expr="//field[@name='partner_id'][@nolabel='1']" position="after">
-                <field name="sudi_is_diamond_job_work"/>
+                <!-- <field name="sudi_is_diamond_job_work"/> -->
                 <field name="sudi_origin_receipt_id"
                        invisible="not sudi_origin_receipt_id"
                        readonly="1"/>
@@ -54,6 +73,10 @@
                        widget="image"
                        invisible="not sudi_is_diamond_job_work"
                        readonly="state in ['cancel', 'done']"/>
+            </xpath>
+
+            <xpath expr="//field[@name='user_id']" position="after">
+                <field name="sudi_is_diamond_job_work"/>
             </xpath>
 
             <xpath expr="//field[@name='origin']" position="after">
@@ -126,6 +149,12 @@
         <field name="model">stock.picking</field>
         <field name="inherit_id" ref="stock.vpicktree"/>
         <field name="arch" type="xml">
+            <xpath expr="//list" position="attributes">
+                <attribute name="default_order">create_date desc, id desc</attribute>
+            </xpath>
+            <xpath expr="/list//field[@name='partner_id']" position="attributes">
+                <attribute name="string">Party Name/Company</attribute>
+            </xpath>
             <field name="partner_id" position="after">
                 <field name="sudi_is_diamond_job_work" optional="hide"/>
             </field>

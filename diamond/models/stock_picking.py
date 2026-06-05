@@ -8,10 +8,12 @@ from odoo.tools.float_utils import float_is_zero
 class StockPicking(models.Model):
     _inherit = "stock.picking"
 
+    state = fields.Selection(selection_add=[("assigned", "Job Work in Progress")])
     sudi_is_diamond_job_work = fields.Boolean(
         string="Diamond Job Work",
         copy=True,
         tracking=True,
+        default=True,
     )
     sudi_origin_receipt_id = fields.Many2one(
         "stock.picking",
@@ -37,8 +39,8 @@ class StockPicking(models.Model):
         tracking=True,
     )
     sudi_pickup_datetime = fields.Datetime(string="Pickup Date/Time", tracking=True)
-    sudi_customer_contact = fields.Char(string="Customer Contact")
-    sudi_internal_notes = fields.Text(string="Job Work Notes")
+    sudi_customer_contact = fields.Char(string="Customer Contact", tracking=True)
+    sudi_internal_notes = fields.Text(string="Job Work Notes", tracking=True)
     sudi_jangad_image = fields.Image(string="Jangad")
     sudi_billing_line_ids = fields.One2many(
         "sudi.diamond.billing.line",
@@ -61,6 +63,21 @@ class StockPicking(models.Model):
                 invoices = AccountMove.search([("sudi_delivery_ids", "in", picking.ids)])
             picking.sudi_invoice_ids = invoices
             picking.sudi_invoice_count = len(invoices)
+
+    def action_sudi_confirm_pickup(self):
+        invalid_pickings = self.filtered(
+            lambda picking: not picking.sudi_is_diamond_job_work
+            or picking.picking_type_code != "incoming"
+            or picking.state in ("done", "cancel")
+        )
+        if invalid_pickings:
+            raise UserError(_("Pickup can only be confirmed on active diamond job-work receipts."))
+
+        self.write({
+            "sudi_pickup_user_id": self.env.user.id,
+            "sudi_pickup_datetime": fields.Datetime.now(),
+        })
+        return True
 
     @api.model
     def _sudi_normalize_phone(self, phone):
@@ -238,6 +255,15 @@ class StockPicking(models.Model):
             )
             stale_lines.write({"active": False})
 
+    def _autoconfirm_picking(self):
+        regular_pickings = self.filtered(
+            lambda picking: not (
+                picking.sudi_is_diamond_job_work
+                and picking.picking_type_code == "incoming"
+            )
+        )
+        return super(StockPicking, regular_pickings)._autoconfirm_picking()
+
     def _pre_action_done_hook(self):
         res = super()._pre_action_done_hook()
         if res is not True:
@@ -317,6 +343,7 @@ class StockPicking(models.Model):
                 "sudi_is_diamond_job_work": True,
                 "sudi_origin_receipt_id": receipt.id,
                 "sudi_pickup_user_id": receipt.sudi_pickup_user_id.id,
+                "sudi_pickup_datetime": receipt.sudi_pickup_datetime,
                 "sudi_customer_contact": receipt.sudi_customer_contact,
                 "sudi_internal_notes": receipt.sudi_internal_notes,
                 "move_ids": move_commands,
