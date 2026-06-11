@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="sudi_diamond_timesheet_project" model="project.project">
+        <field name="name">Diamond Job Work Timesheets</field>
+        <field name="allow_timesheets">1</field>
+        <field name="privacy_visibility">employees</field>
+    </record>
+</odoo>

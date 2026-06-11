@@ -9,6 +9,16 @@
                 <attribute name="invisible">state != 'draft' or (sudi_is_diamond_job_work and picking_type_code == 'incoming')</attribute>
             </xpath>
 
+            <xpath expr="//header/button[@name='button_validate'][1]" position="attributes">
+                <attribute name="invisible">state in ('sudi_pickup_pending', 'draft', 'confirmed', 'done', 'cancel') or (sudi_is_diamond_job_work and picking_type_code == 'outgoing' and sudi_origin_receipt_id)</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='button_validate'][2]" position="attributes">
+                <attribute name="invisible">state in ('sudi_pickup_pending', 'waiting', 'assigned', 'done', 'cancel') or (sudi_is_diamond_job_work and picking_type_code == 'outgoing' and sudi_origin_receipt_id)</attribute>
+            </xpath>
+            <xpath expr="//header/field[@name='state'][@widget='statusbar'][1]" position="attributes">
+                <attribute name="statusbar_visible">sudi_pickup_pending,draft,assigned,done</attribute>
+            </xpath>
+
             <xpath expr="//header/button[@name='action_confirm']" position="after">
                 <button name="action_confirm"
                         invisible="state != 'draft' or not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
@@ -23,10 +33,47 @@
                         type="object"
                         icon="fa-check-square-o"
                         groups="base.group_user"
-                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state in ['done', 'cancel']"/>
+                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state != 'sudi_pickup_pending'"/>
+                <field name="sudi_display_timesheet_timer" invisible="1"/>
+                <field name="sudi_total_hours_spent" invisible="1"/>
+                <field name="sudi_timesheet_unit_amount" invisible="1"/>
+                <button class="btn-primary"
+                        name="action_timer_start"
+                        type="object"
+                        string="Start"
+                        data-hotkey="z"
+                        groups="hr_timesheet.group_hr_timesheet_user"
+                        invisible="state != 'assigned' or not sudi_display_timesheet_timer or timer_start or sudi_total_hours_spent"/>
+                <button class="btn-secondary"
+                        name="action_timer_start"
+                        type="object"
+                        string="Start"
+                        data-hotkey="z"
+                        groups="hr_timesheet.group_hr_timesheet_user"
+                        invisible="state != 'assigned' or not sudi_display_timesheet_timer or timer_start or not sudi_total_hours_spent"/>
+                <button class="btn-primary o_fsm_stop"
+                        name="action_timer_stop"
+                        type="object"
+                        string="Stop"
+                        data-hotkey="z"
+                        groups="hr_timesheet.group_hr_timesheet_user"
+                        invisible="state != 'assigned' or not sudi_display_timesheet_timer or not timer_start"/>
+                <field name="timer_start"
+                       widget="timer_start_field"
+                       class="d-flex align-self-center me-auto ms-2 h2"
+                       options="{'unit_amount_field': 'sudi_timesheet_unit_amount'}"
+                       groups="hr_timesheet.group_hr_timesheet_user"
+                       invisible="state != 'assigned' or not sudi_display_timesheet_timer"/>
             </xpath>
 
             <xpath expr="//header/button[@name='button_validate'][1]" position="after">
+                <button name="action_sudi_mark_delivered"
+                        string="Mark Delivered"
+                        type="object"
+                        class="btn-primary"
+                        icon="fa-check"
+                        groups="stock.group_stock_user"
+                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing' or not sudi_origin_receipt_id or state in ['done', 'cancel']"/>
                 <button name="action_sudi_create_invoice"
                         string="Create Diamond Invoice"
                         type="object"
@@ -91,6 +138,10 @@
                 <field name="sudi_customer_contact"
                        invisible="not sudi_is_diamond_job_work"
                        readonly="state in ['cancel', 'done']"/>
+                <field name="sudi_timesheet_job_type_id"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
+                       readonly="state in ['cancel', 'done']"
+                       groups="hr_timesheet.group_hr_timesheet_user"/>
                 <field name="user_id" widget="many2one_avatar_user" domain="[('share', '=', False)]" readonly="state in ['cancel', 'done']"/>
             </xpath>
 
@@ -123,6 +174,47 @@
                             <field name="invoice_line_id" readonly="1" optional="show"/>
                         </list>
                     </field>
+                </page>
+                <page string="Timesheets"
+                      name="sudi_timesheets"
+                      groups="hr_timesheet.group_hr_timesheet_user"
+                      invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'">
+                    <field name="sudi_timesheet_ids"
+                           widget="timesheets_one2many"
+                           mode="list,kanban"
+                           context="{'default_sudi_picking_id': id, 'default_sudi_job_type_id': sudi_timesheet_job_type_id}">
+                        <list editable="top" string="Timesheet Activities" decoration-muted="readonly_timesheet == True">
+                            <field name="readonly_timesheet" column_invisible="True"/>
+                            <field name="is_timer_running" column_invisible="True"/>
+                            <field name="timer_start" column_invisible="True"/>
+                            <field name="date" readonly="readonly_timesheet or is_timer_running"/>
+                            <field name="user_id" column_invisible="True"/>
+                            <field name="employee_id" widget="many2one_avatar_employee" required="1" context="{'active_test': True}" readonly="readonly_timesheet or is_timer_running"/>
+                            <field name="sudi_job_type_id" required="1" readonly="readonly_timesheet or is_timer_running"/>
+                            <field name="name" required="0" readonly="readonly_timesheet"/>
+                            <field name="unit_amount" string="Time Spent" widget="timesheet_uom_timer" decoration-danger="unit_amount &gt; 24 or unit_amount &lt; 0" readonly="id and (readonly_timesheet or is_timer_running)"/>
+                            <field name="project_id" column_invisible="True"/>
+                            <field name="task_id" column_invisible="True"/>
+                            <field name="company_id" column_invisible="True"/>
+                        </list>
+                        <kanban class="o_kanban_mobile">
+                            <templates>
+                                <t t-name="card" class="row g-0">
+                                    <field name="employee_id" class="col-6 fw-bolder" context="{'active_test': True}"/>
+                                    <field name="date" class="col-6 text-end fw-bolder"/>
+                                    <field name="sudi_job_type_id" class="col-6 text-muted"/>
+                                    <field name="unit_amount" widget="float_time" decoration-danger="unit_amount &gt; 24" class="col-6 text-end"/>
+                                    <field name="name" class="col-12 text-muted"/>
+                                </t>
+                            </templates>
+                        </kanban>
+                    </field>
+                    <group>
+                        <group class="oe_subtotal_footer" name="sudi_receipt_hours">
+                            <label class="fw-bold" for="sudi_total_hours_spent" string="Time Spent"/>
+                            <field name="sudi_total_hours_spent" widget="timesheet_uom" nolabel="1"/>
+                        </group>
+                    </group>
                 </page>
             </xpath>
 

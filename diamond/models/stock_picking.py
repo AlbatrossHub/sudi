@@ -6,9 +6,13 @@ from odoo.tools.float_utils import float_is_zero
 
 
 class StockPicking(models.Model):
-    _inherit = "stock.picking"
+    _inherit = ["stock.picking", "timer.parent.mixin"]
 
-    state = fields.Selection(selection_add=[("assigned", "Job Work in Progress")])
+    state = fields.Selection(selection_add=[
+        ("sudi_pickup_pending", "Pick up pending"),
+        ("draft",),
+        ("assigned", "Job Work in Progress"),
+    ])
     sudi_is_diamond_job_work = fields.Boolean(
         string="Diamond Job Work",
         copy=True,
@@ -48,6 +52,26 @@ class StockPicking(models.Model):
         string="Billing Details",
         copy=False,
     )
+    sudi_timesheet_ids = fields.One2many(
+        "account.analytic.line",
+        "sudi_picking_id",
+        string="Timesheets",
+    )
+    sudi_total_hours_spent = fields.Float(
+        string="Time Spent",
+        compute="_compute_sudi_total_hours_spent",
+        compute_sudo=True,
+    )
+    sudi_display_timesheet_timer = fields.Boolean(
+        string="Display Timesheet Timer",
+        compute="_compute_sudi_display_timesheet_timer",
+    )
+    sudi_timesheet_unit_amount = fields.Float(compute="_compute_sudi_timesheet_unit_amount")
+    sudi_timesheet_job_type_id = fields.Many2one(
+        "sudi.diamond.job.type",
+        string="Timer Job Type",
+        copy=False,
+    )
 
     @api.depends("sudi_delivery_ids")
     def _compute_sudi_counts(self):
@@ -64,20 +88,141 @@ class StockPicking(models.Model):
             picking.sudi_invoice_ids = invoices
             picking.sudi_invoice_count = len(invoices)
 
+    @api.depends(
+        "move_type",
+        "move_ids.state",
+        "move_ids.picking_id",
+        "sudi_is_diamond_job_work",
+        "sudi_pickup_datetime",
+        "picking_type_id.code",
+    )
+    def _compute_state(self):
+        super()._compute_state()
+        for picking in self:
+            if (
+                picking.sudi_is_diamond_job_work
+                and picking.picking_type_code == "incoming"
+                and picking.state == "draft"
+                and not picking.sudi_pickup_datetime
+            ):
+                picking.state = "sudi_pickup_pending"
+
+    @api.depends("sudi_timesheet_ids.unit_amount")
+    def _compute_sudi_total_hours_spent(self):
+        if not any(self._ids):
+            for picking in self:
+                picking.sudi_total_hours_spent = sum(picking.sudi_timesheet_ids.mapped("unit_amount"))
+            return
+
+        timesheet_read_group = self.env["account.analytic.line"]._read_group(
+            [("sudi_picking_id", "in", self.ids)],
+            ["sudi_picking_id"],
+            ["unit_amount:sum"],
+        )
+        hours_by_picking = {picking.id: unit_amount_sum for picking, unit_amount_sum in timesheet_read_group}
+        for picking in self:
+            picking.sudi_total_hours_spent = hours_by_picking.get(picking.id, 0.0)
+
+    def _compute_sudi_display_timesheet_timer(self):
+        uom_hour = self.env.ref("uom.product_uom_hour", raise_if_not_found=False)
+        is_hour_encoding = self.env.company.timesheet_encode_uom_id == uom_hour
+        for picking in self:
+            picking.sudi_display_timesheet_timer = (
+                is_hour_encoding
+                and picking.sudi_is_diamond_job_work
+                and picking.picking_type_code == "incoming"
+                and picking.state == "assigned"
+            )
+
+    @api.depends("user_timer_id")
+    def _compute_sudi_timesheet_unit_amount(self):
+        timesheet_ids = self.mapped("user_timer_id.res_id")
+        unit_amount_by_timesheet_id = {}
+        if timesheet_ids:
+            timesheet_read = self.env["account.analytic.line"].search_read(
+                [("id", "in", timesheet_ids)],
+                ["unit_amount"],
+            )
+            unit_amount_by_timesheet_id = {
+                timesheet["id"]: timesheet["unit_amount"]
+                for timesheet in timesheet_read
+            }
+
+        for picking in self:
+            timesheet_id = picking.user_timer_id.res_id if picking.user_timer_id else False
+            picking.sudi_timesheet_unit_amount = unit_amount_by_timesheet_id.get(timesheet_id, 0.0)
+
     def action_sudi_confirm_pickup(self):
         invalid_pickings = self.filtered(
             lambda picking: not picking.sudi_is_diamond_job_work
             or picking.picking_type_code != "incoming"
-            or picking.state in ("done", "cancel")
+            or picking.state != "sudi_pickup_pending"
         )
         if invalid_pickings:
-            raise UserError(_("Pickup can only be confirmed on active diamond job-work receipts."))
+            raise UserError(_("Pickup can only be confirmed on diamond job-work receipts waiting for pickup."))
 
         self.write({
             "sudi_pickup_user_id": self.env.user.id,
             "sudi_pickup_datetime": fields.Datetime.now(),
         })
         return True
+
+    def action_timer_start(self):
+        self.ensure_one()
+        if self.sudi_display_timesheet_timer:
+            return super().action_timer_start()
+        return False
+
+    def action_timer_stop(self):
+        self.ensure_one()
+        if self.sudi_display_timesheet_timer and self.user_timer_id:
+            timesheet = self._get_record_with_timer_running()
+            if timesheet:
+                return {
+                    "name": _("Confirm Time Spent"),
+                    "type": "ir.actions.act_window",
+                    "res_model": "hr.timesheet.stop.timer.confirmation.wizard",
+                    "context": {
+                        "default_timesheet_id": timesheet.id,
+                        "dialog_size": "medium",
+                    },
+                    "views": [[
+                        self.env.ref("timesheet_grid.hr_timesheet_stop_timer_confirmation_wizard_view_form").id,
+                        "form",
+                    ]],
+                    "target": "new",
+                }
+            return super().action_timer_stop()
+        return False
+
+    def _sudi_get_default_timesheet_job_type(self):
+        self.ensure_one()
+        if self.sudi_timesheet_job_type_id:
+            return self.sudi_timesheet_job_type_id
+
+        job_types = self.move_ids.filtered(
+            lambda move: move.state != "cancel" and move.sudi_job_type_id
+        ).mapped("sudi_job_type_id")
+        return job_types if len(job_types) == 1 else self.env["sudi.diamond.job.type"]
+
+    def _create_record_to_start_timer(self):
+        self.ensure_one()
+        job_type = self._sudi_get_default_timesheet_job_type()
+        if not job_type:
+            raise UserError(_("Please select a Timer Job Type before starting the receipt timer."))
+
+        project = self.env["account.analytic.line"]._sudi_get_timesheet_project()
+        return self.env["account.analytic.line"].create({
+            "sudi_picking_id": self.id,
+            "sudi_job_type_id": job_type.id,
+            "project_id": project.id,
+            "date": fields.Date.context_today(self),
+            "name": "/",
+            "user_id": self.env.uid,
+        })
+
+    def _action_interrupt_user_timers(self):
+        self.action_timer_stop()
 
     @api.model
     def _sudi_normalize_phone(self, phone):
@@ -260,6 +405,7 @@ class StockPicking(models.Model):
             lambda picking: not (
                 picking.sudi_is_diamond_job_work
                 and picking.picking_type_code == "incoming"
+                and (not picking.sudi_pickup_datetime or picking.state in ("sudi_pickup_pending", "draft"))
             )
         )
         return super(StockPicking, regular_pickings)._autoconfirm_picking()
@@ -342,14 +488,28 @@ class StockPicking(models.Model):
                 "scheduled_date": fields.Datetime.now(),
                 "sudi_is_diamond_job_work": True,
                 "sudi_origin_receipt_id": receipt.id,
-                "sudi_pickup_user_id": receipt.sudi_pickup_user_id.id,
-                "sudi_pickup_datetime": receipt.sudi_pickup_datetime,
                 "sudi_customer_contact": receipt.sudi_customer_contact,
                 "sudi_internal_notes": receipt.sudi_internal_notes,
                 "move_ids": move_commands,
             })
             delivery.action_confirm()
             delivery.action_assign()
+
+    def action_sudi_mark_delivered(self):
+        invalid_pickings = self.filtered(
+            lambda picking: not picking.sudi_is_diamond_job_work
+            or picking.picking_type_code != "outgoing"
+            or not picking.sudi_origin_receipt_id
+            or picking.state in ("done", "cancel")
+        )
+        if invalid_pickings:
+            raise UserError(_("Only active diamond job-work deliveries can be marked delivered."))
+
+        self.write({
+            "sudi_pickup_user_id": self.env.user.id,
+            "sudi_pickup_datetime": fields.Datetime.now(),
+        })
+        return self.button_validate()
 
     def _sudi_get_delivery_picking_type(self):
         self.ensure_one()
