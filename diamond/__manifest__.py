@@ -17,6 +17,7 @@
         "website",
     ],
     "data": [
+        "security/diamond_security.xml",
         "security/ir.model.access.csv",
         "data/diamond_product_data.xml",
         "data/diamond_job_type_data.xml",
@@ -33,6 +34,8 @@
     "assets": {
         "web.assets_frontend": [
             "diamond/static/src/js/jangad_upload.js",
+            "diamond/static/src/js/jangad_pwa.js",
+            "diamond/static/src/scss/jangad_pwa.scss",
         ],
     },
     "installable": True,

@@ -26,7 +26,7 @@
                         type="object"
                         class="oe_highlight"
                         icon="fa-flag-checkered"
-                        groups="base.group_user"
+                        groups="stock.group_stock_user"
                         data-hotkey="q"/>
                 <button name="action_sudi_confirm_pickup"
                         string="Confirm Pickup"
@@ -72,7 +72,7 @@
                         type="object"
                         class="btn-primary"
                         icon="fa-check"
-                        groups="stock.group_stock_user"
+                        groups="base.group_user"
                         invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing' or not sudi_origin_receipt_id or state in ['done', 'cancel']"/>
                 <button name="action_sudi_create_invoice"
                         string="Create Diamond Invoice"
@@ -254,6 +254,163 @@
                 <field name="sudi_is_diamond_job_work" optional="hide"/>
             </field>
         </field>
+    </record>
+
+    <record id="view_sudi_operator_pickup_list" model="ir.ui.view">
+        <field name="name">stock.picking.list.sudi.operator.pickup</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <list string="Pickup" create="0" delete="0" edit="0" default_order="create_date desc, id desc">
+                <field name="name"/>
+                <field name="partner_id" string="Customer" options="{'no_open': True, 'no_create': True}"/>
+                <field name="sudi_customer_contact"/>
+                <field name="scheduled_date"/>
+                <field name="state" widget="badge"
+                       decoration-warning="state == 'sudi_pickup_pending'"
+                       decoration-success="state == 'done'"
+                       decoration-muted="state in ['draft', 'cancel']"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sudi_operator_pickup_form" model="ir.ui.view">
+        <field name="name">stock.picking.form.sudi.operator.pickup</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <form string="Pickup" create="0" delete="0">
+                <header>
+                    <button name="action_sudi_confirm_pickup"
+                            string="Confirm Pickup"
+                            type="object"
+                            class="btn-primary"
+                            groups="base.group_user"
+                            invisible="state != 'sudi_pickup_pending'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="sudi_pickup_pending,draft,assigned,done"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name" readonly="1"/>
+                            <field name="partner_id"
+                                   string="Customer"
+                                   readonly="1"
+                                   options="{'no_open': True, 'no_create': True}"/>
+                            <field name="sudi_partner_address" readonly="1" nolabel="1" placeholder="No customer address available."/>
+                        </group>
+                        <group>
+                            <field name="scheduled_date" readonly="1"/>
+                            <field name="sudi_customer_contact" readonly="1"/>
+                            <field name="sudi_pickup_user_id" readonly="1"/>
+                            <field name="sudi_pickup_datetime" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Jangad">
+                        <field name="sudi_jangad_image" widget="image" readonly="1" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sudi_operator_delivery_list" model="ir.ui.view">
+        <field name="name">stock.picking.list.sudi.operator.delivery</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <list string="Deliveries" create="0" delete="0" edit="0" default_order="state, scheduled_date, id">
+                <field name="name"/>
+                <field name="partner_id" string="Customer" options="{'no_open': True, 'no_create': True}"/>
+                <field name="sudi_origin_receipt_name"/>
+                <field name="scheduled_date"/>
+                <field name="date_done"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'assigned'"
+                       decoration-warning="state not in ['assigned', 'done', 'cancel']"
+                       decoration-success="state == 'done'"
+                       decoration-muted="state == 'cancel'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sudi_operator_delivery_form" model="ir.ui.view">
+        <field name="name">stock.picking.form.sudi.operator.delivery</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <form string="Deliveries" create="0" delete="0">
+                <header>
+                    <button name="action_sudi_mark_delivered"
+                            string="Mark Delivered"
+                            type="object"
+                            class="btn-primary"
+                            groups="base.group_user"
+                            invisible="state in ['done', 'cancel']"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,assigned,done"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name" readonly="1"/>
+                            <field name="partner_id"
+                                   string="Customer"
+                                   readonly="1"
+                                   options="{'no_open': True, 'no_create': True}"/>
+                            <field name="sudi_partner_address" readonly="1" nolabel="1" placeholder="No customer address available."/>
+                        </group>
+                        <group>
+                            <field name="sudi_origin_receipt_name" readonly="1"/>
+                            <field name="scheduled_date" readonly="1"/>
+                            <field name="date_done" readonly="1"/>
+                            <field name="sudi_pickup_user_id" readonly="1"/>
+                            <field name="sudi_pickup_datetime" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Items" name="items">
+                            <field name="move_ids" readonly="1">
+                                <list create="0" delete="0" edit="0">
+                                    <field name="sudi_sr"/>
+                                    <field name="product_id"/>
+                                    <field name="sudi_size"/>
+                                    <field name="sudi_pcs_qty"/>
+                                    <field name="sudi_carats"/>
+                                    <field name="sudi_job_type_id"/>
+                                    <field name="sudi_remarks"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sudi_operator_pickups" model="ir.actions.act_window">
+        <field name="name">Pickup</field>
+        <field name="res_model">stock.picking</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_sudi_operator_pickup_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_sudi_operator_pickup_form')})]"/>
+        <field name="domain">[
+            ('sudi_is_diamond_job_work', '=', True),
+            ('picking_type_id.code', '=', 'incoming'),
+            ('state', '=', 'sudi_pickup_pending'),
+        ]</field>
+        <field name="context">{'create': False, 'delete': False}</field>
+    </record>
+
+    <record id="action_sudi_operator_deliveries" model="ir.actions.act_window">
+        <field name="name">Deliveries</field>
+        <field name="res_model">stock.picking</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_sudi_operator_delivery_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_sudi_operator_delivery_form')})]"/>
+        <field name="domain">[
+            ('sudi_is_diamond_job_work', '=', True),
+            ('picking_type_id.code', '=', 'outgoing'),
+            ('sudi_origin_receipt_id', '!=', False),
+        ]</field>
+        <field name="context">{'create': False, 'delete': False}</field>
     </record>
 
     <record id="action_sudi_diamond_receipts" model="ir.actions.act_window">

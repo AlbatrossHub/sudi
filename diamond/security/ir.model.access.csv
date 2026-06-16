@@ -5,3 +5,10 @@ access_sudi_diamond_partner_service_price_user,sudi.diamond.partner.service.pric
 access_sudi_diamond_partner_service_price_stock_manager,sudi.diamond.partner.service.price.stock.manager,model_sudi_diamond_partner_service_price,stock.group_stock_manager,1,1,1,1
 access_sudi_diamond_billing_line_account,sudi.diamond.billing.line.account,model_sudi_diamond_billing_line,account.group_account_invoice,1,0,0,0
 access_sudi_diamond_billing_line_stock_manager,sudi.diamond.billing.line.stock.manager,model_sudi_diamond_billing_line,stock.group_stock_manager,1,1,1,1
+access_sudi_operator_stock_picking,sudi.operator.stock.picking,stock.model_stock_picking,diamond.group_sudi_pickup_delivery_operator,1,1,0,0
+access_sudi_operator_stock_move,sudi.operator.stock.move,stock.model_stock_move,diamond.group_sudi_pickup_delivery_operator,1,1,0,0
+access_sudi_operator_stock_move_line,sudi.operator.stock.move.line,stock.model_stock_move_line,diamond.group_sudi_pickup_delivery_operator,1,1,1,1
+access_sudi_operator_diamond_job_type,sudi.operator.diamond.job.type,model_sudi_diamond_job_type,diamond.group_sudi_pickup_delivery_operator,1,0,0,0
+access_sudi_internal_stock_picking,sudi.internal.stock.picking,stock.model_stock_picking,base.group_user,1,1,0,0
+access_sudi_internal_stock_move,sudi.internal.stock.move,stock.model_stock_move,base.group_user,1,1,0,0
+access_sudi_internal_diamond_job_type,sudi.internal.diamond.job.type,model_sudi_diamond_job_type,base.group_user,1,0,0,0

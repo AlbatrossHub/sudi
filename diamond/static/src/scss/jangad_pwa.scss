@@ -1,0 +1,20 @@
+.sudi-jangad-pwa-banner {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    left: 1rem;
+    z-index: 1050;
+    max-width: 34rem;
+    margin: 0 auto;
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.18);
+}
+
+.sudi-jangad-pwa-banner .btn-close {
+    float: right;
+}
+
+.sudi-jangad-qr-card img {
+    max-width: 320px;
+    width: 100%;
+    height: auto;
+}

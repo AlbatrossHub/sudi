@@ -1,7 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <template id="jangad_pwa_head" name="Jangad PWA Head">
+        <link rel="manifest" href="/diamond/jangad/manifest.webmanifest"/>
+        <link rel="apple-touch-icon" href="/diamond/jangad/icon/192.png"/>
+        <meta name="theme-color" content="#875A7B"/>
+        <meta name="apple-mobile-web-app-capable" content="yes"/>
+        <meta name="apple-mobile-web-app-title" content="Jangad"/>
+        <meta name="mobile-web-app-capable" content="yes"/>
+        <meta name="application-name" content="Jangad"/>
+    </template>
+
     <template id="jangad_upload_form" name="Jangad Upload">
         <t t-call="website.layout">
+            <t t-set="head">
+                <t t-out="head"/>
+                <t t-call="diamond.jangad_pwa_head"/>
+            </t>
             <div id="wrap" class="oe_structure">
                 <section class="container py-5">
                     <div class="row justify-content-center">
@@ -59,6 +73,24 @@
                                     If the network is weak, the compressed image can be saved on this device and retried when online.
                                 </p>
                             </form>
+                            <div data-sudi-jangad-pwa="1">
+                                <div class="alert alert-light border sudi-jangad-pwa-banner d-none" data-sudi-jangad-pwa-android="">
+                                    <button type="button" class="btn-close" aria-label="Close" data-sudi-jangad-pwa-dismiss=""></button>
+                                    <h5 class="mb-2">Install Jangad Upload</h5>
+                                    <p class="mb-3">Install this page as an app for quick camera uploads.</p>
+                                    <button type="button" class="btn btn-primary" data-sudi-jangad-pwa-install="">Install App</button>
+                                </div>
+                                <div class="alert alert-light border sudi-jangad-pwa-banner d-none" data-sudi-jangad-pwa-ios="">
+                                    <button type="button" class="btn-close" aria-label="Close" data-sudi-jangad-pwa-dismiss=""></button>
+                                    <h5 class="mb-2">Install on iPhone or iPad</h5>
+                                    <ol class="mb-0 ps-3">
+                                        <li>Open this page in Safari.</li>
+                                        <li>Tap the Share button.</li>
+                                        <li>Choose Add to Home Screen.</li>
+                                        <li>Tap Add.</li>
+                                    </ol>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -68,6 +100,10 @@
 
     <template id="jangad_upload_success" name="Jangad Upload Success">
         <t t-call="website.layout">
+            <t t-set="head">
+                <t t-out="head"/>
+                <t t-call="diamond.jangad_pwa_head"/>
+            </t>
             <div id="wrap" class="oe_structure">
                 <section class="container py-5">
                     <div class="row justify-content-center">
@@ -86,6 +122,55 @@
                                 Our team will review it from the receipt contact field.
                             </p>
                             <a href="/diamond/jangad/upload" class="btn btn-secondary">Upload Another</a>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <template id="jangad_upload_offline" name="Jangad Upload Offline">
+        <t t-call="website.layout">
+            <t t-set="head">
+                <t t-out="head"/>
+                <t t-call="diamond.jangad_pwa_head"/>
+            </t>
+            <div id="wrap" class="oe_structure">
+                <section class="container py-5">
+                    <div class="row justify-content-center">
+                        <div class="col-lg-6">
+                            <div class="alert alert-warning" role="alert">
+                                You are offline. Reopen Jangad Upload when the network is available.
+                            </div>
+                            <a href="/diamond/jangad/upload" class="btn btn-primary">Open Jangad Upload</a>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <template id="jangad_upload_qr" name="Jangad Upload QR">
+        <t t-call="website.layout">
+            <t t-set="head">
+                <t t-out="head"/>
+                <t t-call="diamond.jangad_pwa_head"/>
+            </t>
+            <div id="wrap" class="oe_structure">
+                <section class="container py-5">
+                    <div class="row justify-content-center">
+                        <div class="col-lg-6 text-center">
+                            <div class="card p-4 sudi-jangad-qr-card">
+                                <h1 class="h3 mb-3">Install Jangad Upload</h1>
+                                <p class="text-muted">Scan this QR code to open the installable upload page.</p>
+                                <img t-att-src="qr_src" alt="Jangad Upload QR Code" class="mx-auto mb-3"/>
+                                <p class="small text-break mb-3">
+                                    <a t-att-href="upload_url">
+                                        <t t-out="upload_url"/>
+                                    </a>
+                                </p>
+                                <a t-att-href="upload_url" class="btn btn-primary">Open Upload Page</a>
+                            </div>
                         </div>
                     </div>
                 </section>

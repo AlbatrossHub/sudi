@@ -1,0 +1,69 @@
+/* eslint-env serviceworker */
+/* eslint-disable no-restricted-globals */
+
+const CACHE_NAME = "sudi-jangad-pwa-v1";
+const SCOPE_PATH = "/diamond/jangad/";
+const OFFLINE_URL = "/diamond/jangad/offline";
+const SHELL_URLS = [
+    OFFLINE_URL,
+    "/diamond/jangad/upload",
+];
+
+const canHandleRequest = (request) => {
+    const url = new URL(request.url);
+    if (url.origin !== self.location.origin) {
+        return false;
+    }
+    return url.pathname.startsWith(SCOPE_PATH)
+        || ["style", "script", "image", "font"].includes(request.destination);
+};
+
+const cacheResponse = async (request, response) => {
+    if (!response || !response.ok || response.type !== "basic") {
+        return response;
+    }
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+    return response;
+};
+
+const networkFirst = async (request) => {
+    try {
+        return await cacheResponse(request, await fetch(request));
+    } catch (error) {
+        const cached = await caches.match(request);
+        if (cached) {
+            return cached;
+        }
+        if (request.mode === "navigate") {
+            return caches.match(OFFLINE_URL);
+        }
+        throw error;
+    }
+};
+
+self.addEventListener("install", (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS))
+    );
+});
+
+self.addEventListener("activate", (event) => {
+    event.waitUntil(
+        caches.keys().then((cacheNames) =>
+            Promise.all(
+                cacheNames
+                    .filter((cacheName) => cacheName !== CACHE_NAME && cacheName.startsWith("sudi-jangad-pwa-"))
+                    .map((cacheName) => caches.delete(cacheName))
+            )
+        )
+    );
+});
+
+self.addEventListener("fetch", (event) => {
+    const request = event.request;
+    if (request.method !== "GET" || !canHandleRequest(request)) {
+        return;
+    }
+    event.respondWith(networkFirst(request));
+});

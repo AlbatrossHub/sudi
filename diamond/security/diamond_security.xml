@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record model="res.groups.privilege" id="res_groups_privilege_sudi_diamond_operations">
+            <field name="name">Onfield</field>
+            <field name="category_id" ref="base.module_category_supply_chain"/>
+        </record>
+
+        <record id="group_sudi_pickup_delivery_operator" model="res.groups">
+            <field name="name">Onfield User</field>
+            <field name="sequence">10</field>
+            <field name="privilege_id" ref="res_groups_privilege_sudi_diamond_operations"/>
+            <field name="implied_ids" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
+    </data>
+
+    <data noupdate="1">
+        <record id="rule_sudi_operator_pickup_pending_receipts" model="ir.rule">
+            <field name="name">Sudi operator: pending pickup receipts</field>
+            <field name="model_id" ref="stock.model_stock_picking"/>
+            <field name="domain_force">[
+                ('sudi_is_diamond_job_work', '=', True),
+                ('picking_type_id.code', '=', 'incoming'),
+                ('state', '=', 'sudi_pickup_pending'),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_operator_active_deliveries" model="ir.rule">
+            <field name="name">Sudi operator: active deliveries</field>
+            <field name="model_id" ref="stock.model_stock_picking"/>
+            <field name="domain_force">[
+                ('sudi_is_diamond_job_work', '=', True),
+                ('picking_type_id.code', '=', 'outgoing'),
+                ('sudi_origin_receipt_id', '!=', False),
+                ('state', '!=', 'done'),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_operator_today_done_deliveries" model="ir.rule">
+            <field name="name">Sudi operator: today's done deliveries</field>
+            <field name="model_id" ref="stock.model_stock_picking"/>
+            <field name="domain_force">[
+                ('sudi_is_diamond_job_work', '=', True),
+                ('picking_type_id.code', '=', 'outgoing'),
+                ('sudi_origin_receipt_id', '!=', False),
+                ('state', '=', 'done'),
+                '|',
+                    ('date_done', '=', False),
+                    '&amp;',
+                        ('date_done', '&gt;=', user._sudi_operator_today_start_utc()),
+                        ('date_done', '&lt;', user._sudi_operator_tomorrow_start_utc()),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_operator_pending_receipt_moves" model="ir.rule">
+            <field name="name">Sudi operator: pending pickup receipt moves</field>
+            <field name="model_id" ref="stock.model_stock_move"/>
+            <field name="domain_force">[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'incoming'),
+                ('picking_id.state', '=', 'sudi_pickup_pending'),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_operator_active_delivery_moves" model="ir.rule">
+            <field name="name">Sudi operator: active delivery moves</field>
+            <field name="model_id" ref="stock.model_stock_move"/>
+            <field name="domain_force">[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'outgoing'),
+                ('picking_id.sudi_origin_receipt_id', '!=', False),
+                ('picking_id.state', '!=', 'done'),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_operator_today_done_delivery_moves" model="ir.rule">
+            <field name="name">Sudi operator: today's done delivery moves</field>
+            <field name="model_id" ref="stock.model_stock_move"/>
+            <field name="domain_force">[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'outgoing'),
+                ('picking_id.sudi_origin_receipt_id', '!=', False),
+                ('picking_id.state', '=', 'done'),
+                '|',
+                    ('picking_id.date_done', '=', False),
+                    '&amp;',
+                        ('picking_id.date_done', '&gt;=', user._sudi_operator_today_start_utc()),
+                        ('picking_id.date_done', '&lt;', user._sudi_operator_tomorrow_start_utc()),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_operator_pending_receipt_move_lines" model="ir.rule">
+            <field name="name">Sudi operator: pending pickup receipt move lines</field>
+            <field name="model_id" ref="stock.model_stock_move_line"/>
+            <field name="domain_force">[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'incoming'),
+                ('picking_id.state', '=', 'sudi_pickup_pending'),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_operator_active_delivery_move_lines" model="ir.rule">
+            <field name="name">Sudi operator: active delivery move lines</field>
+            <field name="model_id" ref="stock.model_stock_move_line"/>
+            <field name="domain_force">[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'outgoing'),
+                ('picking_id.sudi_origin_receipt_id', '!=', False),
+                ('picking_id.state', '!=', 'done'),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_operator_today_done_delivery_move_lines" model="ir.rule">
+            <field name="name">Sudi operator: today's done delivery move lines</field>
+            <field name="model_id" ref="stock.model_stock_move_line"/>
+            <field name="domain_force">[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'outgoing'),
+                ('picking_id.sudi_origin_receipt_id', '!=', False),
+                ('picking_id.state', '=', 'done'),
+                '|',
+                    ('picking_id.date_done', '=', False),
+                    '&amp;',
+                        ('picking_id.date_done', '&gt;=', user._sudi_operator_today_start_utc()),
+                        ('picking_id.date_done', '&lt;', user._sudi_operator_tomorrow_start_utc()),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_stock_user_all_pickings" model="ir.rule">
+            <field name="name">Sudi stock users: unrestricted pickings</field>
+            <field name="model_id" ref="stock.model_stock_picking"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[Command.link(ref('stock.group_stock_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_stock_user_all_moves" model="ir.rule">
+            <field name="name">Sudi stock users: unrestricted moves</field>
+            <field name="model_id" ref="stock.model_stock_move"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[Command.link(ref('stock.group_stock_user'))]"/>
+        </record>
+
+        <record id="rule_sudi_stock_user_all_move_lines" model="ir.rule">
+            <field name="name">Sudi stock users: unrestricted move lines</field>
+            <field name="model_id" ref="stock.model_stock_move_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[Command.link(ref('stock.group_stock_user'))]"/>
+        </record>
+    </data>
+</odoo>

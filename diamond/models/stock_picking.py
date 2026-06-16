@@ -1,7 +1,7 @@
 import re
 
 from odoo import Command, _, api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools.float_utils import float_is_zero
 
 
@@ -30,6 +30,11 @@ class StockPicking(models.Model):
         "sudi_origin_receipt_id",
         string="Diamond Deliveries",
     )
+    sudi_origin_receipt_name = fields.Char(
+        string="Origin Receipt",
+        compute="_compute_sudi_origin_receipt_name",
+        compute_sudo=True,
+    )
     sudi_delivery_count = fields.Integer(compute="_compute_sudi_counts")
     sudi_invoice_ids = fields.Many2many(
         "account.move",
@@ -46,6 +51,10 @@ class StockPicking(models.Model):
     sudi_customer_contact = fields.Char(string="Customer Contact", tracking=True)
     sudi_internal_notes = fields.Text(string="Job Work Notes", tracking=True)
     sudi_jangad_image = fields.Image(string="Jangad")
+    sudi_partner_address = fields.Text(
+        string="Customer Address",
+        compute="_compute_sudi_partner_address",
+    )
     sudi_billing_line_ids = fields.One2many(
         "sudi.diamond.billing.line",
         "picking_id",
@@ -78,6 +87,11 @@ class StockPicking(models.Model):
         for picking in self:
             picking.sudi_delivery_count = len(picking.sudi_delivery_ids)
 
+    @api.depends("sudi_origin_receipt_id.name")
+    def _compute_sudi_origin_receipt_name(self):
+        for picking in self:
+            picking.sudi_origin_receipt_name = picking.sudi_origin_receipt_id.name or ""
+
     def _compute_sudi_invoice_ids(self):
         AccountMove = self.env["account.move"]
         for picking in self:
@@ -87,6 +101,11 @@ class StockPicking(models.Model):
                 invoices = AccountMove.search([("sudi_delivery_ids", "in", picking.ids)])
             picking.sudi_invoice_ids = invoices
             picking.sudi_invoice_count = len(invoices)
+
+    @api.depends("partner_id")
+    def _compute_sudi_partner_address(self):
+        for picking in self:
+            picking.sudi_partner_address = picking.partner_id.contact_address or ""
 
     @api.depends(
         "move_type",
@@ -153,6 +172,7 @@ class StockPicking(models.Model):
             picking.sudi_timesheet_unit_amount = unit_amount_by_timesheet_id.get(timesheet_id, 0.0)
 
     def action_sudi_confirm_pickup(self):
+        self._sudi_check_pickup_delivery_operator_access()
         invalid_pickings = self.filtered(
             lambda picking: not picking.sudi_is_diamond_job_work
             or picking.picking_type_code != "incoming"
@@ -166,6 +186,12 @@ class StockPicking(models.Model):
             "sudi_pickup_datetime": fields.Datetime.now(),
         })
         return True
+
+    def _sudi_check_pickup_delivery_operator_access(self):
+        if self.env.su:
+            return
+        if not self.env.user.has_group("base.group_user"):
+            raise AccessError(_("You are not allowed to operate diamond pickup and delivery records."))
 
     def action_timer_start(self):
         self.ensure_one()
@@ -496,6 +522,7 @@ class StockPicking(models.Model):
             delivery.action_assign()
 
     def action_sudi_mark_delivered(self):
+        self._sudi_check_pickup_delivery_operator_access()
         invalid_pickings = self.filtered(
             lambda picking: not picking.sudi_is_diamond_job_work
             or picking.picking_type_code != "outgoing"
@@ -509,6 +536,10 @@ class StockPicking(models.Model):
             "sudi_pickup_user_id": self.env.user.id,
             "sudi_pickup_datetime": fields.Datetime.now(),
         })
+        for move in self.move_ids.filtered(lambda stock_move: stock_move.state not in ("done", "cancel")):
+            if float_is_zero(move.quantity, precision_rounding=move.product_uom.rounding):
+                move.quantity = move.product_uom_qty
+            move.picked = True
         return self.button_validate()
 
     def _sudi_get_delivery_picking_type(self):

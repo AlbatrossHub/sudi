@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <menuitem id="menu_sudi_operator_pickup_root"
+              name="Pickup"
+              action="action_sudi_operator_pickups"
+              sequence="135"
+              groups="base.group_user"
+              web_icon="diamond,static/description/icon.svg"/>
+
+    <menuitem id="menu_sudi_operator_deliveries_root"
+              name="Deliveries"
+              action="action_sudi_operator_deliveries"
+              sequence="136"
+              groups="base.group_user"
+              web_icon="diamond,static/description/icon.svg"/>
+
     <menuitem id="menu_sudi_diamond_root"
               name="Diamond Job Work"
               parent="stock.menu_stock_root"
