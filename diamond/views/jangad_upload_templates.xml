@@ -106,6 +106,14 @@
                                     If the network is weak, the compressed image can be saved on this device and retried when online.
                                 </p>
                             </form>
+                            <div class="card p-4 text-center d-none" data-sudi-jangad-complete="">
+                                <div class="alert alert-success" role="alert" data-sudi-jangad-complete-message="">
+                                    Your Jangad image has been submitted successfully.
+                                </div>
+                                <button type="button" class="btn btn-primary" data-sudi-jangad-submit-another="">
+                                    Submit Another Jangad
+                                </button>
+                            </div>
                             <div data-sudi-jangad-pwa="1">
                                 <div class="alert alert-light border sudi-jangad-pwa-banner d-none" data-sudi-jangad-pwa-android="">
                                     <button type="button" class="btn-close" aria-label="Close" data-sudi-jangad-pwa-dismiss=""></button>
@@ -154,7 +162,7 @@
                                 We could not match your phone number with an existing customer.
                                 Our team will review it from the receipt contact field.
                             </p>
-                            <a href="/diamond/jangad/upload" class="btn btn-secondary">Upload Another</a>
+                            <a href="/diamond/jangad/upload" class="btn btn-primary">Submit Another Jangad</a>
                         </div>
                     </div>
                 </section>

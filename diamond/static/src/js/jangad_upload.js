@@ -40,6 +40,32 @@
         bar.textContent = `${percent}%`;
     };
 
+    const resetPickupAddressLookup = (form) => {
+        const selectedInput = form.querySelector("[data-sudi-pickup-address-id]");
+        const modeInput = form.querySelector("[data-sudi-pickup-address-mode]");
+        const status = form.querySelector("[data-sudi-pickup-address-status]");
+        const optionsWrap = form.querySelector("[data-sudi-pickup-address-options]");
+        const manualWrap = form.querySelector("[data-sudi-pickup-address-manual-wrap]");
+        const manualInput = form.querySelector("[data-sudi-pickup-address-manual]");
+        if (selectedInput) {
+            selectedInput.value = "";
+        }
+        if (modeInput) {
+            modeInput.value = "existing";
+        }
+        if (status) {
+            status.textContent = "Enter a 10-digit phone number to search pickup addresses.";
+        }
+        if (optionsWrap) {
+            optionsWrap.textContent = "";
+            optionsWrap.classList.add("d-none");
+        }
+        manualWrap?.classList.add("d-none");
+        if (manualInput) {
+            manualInput.value = "";
+        }
+    };
+
     const normalizePhone = (phone) => {
         const digits = (phone || "").replace(/\D+/g, "");
         return digits.length > 10 ? digits.slice(-10) : digits;
@@ -392,11 +418,23 @@
             progress: form.querySelector("[data-sudi-jangad-progress]"),
             submitButton: form.querySelector("[data-sudi-jangad-submit]"),
             retryButton: form.querySelector("[data-sudi-jangad-retry]"),
+            complete: document.querySelector("[data-sudi-jangad-complete]"),
+            completeMessage: document.querySelector("[data-sudi-jangad-complete-message]"),
+            submitAnotherButton: document.querySelector("[data-sudi-jangad-submit-another]"),
         };
 
         await updatePendingUi(elements.pending, elements.retryButton);
         window.addEventListener("online", () => retryPendingUploads(form, elements));
         elements.retryButton?.addEventListener("click", () => retryPendingUploads(form, elements));
+        elements.submitAnotherButton?.addEventListener("click", () => {
+            form.reset();
+            resetPickupAddressLookup(form);
+            elements.complete?.classList.add("d-none");
+            form.classList.remove("d-none");
+            setAlert(elements.success, "");
+            setAlert(elements.error, "");
+            setAlert(elements.pending, "");
+        });
 
         form.addEventListener("submit", async (event) => {
             event.preventDefault();
@@ -431,8 +469,14 @@
 
                 const data = await uploadPayload(form, payload);
                 setProgress(elements.progressWrap, elements.progress, 100);
-                setAlert(elements.success, `Jangad uploaded successfully. Receipt: ${data.receipt_name}`);
+                if (elements.completeMessage) {
+                    elements.completeMessage.textContent = `Jangad uploaded successfully. Receipt: ${data.receipt_name}`;
+                }
+                elements.complete?.classList.remove("d-none");
+                form.classList.add("d-none");
+                setAlert(elements.success, "");
                 form.reset();
+                resetPickupAddressLookup(form);
                 await retryPendingUploads(form, elements);
             } catch (error) {
                 try {
