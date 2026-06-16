@@ -138,6 +138,14 @@
                 <field name="sudi_customer_contact"
                        invisible="not sudi_is_diamond_job_work"
                        readonly="state in ['cancel', 'done']"/>
+                <field name="sudi_pickup_address_id"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
+                       readonly="state in ['cancel', 'done']"
+                       options="{'no_create': True}"/>
+                <field name="sudi_pickup_address"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
+                       readonly="state in ['cancel', 'done']"
+                       placeholder="Pickup address submitted from Jangad upload..."/>
                 <field name="sudi_timesheet_job_type_id"
                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
                        readonly="state in ['cancel', 'done']"
@@ -264,6 +272,7 @@
                 <field name="name"/>
                 <field name="partner_id" string="Customer" options="{'no_open': True, 'no_create': True}"/>
                 <field name="sudi_customer_contact"/>
+                <field name="sudi_pickup_address" string="Pickup Address"/>
                 <field name="scheduled_date"/>
                 <field name="state" widget="badge"
                        decoration-warning="state == 'sudi_pickup_pending'"
@@ -295,7 +304,13 @@
                                    string="Customer"
                                    readonly="1"
                                    options="{'no_open': True, 'no_create': True}"/>
-                            <field name="sudi_partner_address" readonly="1" nolabel="1" placeholder="No customer address available."/>
+                            <field name="sudi_pickup_address_id"
+                                   readonly="1"
+                                   options="{'no_open': True, 'no_create': True}"/>
+                            <field name="sudi_pickup_address"
+                                   readonly="1"
+                                   nolabel="1"
+                                   placeholder="No pickup address available."/>
                         </group>
                         <group>
                             <field name="scheduled_date" readonly="1"/>

@@ -35,7 +35,9 @@
                                   enctype="multipart/form-data"
                                   class="card p-4"
                                   data-sudi-jangad-upload="1"
-                                  data-json-url="/diamond/jangad/upload/json">
+                                  data-json-url="/diamond/jangad/upload/json"
+                                  data-address-url="/diamond/jangad/address_suggestions"
+                                  t-att-data-initial-addresses="address_suggestions_json">
                                 <input type="hidden" name="csrf_token" t-att-value="csrf_token"/>
                                 <div class="mb-3">
                                     <label for="sudi_jangad_phone" class="form-label">Phone Number</label>
@@ -45,6 +47,37 @@
                                            class="form-control"
                                            required="required"
                                            t-att-value="phone"/>
+                                </div>
+                                <div class="mb-3" data-sudi-pickup-address="">
+                                    <label class="form-label">Pickup Address</label>
+                                    <input type="hidden"
+                                           name="pickup_address_id"
+                                           data-sudi-pickup-address-id=""
+                                           t-att-value="pickup_address_id"/>
+                                    <input type="hidden"
+                                           name="pickup_address_mode"
+                                           data-sudi-pickup-address-mode=""
+                                           t-att-value="pickup_address_mode"/>
+                                    <div class="small text-muted mb-2" data-sudi-pickup-address-status="">
+                                        Enter a 10-digit phone number to search pickup addresses.
+                                    </div>
+                                    <div class="list-group mb-2 d-none" data-sudi-pickup-address-options=""></div>
+                                    <button type="button"
+                                            class="btn btn-link p-0 mb-2"
+                                            data-sudi-pickup-address-manual-button="">
+                                        Enter a new pickup address
+                                    </button>
+                                    <div t-att-class="'d-none' if pickup_address_mode != 'manual' else ''"
+                                         data-sudi-pickup-address-manual-wrap="">
+                                        <textarea name="manual_pickup_address"
+                                                  class="form-control"
+                                                  rows="3"
+                                                  placeholder="Enter full pickup address"
+                                                  data-sudi-pickup-address-manual=""><t t-out="manual_pickup_address"/></textarea>
+                                        <div class="form-text">
+                                            This address will be saved as a child pickup address for future use.
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
                                     <label for="sudi_jangad_image" class="form-label">Jangad Image</label>

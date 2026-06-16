@@ -49,6 +49,17 @@ class StockPicking(models.Model):
     )
     sudi_pickup_datetime = fields.Datetime(string="Pickup Date/Time", tracking=True)
     sudi_customer_contact = fields.Char(string="Customer Contact", tracking=True)
+    sudi_pickup_address_id = fields.Many2one(
+        "res.partner",
+        string="Pickup Address",
+        copy=False,
+        tracking=True,
+    )
+    sudi_pickup_address = fields.Text(
+        string="Pickup Address",
+        copy=False,
+        tracking=True,
+    )
     sudi_internal_notes = fields.Text(string="Job Work Notes", tracking=True)
     sudi_jangad_image = fields.Image(string="Jangad")
     sudi_partner_address = fields.Text(
@@ -282,6 +293,102 @@ class StockPicking(models.Model):
         return self.env["res.partner"]
 
     @api.model
+    def _sudi_format_pickup_address(self, partner):
+        address = partner.contact_address or ""
+        return "\n".join(line.strip() for line in address.splitlines() if line.strip())
+
+    @api.model
+    def sudi_get_public_pickup_address_suggestions(self, phone=None, partner=None):
+        commercial_partner = (partner or self._sudi_find_partner_by_phone(phone)).sudo().commercial_partner_id
+        if not commercial_partner:
+            return []
+
+        candidates = commercial_partner | commercial_partner.child_ids.filtered("active")
+        suggestions = []
+        seen_partner_ids = set()
+        for candidate in candidates:
+            if candidate.id in seen_partner_ids:
+                continue
+            address = self._sudi_format_pickup_address(candidate)
+            if not address:
+                continue
+            seen_partner_ids.add(candidate.id)
+            suggestions.append({
+                "id": candidate.id,
+                "name": candidate.display_name,
+                "address": address,
+                "is_default": candidate == commercial_partner,
+            })
+        return suggestions
+
+    @api.model
+    def _sudi_get_or_create_public_jangad_partner(self, phone):
+        partner = self._sudi_find_partner_by_phone(phone)
+        if partner:
+            return partner
+        return self.env["res.partner"].sudo().create({
+            "name": _("Jangad Customer %s") % (phone or "").strip(),
+            "phone": (phone or "").strip(),
+        })
+
+    @api.model
+    def _sudi_create_manual_pickup_address(self, commercial_partner, phone, manual_pickup_address):
+        lines = [
+            line.strip()
+            for line in (manual_pickup_address or "").splitlines()
+            if line.strip()
+        ]
+        if not lines:
+            return self.env["res.partner"]
+
+        return self.env["res.partner"].sudo().create({
+            "parent_id": commercial_partner.id,
+            "type": "delivery",
+            "name": _("Pickup Address"),
+            "phone": (phone or "").strip(),
+            "street": lines[0],
+            "street2": "\n".join(lines[1:]),
+        })
+
+    @api.model
+    def _sudi_resolve_public_pickup_address(self, phone, pickup_address_id=False, manual_pickup_address=False):
+        Partner = self.env["res.partner"].sudo()
+        manual_pickup_address = (manual_pickup_address or "").strip()
+        commercial_partner = self._sudi_find_partner_by_phone(phone)
+        pickup_address = self.env["res.partner"]
+
+        if pickup_address_id:
+            try:
+                pickup_address_id = int(pickup_address_id)
+            except (TypeError, ValueError):
+                raise UserError(_("Please select a valid pickup address."))
+            pickup_address = Partner.browse(pickup_address_id).exists()
+            if not pickup_address:
+                raise UserError(_("Please select a valid pickup address."))
+            commercial_partner = commercial_partner or pickup_address.commercial_partner_id
+            valid_address_ids = {
+                suggestion["id"]
+                for suggestion in self.sudi_get_public_pickup_address_suggestions(phone, commercial_partner)
+            }
+            if pickup_address.id not in valid_address_ids:
+                raise UserError(_("The selected pickup address does not match the entered phone number."))
+        elif manual_pickup_address:
+            commercial_partner = self._sudi_get_or_create_public_jangad_partner(phone)
+            pickup_address = self._sudi_create_manual_pickup_address(
+                commercial_partner,
+                phone,
+                manual_pickup_address,
+            )
+        else:
+            suggestions = self.sudi_get_public_pickup_address_suggestions(phone, commercial_partner)
+            if not suggestions:
+                raise UserError(_("Please enter a pickup address."))
+            pickup_address = Partner.browse(suggestions[0]["id"])
+
+        pickup_address_text = manual_pickup_address or self._sudi_format_pickup_address(pickup_address)
+        return commercial_partner, pickup_address, pickup_address_text
+
+    @api.model
     def _sudi_get_public_receipt_defaults(self):
         company = self.env.company
         warehouse = self.env["stock.warehouse"].sudo().search([("company_id", "=", company.id)], limit=1)
@@ -307,9 +414,19 @@ class StockPicking(models.Model):
         return picking_type, source_location, destination_location
 
     @api.model
-    def sudi_create_public_jangad_receipt(self, phone, jangad_image):
+    def sudi_create_public_jangad_receipt(
+        self,
+        phone,
+        jangad_image,
+        pickup_address_id=False,
+        manual_pickup_address=False,
+    ):
         picking_type, source_location, destination_location = self._sudi_get_public_receipt_defaults()
-        partner = self._sudi_find_partner_by_phone(phone)
+        partner, pickup_address, pickup_address_text = self._sudi_resolve_public_pickup_address(
+            phone,
+            pickup_address_id=pickup_address_id,
+            manual_pickup_address=manual_pickup_address,
+        )
         vals = {
             "picking_type_id": picking_type.id,
             "location_id": source_location.id,
@@ -317,10 +434,13 @@ class StockPicking(models.Model):
             "company_id": picking_type.company_id.id or self.env.company.id,
             "sudi_is_diamond_job_work": True,
             "sudi_customer_contact": phone,
+            "sudi_pickup_address": pickup_address_text,
             "sudi_jangad_image": jangad_image,
         }
         if partner:
             vals["partner_id"] = partner.id
+        if pickup_address:
+            vals["sudi_pickup_address_id"] = pickup_address.id
         return self.sudo().create(vals)
 
     @api.onchange(

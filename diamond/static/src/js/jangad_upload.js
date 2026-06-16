@@ -40,6 +40,173 @@
         bar.textContent = `${percent}%`;
     };
 
+    const normalizePhone = (phone) => {
+        const digits = (phone || "").replace(/\D+/g, "");
+        return digits.length > 10 ? digits.slice(-10) : digits;
+    };
+
+    const debounce = (callback, delay = 300) => {
+        let timeout;
+        return (...args) => {
+            window.clearTimeout(timeout);
+            timeout = window.setTimeout(() => callback(...args), delay);
+        };
+    };
+
+    const getPickupAddressPayload = (form) => {
+        const mode = form.querySelector("[data-sudi-pickup-address-mode]")?.value || "existing";
+        const manualPickupAddress = form.querySelector("[data-sudi-pickup-address-manual]")?.value.trim() || "";
+        const pickupAddressId = form.querySelector("[data-sudi-pickup-address-id]")?.value || "";
+        return {
+            pickupAddressId: mode === "manual" ? "" : pickupAddressId,
+            pickupAddressMode: mode === "manual" ? "manual" : "existing",
+            manualPickupAddress: mode === "manual" ? manualPickupAddress : "",
+        };
+    };
+
+    const initPickupAddressLookup = (form) => {
+        const phoneInput = form.querySelector("input[name='phone']");
+        const addressUrl = form.dataset.addressUrl;
+        const selectedInput = form.querySelector("[data-sudi-pickup-address-id]");
+        const modeInput = form.querySelector("[data-sudi-pickup-address-mode]");
+        const status = form.querySelector("[data-sudi-pickup-address-status]");
+        const optionsWrap = form.querySelector("[data-sudi-pickup-address-options]");
+        const manualButton = form.querySelector("[data-sudi-pickup-address-manual-button]");
+        const manualWrap = form.querySelector("[data-sudi-pickup-address-manual-wrap]");
+        const manualInput = form.querySelector("[data-sudi-pickup-address-manual]");
+        if (!phoneInput || !addressUrl || !selectedInput || !modeInput || !status || !optionsWrap) {
+            return;
+        }
+
+        console.info("Jangad pickup address lookup initialized");
+        let suggestions = [];
+
+        const setStatus = (message) => {
+            status.textContent = message || "";
+        };
+
+        const setManualMode = () => {
+            selectedInput.value = "";
+            modeInput.value = "manual";
+            manualWrap?.classList.remove("d-none");
+            setStatus("Enter the pickup address manually.");
+            renderSuggestions();
+        };
+
+        const selectSuggestion = (suggestionId) => {
+            selectedInput.value = String(suggestionId);
+            modeInput.value = "existing";
+            if (manualInput) {
+                manualInput.value = "";
+            }
+            manualWrap?.classList.add("d-none");
+            setStatus("Pickup address selected.");
+            renderSuggestions();
+        };
+
+        const renderSuggestions = () => {
+            optionsWrap.textContent = "";
+            optionsWrap.classList.toggle("d-none", !suggestions.length);
+            suggestions.forEach((suggestion) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "list-group-item list-group-item-action";
+                if (String(suggestion.id) === selectedInput.value && modeInput.value !== "manual") {
+                    button.classList.add("active");
+                }
+
+                const title = document.createElement("div");
+                title.className = "fw-semibold";
+                title.textContent = suggestion.name || "Pickup Address";
+                const address = document.createElement("div");
+                address.className = "small";
+                address.style.whiteSpace = "pre-line";
+                address.textContent = suggestion.address || "";
+                button.append(title, address);
+                button.addEventListener("click", () => selectSuggestion(suggestion.id));
+                optionsWrap.appendChild(button);
+            });
+        };
+
+        const applySuggestions = (nextSuggestions) => {
+            suggestions = nextSuggestions || [];
+            if (!suggestions.length) {
+                selectedInput.value = "";
+                setStatus("No saved pickup address found. Please enter the pickup address manually.");
+                setManualMode();
+                return;
+            }
+            const currentId = selectedInput.value;
+            const currentSuggestion = suggestions.find((suggestion) => String(suggestion.id) === currentId);
+            const defaultSuggestion = currentSuggestion || suggestions.find((suggestion) => suggestion.is_default) || suggestions[0];
+            selectSuggestion(defaultSuggestion.id);
+            setStatus(suggestions.length === 1 ? "Pickup address selected automatically." : "Select the pickup address.");
+        };
+
+        const lookupAddresses = async () => {
+            const phoneDigits = normalizePhone(phoneInput.value);
+            if (phoneDigits.length !== 10) {
+                suggestions = [];
+                selectedInput.value = "";
+                optionsWrap.textContent = "";
+                optionsWrap.classList.add("d-none");
+                setStatus("Enter a 10-digit phone number to search pickup addresses.");
+                return;
+            }
+
+            try {
+                setStatus("Searching pickup addresses...");
+                console.info("Searching Jangad pickup addresses", phoneDigits);
+                const response = await fetch(`${addressUrl}?phone=${encodeURIComponent(phoneDigits)}`, {
+                    credentials: "same-origin",
+                });
+                const contentType = response.headers.get("content-type") || "";
+                if (!contentType.includes("application/json")) {
+                    throw new Error("Pickup address lookup did not return JSON. Please refresh the page after module upgrade.");
+                }
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || "Could not load pickup addresses.");
+                }
+                console.info("Jangad pickup address suggestions", data.addresses || []);
+                applySuggestions(data.addresses || []);
+            } catch (error) {
+                console.error("Jangad pickup address lookup failed", error);
+                selectedInput.value = "";
+                setStatus(error.message);
+                setManualMode();
+            }
+        };
+
+        manualButton?.addEventListener("click", setManualMode);
+        manualInput?.addEventListener("input", () => {
+            if (manualInput.value.trim()) {
+                selectedInput.value = "";
+                modeInput.value = "manual";
+            }
+        });
+        phoneInput.addEventListener("input", debounce(lookupAddresses));
+
+        let initialSuggestions = [];
+        try {
+            initialSuggestions = JSON.parse(form.dataset.initialAddresses || "[]");
+        } catch {
+            initialSuggestions = [];
+        }
+        if (modeInput.value === "manual" && manualInput?.value.trim()) {
+            suggestions = initialSuggestions;
+            manualWrap?.classList.remove("d-none");
+            renderSuggestions();
+            setStatus("Enter the pickup address manually.");
+        } else if (initialSuggestions.length) {
+            applySuggestions(initialSuggestions);
+        } else if (normalizePhone(phoneInput.value).length === 10) {
+            lookupAddresses();
+        } else {
+            setStatus("Enter a 10-digit phone number to search pickup addresses.");
+        }
+    };
+
     const openDb = () =>
         new Promise((resolve, reject) => {
             const request = indexedDB.open(DB_NAME, 1);
@@ -153,6 +320,9 @@
             formData.append("csrf_token", csrfToken);
         }
         formData.append("phone", payload.phone);
+        formData.append("pickup_address_id", payload.pickupAddressId || "");
+        formData.append("pickup_address_mode", payload.pickupAddressMode || "existing");
+        formData.append("manual_pickup_address", payload.manualPickupAddress || "");
         formData.append("jangad_image", payload.file, payload.file.name || "jangad.jpg");
 
         const response = await fetch(form.dataset.jsonUrl, {
@@ -179,6 +349,9 @@
     const queueUpload = async (payload, pendingElement, retryButton) => {
         await addPendingUpload({
             phone: payload.phone,
+            pickupAddressId: payload.pickupAddressId || "",
+            pickupAddressMode: payload.pickupAddressMode || "existing",
+            manualPickupAddress: payload.manualPickupAddress || "",
             file: payload.file,
             createdAt: new Date().toISOString(),
         });
@@ -232,8 +405,13 @@
 
             const phone = form.querySelector("input[name='phone']")?.value.trim();
             const file = form.querySelector("input[name='jangad_image']")?.files?.[0];
+            const pickupAddress = getPickupAddressPayload(form);
             if (!phone || !file) {
                 setAlert(elements.error, "Please enter your phone number and select a Jangad image.");
+                return;
+            }
+            if (!pickupAddress.pickupAddressId && !pickupAddress.manualPickupAddress) {
+                setAlert(elements.error, "Please select or enter a pickup address.");
                 return;
             }
 
@@ -244,7 +422,7 @@
                 elements.size.textContent = `Original: ${formatBytes(file.size)} | Compressed: ${formatBytes(compressedFile.size)}`;
                 setProgress(elements.progressWrap, elements.progress, 55);
 
-                const payload = { phone, file: compressedFile };
+                const payload = { phone, file: compressedFile, ...pickupAddress };
                 if (!navigator.onLine) {
                     await queueUpload(payload, elements.pending, elements.retryButton);
                     setAlert(elements.success, "Network is offline. The compressed image was saved on this device and will retry when online.");
@@ -260,12 +438,17 @@
                 try {
                     const phoneValue = form.querySelector("input[name='phone']")?.value.trim();
                     const selectedFile = form.querySelector("input[name='jangad_image']")?.files?.[0];
+                    const pickupAddress = getPickupAddressPayload(form);
                     if (phoneValue && selectedFile && error.name !== "TypeError") {
                         throw error;
                     }
                     const compressedFile = selectedFile ? await compressImage(selectedFile) : null;
-                    if (phoneValue && compressedFile) {
-                        await queueUpload({ phone: phoneValue, file: compressedFile }, elements.pending, elements.retryButton);
+                    if (phoneValue && compressedFile && (pickupAddress.pickupAddressId || pickupAddress.manualPickupAddress)) {
+                        await queueUpload(
+                            { phone: phoneValue, file: compressedFile, ...pickupAddress },
+                            elements.pending,
+                            elements.retryButton
+                        );
                         setAlert(elements.success, "Upload failed, so the compressed image was saved on this device for retry.");
                     } else {
                         setAlert(elements.error, error.message);
@@ -280,10 +463,17 @@
         });
     };
 
-    document.addEventListener("DOMContentLoaded", () => {
+    const initJangadUpload = () => {
         const form = document.querySelector("[data-sudi-jangad-upload]");
         if (form) {
+            initPickupAddressLookup(form);
             initForm(form);
         }
-    });
+    };
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initJangadUpload);
+    } else {
+        initJangadUpload();
+    }
 })();
