@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="config_sudi_pickup_notify_user_id" model="ir.config_parameter">
+            <field name="key">diamond.sudi_pickup_notify_user_id</field>
+            <field name="value">10</field>
+        </record>
+    </data>
+</odoo>

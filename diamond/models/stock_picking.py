@@ -1,5 +1,7 @@
 import re
 
+from markupsafe import Markup, escape
+
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools.float_utils import float_is_zero
@@ -92,6 +94,53 @@ class StockPicking(models.Model):
         string="Timer Job Type",
         copy=False,
     )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        pickings = super().create(vals_list)
+        pickings._sudi_notify_pickup_scheduled()
+        return pickings
+
+    @api.model
+    def _sudi_get_pickup_notify_user(self):
+        param = self.env["ir.config_parameter"].sudo().get_param(
+            "diamond.sudi_pickup_notify_user_id", "10"
+        )
+        try:
+            user_id = int(param)
+        except (TypeError, ValueError):
+            return self.env["res.users"]
+        user = self.env["res.users"].browse(user_id).exists()
+        if not user.active:
+            return self.env["res.users"]
+        return user
+
+    def _sudi_notify_pickup_scheduled(self):
+        notify_user = self._sudi_get_pickup_notify_user()
+        if not notify_user:
+            return
+        receipts = self.filtered(
+            lambda picking: picking.sudi_is_diamond_job_work
+            and picking.picking_type_code == "incoming"
+            and picking.state == "sudi_pickup_pending"
+        )
+        for receipt in receipts:
+            partner = notify_user.partner_id
+            mention_html = Markup(
+                "<a href=\"#\" class=\"o_mail_redirect\" data-oe-model=\"res.partner\" "
+                "data-oe-id=\"%s\" target=\"_blank\" contenteditable=\"false\">@%s</a>"
+            ) % (partner.id, escape(partner.display_name))
+            body = Markup("%s %s") % (
+                escape(_("A pick has been scheduled for receipt %s.", receipt.name)),
+                mention_html,
+            )
+            receipt.sudo().message_post(
+                body=body,
+                subject=_("Pickup scheduled: %s") % receipt.name,
+                message_type="comment",
+                partner_ids=partner.ids,
+                subtype_xmlid="mail.mt_comment",
+            )
 
     @api.depends("sudi_delivery_ids")
     def _compute_sudi_counts(self):

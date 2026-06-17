@@ -25,6 +25,17 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
             login="sudi_pickup_delivery_internal_user",
             groups="base.group_user",
         )
+        cls.notify_user = new_test_user(
+            cls.env,
+            login="sudi_pickup_notify_user",
+            groups="base.group_user",
+        )
+
+    def _set_pickup_notify_user(self, user):
+        self.env["ir.config_parameter"].sudo().set_param(
+            "diamond.sudi_pickup_notify_user_id",
+            str(user.id),
+        )
 
     def _receipt_move_command(self, qty=10.0):
         return Command.create({
@@ -118,3 +129,27 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
         self.assertIn(internal_group, delivery_menu.groups_id)
         self.assertEqual(pickup_menu.action, self.env.ref("diamond.action_sudi_operator_pickups"))
         self.assertEqual(delivery_menu.action, self.env.ref("diamond.action_sudi_operator_deliveries"))
+
+    def test_pending_receipt_creation_notifies_configured_user(self):
+        self._set_pickup_notify_user(self.notify_user)
+        receipt = self._create_pending_receipt()
+
+        messages = receipt.message_ids.filtered(
+            lambda message: self.notify_user.partner_id in message.notified_partner_ids
+        )
+        self.assertEqual(len(messages), 1)
+        self.assertIn(receipt.name, messages.subject)
+
+    def test_non_diamond_picking_creation_does_not_notify(self):
+        self._set_pickup_notify_user(self.notify_user)
+        unrelated = self.env["stock.picking"].create({
+            "picking_type_id": self.picking_type_int.id,
+            "location_id": self.stock_location.id,
+            "location_dest_id": self.customer_location.id,
+            "sudi_is_diamond_job_work": False,
+        })
+
+        messages = unrelated.message_ids.filtered(
+            lambda message: self.notify_user.partner_id in message.notified_partner_ids
+        )
+        self.assertFalse(messages)
