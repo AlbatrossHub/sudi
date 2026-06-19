@@ -5,5 +5,9 @@
             <field name="key">diamond.sudi_pickup_notify_user_id</field>
             <field name="value">10</field>
         </record>
+        <record id="config_sudi_pickup_confirmed_notify_user_id" model="ir.config_parameter">
+            <field name="key">diamond.sudi_pickup_confirmed_notify_user_id</field>
+            <field name="value">9</field>
+        </record>
     </data>
 </odoo>

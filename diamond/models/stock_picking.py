@@ -102,9 +102,9 @@ class StockPicking(models.Model):
         return pickings
 
     @api.model
-    def _sudi_get_pickup_notify_user(self):
+    def _sudi_get_notify_user(self, config_key, default_user_id):
         param = self.env["ir.config_parameter"].sudo().get_param(
-            "diamond.sudi_pickup_notify_user_id", "10"
+            config_key, str(default_user_id)
         )
         try:
             user_id = int(param)
@@ -114,6 +114,34 @@ class StockPicking(models.Model):
         if not user.active:
             return self.env["res.users"]
         return user
+
+    @api.model
+    def _sudi_get_pickup_notify_user(self):
+        return self._sudi_get_notify_user("diamond.sudi_pickup_notify_user_id", 10)
+
+    @api.model
+    def _sudi_get_pickup_confirmed_notify_user(self):
+        return self._sudi_get_notify_user("diamond.sudi_pickup_confirmed_notify_user_id", 9)
+
+    @api.model
+    def _sudi_build_partner_mention_body(self, text, partner):
+        mention_html = Markup(
+            "<a href=\"#\" class=\"o_mail_redirect\" data-oe-model=\"res.partner\" "
+            "data-oe-id=\"%s\" target=\"_blank\" contenteditable=\"false\">@%s</a>"
+        ) % (partner.id, escape(partner.display_name))
+        return Markup("%s %s") % (escape(text), mention_html)
+
+    def _sudi_post_user_notification(self, notify_user, subject, body_text):
+        partner = notify_user.partner_id
+        body = self._sudi_build_partner_mention_body(body_text, partner)
+        for record in self:
+            record.sudo().message_post(
+                body=body,
+                subject=subject,
+                message_type="comment",
+                partner_ids=partner.ids,
+                subtype_xmlid="mail.mt_comment",
+            )
 
     def _sudi_notify_pickup_scheduled(self):
         notify_user = self._sudi_get_pickup_notify_user()
@@ -125,21 +153,25 @@ class StockPicking(models.Model):
             and picking.state == "sudi_pickup_pending"
         )
         for receipt in receipts:
-            partner = notify_user.partner_id
-            mention_html = Markup(
-                "<a href=\"#\" class=\"o_mail_redirect\" data-oe-model=\"res.partner\" "
-                "data-oe-id=\"%s\" target=\"_blank\" contenteditable=\"false\">@%s</a>"
-            ) % (partner.id, escape(partner.display_name))
-            body = Markup("%s %s") % (
-                escape(_("A pick has been scheduled for receipt %s.", receipt.name)),
-                mention_html,
+            receipt._sudi_post_user_notification(
+                notify_user,
+                _("Pickup scheduled: %s") % receipt.name,
+                _("A pick has been scheduled for receipt %s.", receipt.name),
             )
-            receipt.sudo().message_post(
-                body=body,
-                subject=_("Pickup scheduled: %s") % receipt.name,
-                message_type="comment",
-                partner_ids=partner.ids,
-                subtype_xmlid="mail.mt_comment",
+
+    def _sudi_notify_pickup_confirmed(self):
+        notify_user = self._sudi_get_pickup_confirmed_notify_user()
+        if not notify_user:
+            return
+        for receipt in self:
+            receipt._sudi_post_user_notification(
+                notify_user,
+                _("Pickup confirmed: %s") % receipt.name,
+                _(
+                    "Pickup for receipt %s was successful. "
+                    "Please validate the Jangad and fill in the job table for this order.",
+                    receipt.name,
+                ),
             )
 
     @api.depends("sudi_delivery_ids")
@@ -245,6 +277,7 @@ class StockPicking(models.Model):
             "sudi_pickup_user_id": self.env.user.id,
             "sudi_pickup_datetime": fields.Datetime.now(),
         })
+        self._sudi_notify_pickup_confirmed()
         return True
 
     def _sudi_check_pickup_delivery_operator_access(self):
