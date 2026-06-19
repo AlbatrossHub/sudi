@@ -140,7 +140,7 @@ class StockPicking(models.Model):
                 subject=subject,
                 message_type="comment",
                 partner_ids=partner.ids,
-                subtype_xmlid="mail.mt_comment",
+                subtype_xmlid="mail.mt_note",
             )
 
     def _sudi_notify_pickup_scheduled(self):
