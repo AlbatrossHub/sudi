@@ -30,10 +30,21 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
             login="sudi_pickup_notify_user",
             groups="base.group_user",
         )
+        cls.confirmed_notify_user = new_test_user(
+            cls.env,
+            login="sudi_pickup_confirmed_notify_user",
+            groups="base.group_user",
+        )
 
     def _set_pickup_notify_user(self, user):
         self.env["ir.config_parameter"].sudo().set_param(
             "diamond.sudi_pickup_notify_user_id",
+            str(user.id),
+        )
+
+    def _set_pickup_confirmed_notify_user(self, user):
+        self.env["ir.config_parameter"].sudo().set_param(
+            "diamond.sudi_pickup_confirmed_notify_user_id",
             str(user.id),
         )
 
@@ -153,3 +164,15 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
             lambda message: self.notify_user.partner_id in message.notified_partner_ids
         )
         self.assertFalse(messages)
+
+    def test_confirm_pickup_notifies_configured_user(self):
+        self._set_pickup_confirmed_notify_user(self.confirmed_notify_user)
+        receipt = self._create_pending_receipt()
+        receipt.action_sudi_confirm_pickup()
+
+        messages = receipt.message_ids.filtered(
+            lambda message: self.confirmed_notify_user.partner_id in message.notified_partner_ids
+        )
+        self.assertEqual(len(messages), 1)
+        self.assertIn(receipt.name, messages.subject)
+        self.assertIn("validate the Jangad", messages.body)
