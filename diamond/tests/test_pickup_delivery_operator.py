@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from odoo import Command, fields
 from odoo.exceptions import AccessError
@@ -143,13 +144,19 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
 
     def test_pending_receipt_creation_notifies_configured_user(self):
         self._set_pickup_notify_user(self.notify_user)
-        receipt = self._create_pending_receipt()
+        with patch.object(type(self.notify_user), "_bus_send") as mock_bus_send:
+            receipt = self._create_pending_receipt()
 
         messages = receipt.message_ids.filtered(
             lambda message: self.notify_user.partner_id in message.notified_partner_ids
         )
         self.assertEqual(len(messages), 1)
         self.assertIn(receipt.name, messages.subject)
+        mock_bus_send.assert_called_once()
+        _channel, payload = mock_bus_send.call_args[0]
+        self.assertEqual(_channel, "simple_notification")
+        self.assertEqual(payload["type"], "info")
+        self.assertTrue(payload["sticky"])
 
     def test_non_diamond_picking_creation_does_not_notify(self):
         self._set_pickup_notify_user(self.notify_user)
@@ -168,7 +175,8 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
     def test_confirm_pickup_notifies_configured_user(self):
         self._set_pickup_confirmed_notify_user(self.confirmed_notify_user)
         receipt = self._create_pending_receipt()
-        receipt.action_sudi_confirm_pickup()
+        with patch.object(type(self.confirmed_notify_user), "_bus_send") as mock_bus_send:
+            receipt.action_sudi_confirm_pickup()
 
         messages = receipt.message_ids.filtered(
             lambda message: self.confirmed_notify_user.partner_id in message.notified_partner_ids
@@ -176,3 +184,8 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
         self.assertEqual(len(messages), 1)
         self.assertIn(receipt.name, messages.subject)
         self.assertIn("validate the Jangad", messages.body)
+        mock_bus_send.assert_called_once()
+        _channel, payload = mock_bus_send.call_args[0]
+        self.assertEqual(_channel, "simple_notification")
+        self.assertEqual(payload["type"], "success")
+        self.assertTrue(payload["sticky"])

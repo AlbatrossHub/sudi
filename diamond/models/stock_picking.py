@@ -131,7 +131,7 @@ class StockPicking(models.Model):
         ) % (partner.id, escape(partner.display_name))
         return Markup("%s %s") % (escape(text), mention_html)
 
-    def _sudi_post_user_notification(self, notify_user, subject, body_text):
+    def _sudi_post_user_notification(self, notify_user, subject, body_text, toast_type="info"):
         partner = notify_user.partner_id
         body = self._sudi_build_partner_mention_body(body_text, partner)
         for record in self:
@@ -140,7 +140,16 @@ class StockPicking(models.Model):
                 subject=subject,
                 message_type="comment",
                 partner_ids=partner.ids,
-                subtype_xmlid="mail.mt_note",
+                subtype_xmlid="mail.mt_comment",
+            )
+            notify_user._bus_send(
+                "simple_notification",
+                {
+                    "title": subject,
+                    "message": body_text,
+                    "type": toast_type,
+                    "sticky": True,
+                },
             )
 
     def _sudi_notify_pickup_scheduled(self):
@@ -157,6 +166,7 @@ class StockPicking(models.Model):
                 notify_user,
                 _("Pickup scheduled: %s") % receipt.name,
                 _("A pick has been scheduled for receipt %s.", receipt.name),
+                toast_type="info",
             )
 
     def _sudi_notify_pickup_confirmed(self):
@@ -172,6 +182,7 @@ class StockPicking(models.Model):
                     "Please validate the Jangad and fill in the job table for this order.",
                     receipt.name,
                 ),
+                toast_type="success",
             )
 
     @api.depends("sudi_delivery_ids")
