@@ -87,6 +87,13 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
         self.assertEqual(len(receipt.sudi_delivery_ids), 1)
         return receipt.sudi_delivery_ids
 
+    def _create_assigned_receipt(self):
+        receipt = self._create_pending_receipt()
+        receipt.action_sudi_confirm_pickup()
+        receipt.action_confirm()
+        self.assertEqual(receipt.state, "assigned")
+        return receipt
+
     def test_internal_user_does_not_need_inventory_user_group(self):
         self.assertTrue(self.internal_user.has_group("base.group_user"))
         self.assertFalse(self.internal_user.has_group("stock.group_stock_user"))
@@ -136,11 +143,49 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
         internal_group = self.env.ref("base.group_user")
         pickup_menu = self.env.ref("diamond.menu_sudi_operator_pickup_root")
         delivery_menu = self.env.ref("diamond.menu_sudi_operator_deliveries_root")
+        job_work_menu = self.env.ref("diamond.menu_sudi_operator_job_work_root")
 
         self.assertIn(internal_group, pickup_menu.groups_id)
         self.assertIn(internal_group, delivery_menu.groups_id)
+        self.assertIn(internal_group, job_work_menu.groups_id)
         self.assertEqual(pickup_menu.action, self.env.ref("diamond.action_sudi_operator_pickups"))
         self.assertEqual(delivery_menu.action, self.env.ref("diamond.action_sudi_operator_deliveries"))
+        self.assertEqual(job_work_menu.action, self.env.ref("diamond.action_sudi_operator_job_work"))
+
+    def test_internal_user_can_read_assigned_receipt(self):
+        receipt = self._create_assigned_receipt()
+
+        receipt.with_user(self.internal_user).read(["name", "partner_id", "state"])
+        self.assertEqual(receipt.state, "assigned")
+
+    def test_internal_user_cannot_read_non_assigned_receipt(self):
+        receipt = self._create_pending_receipt()
+        receipt.action_sudi_confirm_pickup()
+        self.assertEqual(receipt.state, "draft")
+
+        with self.assertRaises(AccessError):
+            receipt.with_user(self.internal_user).read(["name"])
+
+    def test_internal_user_cannot_read_unrelated_assigned_receipt(self):
+        unrelated = self.env["stock.picking"].create({
+            "picking_type_id": self.picking_type_in.id,
+            "location_id": self.supplier_location.id,
+            "location_dest_id": self.stock_location.id,
+            "sudi_is_diamond_job_work": False,
+            "move_ids": [Command.create({
+                "name": self.product.display_name,
+                "product_id": self.product.id,
+                "product_uom_qty": 1.0,
+                "product_uom": self.product.uom_id.id,
+                "location_id": self.supplier_location.id,
+                "location_dest_id": self.stock_location.id,
+            })],
+        })
+        unrelated.action_confirm()
+        self.assertEqual(unrelated.state, "assigned")
+
+        with self.assertRaises(AccessError):
+            unrelated.with_user(self.internal_user).read(["name"])
 
     def test_pending_receipt_creation_notifies_configured_user(self):
         self._set_pickup_notify_user(self.notify_user)
