@@ -422,6 +422,13 @@
         <field name="arch" type="xml">
             <form string="Job Work" create="0" delete="0">
                 <header>
+                    <button name="button_validate"
+                            string="Validate"
+                            type="object"
+                            class="oe_highlight"
+                            groups="base.group_user"
+                            invisible="state in ('draft', 'confirmed', 'done', 'cancel', 'sudi_pickup_pending')"
+                            data-hotkey="v"/>
                     <field name="sudi_display_timesheet_timer" invisible="1"/>
                     <field name="sudi_total_hours_spent" invisible="1"/>
                     <field name="sudi_timesheet_unit_amount" invisible="1"/>

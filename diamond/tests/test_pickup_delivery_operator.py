@@ -158,6 +158,16 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
         receipt.with_user(self.internal_user).read(["name", "partner_id", "state"])
         self.assertEqual(receipt.state, "assigned")
 
+    def test_internal_user_can_validate_assigned_receipt(self):
+        receipt = self._create_assigned_receipt()
+        for move in receipt.move_ids:
+            move.quantity = move.product_uom_qty
+            move.picked = True
+
+        receipt.with_user(self.internal_user).button_validate()
+
+        self.assertEqual(receipt.state, "done")
+
     def test_internal_user_cannot_read_non_assigned_receipt(self):
         receipt = self._create_pending_receipt()
         receipt.action_sudi_confirm_pickup()
