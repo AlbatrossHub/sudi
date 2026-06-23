@@ -435,7 +435,7 @@
                     <button class="btn-primary"
                             name="action_timer_start"
                             type="object"
-                            string="Start"
+                            string="Start Time"
                             data-hotkey="z"
                             groups="hr_timesheet.group_hr_timesheet_user"
                             invisible="state != 'assigned' or not sudi_display_timesheet_timer or timer_start or sudi_total_hours_spent"/>
@@ -449,7 +449,7 @@
                     <button class="btn-primary o_fsm_stop"
                             name="action_timer_stop"
                             type="object"
-                            string="Stop"
+                            string="Stop Time"
                             data-hotkey="z"
                             groups="hr_timesheet.group_hr_timesheet_user"
                             invisible="state != 'assigned' or not sudi_display_timesheet_timer or not timer_start"/>
