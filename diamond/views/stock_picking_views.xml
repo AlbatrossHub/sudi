@@ -462,7 +462,7 @@
                                    string="Customer"
                                    readonly="1"
                                    options="{'no_open': True, 'no_create': True}"/>
-                            <field name="sudi_customer_contact" readonly="1"/>
+                            <!-- <field name="sudi_customer_contact" readonly="1"/> -->
                             <!-- <field name="sudi_pickup_address_id"
                                    readonly="1"
                                    options="{'no_open': True, 'no_create': True}"/>
