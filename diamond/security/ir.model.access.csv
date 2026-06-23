@@ -12,3 +12,4 @@ access_sudi_operator_diamond_job_type,sudi.operator.diamond.job.type,model_sudi_
 access_sudi_internal_stock_picking,sudi.internal.stock.picking,stock.model_stock_picking,base.group_user,1,1,0,0
 access_sudi_internal_stock_move,sudi.internal.stock.move,stock.model_stock_move,base.group_user,1,1,0,0
 access_sudi_internal_diamond_job_type,sudi.internal.diamond.job.type,model_sudi_diamond_job_type,base.group_user,1,0,0,0
+access_sudi_department_transfer_wizard,sudi.department.transfer.wizard,model_sudi_diamond_department_transfer_wizard,base.group_user,1,1,1,0

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sudi_diamond_department_transfer_wizard_form" model="ir.ui.view">
+        <field name="name">sudi.diamond.department.transfer.wizard.form</field>
+        <field name="model">sudi.diamond.department.transfer.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Transfer Department">
+                <group>
+                    <field name="picking_id" invisible="1"/>
+                    <field name="department_id" options="{'no_create': True}"/>
+                </group>
+                <footer>
+                    <button name="action_confirm"
+                            string="Transfer"
+                            type="object"
+                            class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

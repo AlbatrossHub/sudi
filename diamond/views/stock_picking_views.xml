@@ -64,6 +64,12 @@
                        options="{'unit_amount_field': 'sudi_timesheet_unit_amount'}"
                        groups="hr_timesheet.group_hr_timesheet_user"
                        invisible="state != 'assigned' or not sudi_display_timesheet_timer"/>
+                <button name="action_sudi_transfer_department"
+                        string="Transfer Department"
+                        type="object"
+                        class="btn-secondary"
+                        groups="base.group_user"
+                        invisible="state != 'assigned' or not sudi_is_diamond_job_work or picking_type_code != 'incoming'"/>
             </xpath>
 
             <xpath expr="//header/button[@name='button_validate'][1]" position="after">
@@ -150,6 +156,15 @@
                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
                        readonly="state in ['cancel', 'done']"
                        groups="hr_timesheet.group_hr_timesheet_user"/>
+                <field name="sudi_current_department_id"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
+                       readonly="state in ['cancel', 'done']"
+                       options="{'no_create': True}"/>
+                <field name="sudi_involved_department_ids"
+                       widget="many2many_tags"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
+                       readonly="state in ['cancel', 'done']"
+                       options="{'no_create': True}"/>
                 <field name="user_id" widget="many2one_avatar_user" domain="[('share', '=', False)]" readonly="state in ['cancel', 'done']"/>
             </xpath>
 
@@ -407,6 +422,8 @@
                 <field name="partner_id" string="Customer" options="{'no_open': True, 'no_create': True}"/>
                 <field name="scheduled_date"/>
                 <field name="user_id" widget="many2one_avatar_user" string="Responsible"/>
+                <field name="sudi_current_department_id" string="Current Department" options="{'no_open': True, 'no_create': True}"/>
+                <field name="sudi_involved_department_ids" string="Involved Department" widget="many2many_tags" options="{'no_open': True, 'no_create': True}"/>
                 <field name="sudi_total_hours_spent" widget="timesheet_uom" groups="hr_timesheet.group_hr_timesheet_user"/>
                 <field name="state" widget="badge"
                        decoration-info="state == 'assigned'"
@@ -459,6 +476,12 @@
                            options="{'unit_amount_field': 'sudi_timesheet_unit_amount'}"
                            groups="hr_timesheet.group_hr_timesheet_user"
                            invisible="state != 'assigned' or not sudi_display_timesheet_timer"/>
+                    <button name="action_sudi_transfer_department"
+                            string="Transfer Department"
+                            type="object"
+                            class="btn-secondary"
+                            groups="base.group_user"
+                            invisible="state != 'assigned'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,assigned,done"/>
                 </header>
                 <sheet>
@@ -486,6 +509,13 @@
                             <field name="sudi_timesheet_job_type_id"
                                    groups="hr_timesheet.group_hr_timesheet_user"
                                    readonly="state in ['cancel', 'done']"/>
+                            <field name="sudi_current_department_id"
+                                   readonly="1"
+                                   options="{'no_open': True, 'no_create': True}"/>
+                            <field name="sudi_involved_department_ids"
+                                   widget="many2many_tags"
+                                   readonly="1"
+                                   options="{'no_create': True}"/>
                         </group>
                     </group>
                     <group string="Jangad">

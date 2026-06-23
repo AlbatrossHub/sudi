@@ -94,6 +94,20 @@ class StockPicking(models.Model):
         string="Timer Job Type",
         copy=False,
     )
+    sudi_current_department_id = fields.Many2one(
+        "sudi.diamond.job.type",
+        string="Current Department",
+        copy=False,
+        tracking=True,
+    )
+    sudi_involved_department_ids = fields.Many2many(
+        "sudi.diamond.job.type",
+        "sudi_picking_job_type_involved_rel",
+        "picking_id",
+        "job_type_id",
+        string="Involved Departments",
+        tracking=True,
+    )
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -296,6 +310,26 @@ class StockPicking(models.Model):
             return
         if not self.env.user.has_group("base.group_user"):
             raise AccessError(_("You are not allowed to operate diamond pickup and delivery records."))
+
+    def action_sudi_transfer_department(self):
+        self.ensure_one()
+        self._sudi_check_pickup_delivery_operator_access()
+        if (
+            not self.sudi_is_diamond_job_work
+            or self.picking_type_code != "incoming"
+            or self.state != "assigned"
+        ):
+            raise UserError(_("Department transfer is only available on diamond job-work receipts in progress."))
+        return {
+            "name": _("Transfer Department"),
+            "type": "ir.actions.act_window",
+            "res_model": "sudi.diamond.department.transfer.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_picking_id": self.id,
+            },
+        }
 
     def action_timer_start(self):
         self.ensure_one()

@@ -2,7 +2,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import Command, fields
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import new_test_user
 from odoo.addons.stock.tests.common import TestStockCommon
 
@@ -13,6 +13,7 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
         super().setUpClass()
         cls.product = cls.env.ref("diamond.product_customer_diamond_parcel")
         cls.job_type = cls.env.ref("diamond.job_type_laser_inscription")
+        cls.other_job_type = cls.env.ref("diamond.job_type_natts_process")
         cls.partner = cls.env["res.partner"].create({
             "name": "Operator Customer",
             "street": "101 Pickup Street",
@@ -167,6 +168,55 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
         receipt.with_user(self.internal_user).button_validate()
 
         self.assertEqual(receipt.state, "done")
+
+    def test_transfer_department_sets_current_department(self):
+        receipt = self._create_assigned_receipt()
+        wizard = self.env["sudi.diamond.department.transfer.wizard"].create({
+            "picking_id": receipt.id,
+            "department_id": self.other_job_type.id,
+        })
+
+        wizard.with_user(self.internal_user).action_confirm()
+
+        self.assertEqual(receipt.sudi_current_department_id, self.other_job_type)
+
+    def test_transfer_department_rejects_non_assigned_receipt(self):
+        receipt = self._create_pending_receipt()
+        receipt.action_sudi_confirm_pickup()
+        self.assertEqual(receipt.state, "draft")
+        wizard = self.env["sudi.diamond.department.transfer.wizard"].create({
+            "picking_id": receipt.id,
+            "department_id": self.other_job_type.id,
+        })
+
+        with self.assertRaises(UserError):
+            wizard.action_confirm()
+
+        with self.assertRaises(UserError):
+            receipt.action_sudi_transfer_department()
+
+    def test_transfer_department_does_not_modify_involved_departments(self):
+        receipt = self._create_assigned_receipt()
+        receipt.write({
+            "sudi_involved_department_ids": [Command.set([self.job_type.id])],
+        })
+        wizard = self.env["sudi.diamond.department.transfer.wizard"].create({
+            "picking_id": receipt.id,
+            "department_id": self.other_job_type.id,
+        })
+
+        wizard.with_user(self.internal_user).action_confirm()
+
+        self.assertEqual(receipt.sudi_current_department_id, self.other_job_type)
+        self.assertEqual(receipt.sudi_involved_department_ids, self.job_type)
+
+    def test_transfer_button_available_for_internal_user_on_assigned_receipt(self):
+        receipt = self._create_assigned_receipt()
+
+        action = receipt.with_user(self.internal_user).action_sudi_transfer_department()
+
+        self.assertEqual(action["res_model"], "sudi.diamond.department.transfer.wizard")
+        self.assertEqual(action["context"]["default_picking_id"], receipt.id)
 
     def test_internal_user_cannot_read_non_assigned_receipt(self):
         receipt = self._create_pending_receipt()
