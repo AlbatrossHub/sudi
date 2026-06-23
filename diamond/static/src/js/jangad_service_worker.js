@@ -1,7 +1,7 @@
 /* eslint-env serviceworker */
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = "sudi-jangad-pwa-v1";
+const CACHE_NAME = "sudi-jangad-pwa-v2";
 const SCOPE_PATH = "/diamond/jangad/";
 const OFFLINE_URL = "/diamond/jangad/offline";
 const SHELL_URLS = [
@@ -9,9 +9,17 @@ const SHELL_URLS = [
     "/diamond/jangad/upload",
 ];
 
+const shouldBypassServiceWorker = (url) =>
+    url.pathname.endsWith("/manifest.webmanifest")
+    || url.pathname.includes("/icon/")
+    || url.pathname.endsWith("/service-worker.js");
+
 const canHandleRequest = (request) => {
     const url = new URL(request.url);
     if (url.origin !== self.location.origin) {
+        return false;
+    }
+    if (shouldBypassServiceWorker(url)) {
         return false;
     }
     return url.pathname.startsWith(SCOPE_PATH)
@@ -43,20 +51,26 @@ const networkFirst = async (request) => {
 };
 
 self.addEventListener("install", (event) => {
+    self.skipWaiting();
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS))
+        caches.open(CACHE_NAME).then((cache) =>
+            Promise.allSettled(SHELL_URLS.map((url) => cache.add(url)))
+        )
     );
 });
 
 self.addEventListener("activate", (event) => {
     event.waitUntil(
-        caches.keys().then((cacheNames) =>
-            Promise.all(
-                cacheNames
-                    .filter((cacheName) => cacheName !== CACHE_NAME && cacheName.startsWith("sudi-jangad-pwa-"))
-                    .map((cacheName) => caches.delete(cacheName))
-            )
-        )
+        Promise.all([
+            caches.keys().then((cacheNames) =>
+                Promise.all(
+                    cacheNames
+                        .filter((cacheName) => cacheName !== CACHE_NAME && cacheName.startsWith("sudi-jangad-pwa-"))
+                        .map((cacheName) => caches.delete(cacheName))
+                )
+            ),
+            self.clients.claim(),
+        ])
     );
 });
 

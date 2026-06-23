@@ -21,15 +21,49 @@
         }
     };
 
+    const debugLog = (hypothesisId, location, message, data = {}) => {
+        // #region agent log
+        fetch("http://127.0.0.1:7357/ingest/e2f1820a-d82f-4f47-b2df-091777e10ca5", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Debug-Session-Id": "1294e1",
+            },
+            body: JSON.stringify({
+                sessionId: "1294e1",
+                runId: "post-fix",
+                hypothesisId,
+                location,
+                message,
+                data,
+                timestamp: Date.now(),
+            }),
+        }).catch(() => {});
+        // #endregion
+    };
+
     const registerServiceWorker = async () => {
+        debugLog("B", "jangad_pwa.js:registerServiceWorker", "registration start", {
+            hasServiceWorker: "serviceWorker" in navigator,
+            isSecureContext: window.isSecureContext,
+        });
         if (!("serviceWorker" in navigator) || !window.isSecureContext) {
             return;
         }
         try {
-            await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
+            const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
                 scope: SERVICE_WORKER_SCOPE,
             });
+            debugLog("B", "jangad_pwa.js:registerServiceWorker", "registration success", {
+                scope: registration.scope,
+                active: Boolean(registration.active),
+                installing: Boolean(registration.installing),
+                waiting: Boolean(registration.waiting),
+            });
         } catch (error) {
+            debugLog("B", "jangad_pwa.js:registerServiceWorker", "registration failed", {
+                error: String(error),
+            });
             console.error("Jangad PWA service worker registration failed", error);
         }
     };
@@ -60,6 +94,7 @@
         window.addEventListener("beforeinstallprompt", (event) => {
             event.preventDefault();
             deferredInstallPrompt = event;
+            debugLog("C", "jangad_pwa.js:beforeinstallprompt", "install prompt captured", {});
             showElement(iosBanner, false);
             showElement(androidBanner, true);
         });
@@ -81,8 +116,30 @@
         });
     };
 
+    const checkManifestIcons = async () => {
+        const iconUrls = [
+            "/diamond/jangad/icon/192.png",
+            "/diamond/jangad/icon/512.png",
+        ];
+        const results = await Promise.all(iconUrls.map(async (url) => {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            return {
+                url,
+                ok: response.ok,
+                contentType: response.headers.get("content-type"),
+                size: blob.size,
+            };
+        }));
+        debugLog("A", "jangad_pwa.js:checkManifestIcons", "manifest icon probe", { results });
+    };
+
     document.addEventListener("DOMContentLoaded", () => {
+        debugLog("D", "jangad_pwa.js:DOMContentLoaded", "pwa init", {
+            manifestLinked: Boolean(document.querySelector('link[rel="manifest"]')),
+        });
         registerServiceWorker();
         initInstallUi();
+        checkManifestIcons();
     });
 })();

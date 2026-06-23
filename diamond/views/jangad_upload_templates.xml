@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <template id="jangad_pwa_head" name="Jangad PWA Head">
-        <link rel="manifest" href="/diamond/jangad/manifest.webmanifest" crossorigin="use-credentials"/>
+        <link rel="manifest" href="/diamond/jangad/manifest.webmanifest"/>
         <link rel="apple-touch-icon" href="/diamond/jangad/icon/192.png"/>
         <meta name="theme-color" content="#875A7B"/>
         <meta name="apple-mobile-web-app-capable" content="yes"/>

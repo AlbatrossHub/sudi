@@ -1,11 +1,11 @@
 import base64
 import json
+import time
 from urllib.parse import quote
 
 from odoo import _
 from odoo.exceptions import UserError
 from odoo.http import Controller, request, route
-from odoo.tools.image import image_process
 from odoo.tools.misc import file_open
 
 
@@ -17,6 +17,25 @@ ALLOWED_IMAGE_MIMETYPES = {
 
 
 class SudiDiamondJangadController(Controller):
+    _DEBUG_LOG_PATH = "/opt/odoo19/.cursor/debug-1294e1.log"
+
+    def _debug_log(self, hypothesis_id, location, message, data=None, run_id="post-fix"):
+        # region agent log
+        try:
+            with open(self._DEBUG_LOG_PATH, "a", encoding="utf-8") as fp:
+                fp.write(json.dumps({
+                    "sessionId": "1294e1",
+                    "runId": run_id,
+                    "hypothesisId": hypothesis_id,
+                    "location": location,
+                    "message": message,
+                    "data": data or {},
+                    "timestamp": int(time.time() * 1000),
+                }) + "\n")
+        except OSError:
+            pass
+        # endregion
+
     def _get_jangad_upload_url(self):
         return request.httprequest.url_root.rstrip("/") + request.env["ir.http"]._url_for("/diamond/jangad/upload")
 
@@ -126,6 +145,7 @@ class SudiDiamondJangadController(Controller):
     )
     def jangad_webmanifest(self):
         manifest = {
+            "id": request.env["ir.http"]._url_for("/diamond/jangad/"),
             "name": "Jangad Upload",
             "short_name": "Jangad",
             "description": "Upload Jangad images for diamond job-work receipts.",
@@ -140,16 +160,20 @@ class SudiDiamondJangadController(Controller):
                     "src": "/diamond/jangad/icon/192.png",
                     "sizes": "192x192",
                     "type": "image/png",
-                    "purpose": "any maskable",
+                    "purpose": "any",
                 },
                 {
                     "src": "/diamond/jangad/icon/512.png",
                     "sizes": "512x512",
                     "type": "image/png",
-                    "purpose": "any maskable",
+                    "purpose": "any",
                 },
             ],
         }
+        self._debug_log("A", "main.py:jangad_webmanifest", "manifest served", {
+            "icon_count": len(manifest["icons"]),
+            "start_url": manifest["start_url"],
+        })
         return request.make_json_response(
             manifest,
             {
@@ -169,8 +193,13 @@ class SudiDiamondJangadController(Controller):
     )
     def jangad_icon(self, size=192):
         size = 512 if size >= 512 else 192
-        with file_open("diamond/static/description/icon.svg", "rb") as fp:
-            image = image_process(fp.read(), size=(size, size), expand=True)
+        with file_open(f"diamond/static/src/img/jangad_pwa_icon_{size}.png", "rb") as fp:
+            image = fp.read()
+        self._debug_log("A", "main.py:jangad_icon", "icon served", {
+            "size": size,
+            "byte_length": len(image),
+            "is_png": image[:8] == b"\x89PNG\r\n\x1a\n",
+        })
         return request.make_response(
             image,
             [
@@ -195,6 +224,7 @@ class SudiDiamondJangadController(Controller):
             body,
             [
                 ("Content-Type", "text/javascript"),
+                ("Cache-Control", "no-cache"),
                 ("Service-Worker-Allowed", request.env["ir.http"]._url_for("/diamond/jangad/")),
             ],
         )
