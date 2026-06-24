@@ -118,8 +118,8 @@
 
     const checkManifestIcons = async () => {
         const iconUrls = [
-            "/diamond/jangad/icon/192.png",
-            "/diamond/jangad/icon/512.png",
+            "/diamond/jangad/icon/192.png?v=2",
+            "/diamond/jangad/icon/512.png?v=2",
         ];
         const results = await Promise.all(iconUrls.map(async (url) => {
             const response = await fetch(url);

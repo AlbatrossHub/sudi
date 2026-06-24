@@ -1,7 +1,7 @@
 /* eslint-env serviceworker */
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = "sudi-jangad-pwa-v2";
+const CACHE_NAME = "sudi-jangad-pwa-v3";
 const SCOPE_PATH = "/diamond/jangad/";
 const OFFLINE_URL = "/diamond/jangad/offline";
 const SHELL_URLS = [

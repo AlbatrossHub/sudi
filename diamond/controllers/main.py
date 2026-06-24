@@ -15,6 +15,8 @@ ALLOWED_IMAGE_MIMETYPES = {
     "image/webp",
 }
 
+JANGAD_PWA_ICON_VERSION = "2"
+
 
 class SudiDiamondJangadController(Controller):
     _DEBUG_LOG_PATH = "/opt/odoo19/.cursor/debug-1294e1.log"
@@ -134,6 +136,9 @@ class SudiDiamondJangadController(Controller):
             "addresses": self._get_address_suggestions(phone=phone_digits),
         })
 
+    def _jangad_pwa_icon_src(self, size):
+        return f"/diamond/jangad/icon/{size}.png?v={JANGAD_PWA_ICON_VERSION}"
+
     @route(
         "/diamond/jangad/manifest.webmanifest",
         type="http",
@@ -157,13 +162,13 @@ class SudiDiamondJangadController(Controller):
             "prefer_related_applications": False,
             "icons": [
                 {
-                    "src": "/diamond/jangad/icon/192.png",
+                    "src": self._jangad_pwa_icon_src(192),
                     "sizes": "192x192",
                     "type": "image/png",
                     "purpose": "any",
                 },
                 {
-                    "src": "/diamond/jangad/icon/512.png",
+                    "src": self._jangad_pwa_icon_src(512),
                     "sizes": "512x512",
                     "type": "image/png",
                     "purpose": "any",
@@ -204,7 +209,8 @@ class SudiDiamondJangadController(Controller):
             image,
             [
                 ("Content-Type", "image/png"),
-                ("Cache-Control", "public, max-age=604800"),
+                ("Cache-Control", "no-cache, must-revalidate"),
+                ("Content-Security-Policy", "default-src 'self'"),
             ],
         )
 
