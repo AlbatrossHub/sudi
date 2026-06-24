@@ -111,9 +111,35 @@ class StockPicking(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get("sudi_is_diamond_job_work"):
+                vals.pop("sudi_billing_line_ids", None)
         pickings = super().create(vals_list)
         pickings._sudi_notify_pickup_scheduled()
+        pickings._sudi_sync_billing_details_on_save()
         return pickings
+
+    def write(self, vals):
+        res = super().write(vals)
+        if not self.env.context.get("sudi_skip_billing_sync"):
+            trigger_fields = {
+                "move_ids",
+                "partner_id",
+                "company_id",
+                "sudi_is_diamond_job_work",
+            }
+            if trigger_fields.intersection(vals):
+                self._sudi_sync_billing_details_on_save()
+        return res
+
+    def _sudi_sync_billing_details_on_save(self):
+        receipts = self.filtered(
+            lambda picking: picking.sudi_is_diamond_job_work
+            and picking.picking_type_code == "incoming"
+            and picking.state not in ("cancel", "done")
+        )
+        if receipts:
+            receipts.with_context(sudi_skip_billing_sync=True)._sudi_sync_billing_details()
 
     @api.model
     def _sudi_get_notify_user(self, config_key, default_user_id):
@@ -581,16 +607,7 @@ class StockPicking(models.Model):
         "move_ids.product_uom_qty",
     )
     def _onchange_sudi_billing_details_source(self):
-        for picking in self.filtered(
-            lambda record: record.sudi_is_diamond_job_work and record.picking_type_code == "incoming" and not record.id
-        ):
-            picking.sudi_billing_line_ids = [
-                Command.clear(),
-                *[
-                    Command.create(vals)
-                    for vals in picking._sudi_prepare_billing_detail_values()
-                ],
-            ]
+        return
 
     def action_sudi_recompute_billing_details(self):
         self._sudi_sync_billing_details()
@@ -598,7 +615,8 @@ class StockPicking(models.Model):
 
     def _sudi_prepare_billing_detail_values(self):
         self.ensure_one()
-        grouped = {}
+        values = []
+        partner = self.partner_id.commercial_partner_id
         for index, move in enumerate(
             self.move_ids.filtered(lambda stock_move: stock_move.state != "cancel" and stock_move.sudi_job_type_id),
             start=1,
@@ -608,28 +626,13 @@ class StockPicking(models.Model):
             if float_is_zero(quantity, precision_rounding=rounding):
                 continue
             job_type = move.sudi_job_type_id
-            group = grouped.setdefault(
-                job_type.id,
-                {
-                    "job_type": job_type,
-                    "quantity": 0.0,
-                    "sequence": move.sudi_sr or index,
-                },
-            )
-            group["quantity"] += quantity
-            if move.sudi_sr:
-                group["sequence"] = min(group["sequence"], move.sudi_sr)
-
-        values = []
-        partner = self.partner_id.commercial_partner_id
-        for group in sorted(grouped.values(), key=lambda item: (item["sequence"], item["job_type"].display_name)):
-            job_type = group["job_type"]
             price_unit, price_source = job_type._sudi_get_price_for_partner_with_source(partner, self.company_id)
             values.append({
-                "sequence": group["sequence"],
+                "sequence": move.sudi_sr or index,
+                "receipt_move_id": move.id,
                 "job_type_id": job_type.id,
-                "name": job_type.invoice_description or job_type.display_name,
-                "quantity": group["quantity"],
+                "name": move._sudi_get_invoice_line_name(),
+                "quantity": quantity,
                 "price_unit": price_unit,
                 "price_source": price_source,
                 "active": True,
@@ -642,18 +645,23 @@ class StockPicking(models.Model):
             lambda picking: picking.sudi_is_diamond_job_work and picking.picking_type_code == "incoming"
         ):
             prepared_values = receipt._sudi_prepare_billing_detail_values()
-            prepared_job_type_ids = {vals["job_type_id"] for vals in prepared_values}
+            prepared_receipt_move_ids = {vals["receipt_move_id"] for vals in prepared_values}
             existing_lines = receipt.sudi_billing_line_ids.sudo().filtered(lambda line: line.active and not line.invoice_line_id)
-            existing_by_job_type = {line.job_type_id.id: line for line in existing_lines}
+            existing_by_receipt_move = {
+                line.receipt_move_id.id: line
+                for line in existing_lines
+                if line.receipt_move_id
+            }
 
             for vals in prepared_values:
-                line = existing_by_job_type.get(vals["job_type_id"])
+                line = existing_by_receipt_move.get(vals["receipt_move_id"])
                 if not line:
                     BillingLine.create({"picking_id": receipt.id, **vals})
                     continue
 
                 write_vals = {
                     "sequence": vals["sequence"],
+                    "job_type_id": vals["job_type_id"],
                     "name": vals["name"],
                     "active": True,
                 }
@@ -667,7 +675,10 @@ class StockPicking(models.Model):
                 line.write(write_vals)
 
             stale_lines = existing_lines.filtered(
-                lambda line: line.job_type_id.id not in prepared_job_type_ids
+                lambda line: (
+                    not line.receipt_move_id
+                    or line.receipt_move_id.id not in prepared_receipt_move_ids
+                )
                 and not line.manual_quantity
                 and not line.manual_price
             )
@@ -835,6 +846,7 @@ class StockPicking(models.Model):
         delivered_moves = delivery_pickings.move_ids.filtered(
             lambda move: move.state == "done"
             and move.sudi_job_type_id
+            and not move.sudi_invoice_line_id
         )
         if not delivered_moves:
             raise UserError(_("There are no delivered uninvoiced diamond job-work lines."))
@@ -844,10 +856,15 @@ class StockPicking(models.Model):
         receipt._sudi_sync_billing_details()
         billing_lines = receipt.sudi_billing_line_ids.filtered(
             lambda line: line.active
+            and line.receipt_move_id
             and not line.invoice_line_id
-            and not float_is_zero(line.quantity, precision_rounding=line.service_product_id.uom_id.rounding)
         )
-        if not billing_lines:
+        eligible_billing_lines = billing_lines.filtered(
+            lambda line: delivered_moves.filtered(
+                lambda move: move.sudi_origin_receipt_move_id == line.receipt_move_id
+            )
+        )
+        if not eligible_billing_lines:
             raise UserError(_("There are no uninvoiced diamond billing lines."))
 
         invoice = self.env["account.move"].create({
@@ -864,18 +881,28 @@ class StockPicking(models.Model):
 
         line_commands = []
         custom_tax_by_billing_line = {}
-        for billing_line in billing_lines:
+        for billing_line in eligible_billing_lines.sorted(key=lambda line: (line.sequence, line.id)):
+            related_delivered_moves = delivered_moves.filtered(
+                lambda move: move.sudi_origin_receipt_move_id == billing_line.receipt_move_id
+            )
             job_type = billing_line.job_type_id
             product = billing_line.service_product_id
             if not product:
                 raise UserError(_("Please configure a service product on job type %s.") % job_type.display_name)
+            invoice_quantity = sum(
+                move._sudi_get_invoice_quantity() for move in related_delivered_moves
+            )
+            rounding = product.uom_id.rounding
+            if float_is_zero(invoice_quantity, precision_rounding=rounding):
+                continue
             line_vals = {
                 "product_id": product.id,
                 "name": billing_line.name,
-                "quantity": billing_line.quantity,
+                "quantity": invoice_quantity,
                 "product_uom_id": product.uom_id.id,
                 "price_unit": billing_line.price_unit,
                 "sudi_billing_line_id": billing_line.id,
+                "sudi_stock_move_id": related_delivered_moves[:1].id,
             }
             if job_type.tax_ids:
                 custom_tax_by_billing_line[billing_line.id] = invoice.fiscal_position_id.map_tax(
@@ -895,7 +922,7 @@ class StockPicking(models.Model):
             billing_line = line.sudi_billing_line_id.sudo()
             billing_line.invoice_line_id = line
             delivered_moves.filtered(
-                lambda move: move.sudi_job_type_id == billing_line.job_type_id
+                lambda move: move.sudi_origin_receipt_move_id == billing_line.receipt_move_id
             ).sudi_invoice_line_id = line
         return {
             "type": "ir.actions.act_window",

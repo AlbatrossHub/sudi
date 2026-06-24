@@ -31,7 +31,7 @@
             </xpath>
 
             <xpath expr="//field[@name='invoice_line_ids']//list//field[@name='name']" position="after">
-                <field name="sudi_stock_move_id" optional="hide"/>
+                <field name="sudi_stock_move_id" optional="show"/>
             </xpath>
         </field>
     </record>

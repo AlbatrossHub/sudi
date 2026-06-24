@@ -88,9 +88,9 @@
                                            accept="image/*"
                                            capture="environment"
                                            required="required"/>
-                                    <div class="form-text">
+<!--                                     <div class="form-text">
                                         On mobile, this can open the camera. The image will be compressed before upload when supported.
-                                    </div>
+                                    </div> -->
                                     <div class="small text-muted mt-2" data-sudi-jangad-size=""></div>
                                 </div>
                                 <div class="progress mb-3 d-none" data-sudi-jangad-progress-wrap="">

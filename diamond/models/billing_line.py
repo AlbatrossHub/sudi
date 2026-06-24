@@ -27,6 +27,17 @@ class SudiDiamondBillingLine(models.Model):
     )
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
+    receipt_move_id = fields.Many2one(
+        "stock.move",
+        string="Receipt Line",
+        ondelete="cascade",
+        index=True,
+    )
+    sudi_sr = fields.Integer(
+        string="Sr",
+        related="receipt_move_id.sudi_sr",
+        readonly=True,
+    )
     job_type_id = fields.Many2one(
         "sudi.diamond.job.type",
         string="Job Type",
@@ -101,12 +112,15 @@ class SudiDiamondBillingLine(models.Model):
                 line.manual_price = True
                 line.price_source = "manual"
 
-    @api.onchange("job_type_id", "picking_id")
+    @api.onchange("job_type_id", "picking_id", "receipt_move_id")
     def _onchange_job_type_id(self):
         for line in self:
+            if line.receipt_move_id:
+                line.name = line.receipt_move_id._sudi_get_invoice_line_name()
+            elif line.job_type_id:
+                line.name = line.job_type_id.invoice_description or line.job_type_id.display_name
             if not line.job_type_id:
                 continue
-            line.name = line.job_type_id.invoice_description or line.job_type_id.display_name
             if not line.manual_price:
                 price, source = line.job_type_id._sudi_get_price_for_partner_with_source(
                     line.picking_id.partner_id.commercial_partner_id,
@@ -116,23 +130,33 @@ class SudiDiamondBillingLine(models.Model):
                 line.price_source = source
                 line.manual_price = False
 
-    @api.constrains("picking_id", "job_type_id", "active")
-    def _check_unique_active_job_type(self):
-        for line in self.filtered("active"):
+    @api.constrains("picking_id", "receipt_move_id", "active", "invoice_line_id")
+    def _check_unique_active_receipt_move(self):
+        for line in self.filtered(lambda record: record.active and record.receipt_move_id):
             duplicate = self.search(
                 [
                     ("id", "!=", line.id),
                     ("picking_id", "=", line.picking_id.id),
-                    ("job_type_id", "=", line.job_type_id.id),
+                    ("receipt_move_id", "=", line.receipt_move_id.id),
                     ("active", "=", True),
                 ],
                 limit=1,
             )
             if duplicate:
-                raise ValidationError(_("Only one active billing line is allowed per receipt and job type."))
+                raise ValidationError(_("Only one active billing line is allowed per receipt line."))
+
+    @api.constrains("receipt_move_id", "active", "invoice_line_id", "picking_id")
+    def _check_receipt_move_required(self):
+        for line in self.filtered(
+            lambda record: record.active
+            and not record.invoice_line_id
+            and record.picking_id.state == "done"
+        ):
+            if not line.receipt_move_id:
+                raise ValidationError(_("Active billing lines must be linked to a receipt line."))
 
     def write(self, vals):
-        protected_fields = {"job_type_id", "quantity", "price_unit", "name", "active"}
+        protected_fields = {"job_type_id", "receipt_move_id", "quantity", "price_unit", "name", "active"}
         if protected_fields.intersection(vals) and any(self.mapped("invoice_line_id")):
             raise ValidationError(_("You cannot modify a billing line that has already been invoiced."))
         return super().write(vals)

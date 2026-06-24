@@ -183,6 +183,8 @@
                         <list editable="bottom">
                             <field name="sequence" widget="handle"/>
                             <field name="active" widget="boolean_toggle"/>
+                            <field name="sudi_sr" readonly="1" optional="show"/>
+                            <field name="receipt_move_id" optional="hide"/>
                             <field name="job_type_id"/>
                             <field name="service_product_id" readonly="1"/>
                             <field name="name"/>

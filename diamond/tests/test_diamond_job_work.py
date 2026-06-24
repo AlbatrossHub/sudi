@@ -7,8 +7,8 @@ class TestSudiDiamondJobWork(TestStockCommon):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.product = cls.env.ref("sudi.product_customer_diamond_parcel")
-        cls.job_type = cls.env.ref("sudi.job_type_laser_inscription")
+        cls.product = cls.env.ref("diamond.product_customer_diamond_parcel")
+        cls.job_type = cls.env.ref("diamond.job_type_laser_inscription")
         cls.job_type.base_price = 100.0
         cls.partner = cls.env["res.partner"].create({
             "name": "Diamond Customer",
@@ -71,7 +71,7 @@ class TestSudiDiamondJobWork(TestStockCommon):
         self.assertEqual(delivery.move_ids.sudi_pcs_qty, 100.0)
         self.assertEqual(delivery.move_ids.sudi_carats, 25.0)
 
-    def test_billing_details_group_receipt_lines_by_job_type(self):
+    def test_billing_details_one_line_per_receipt_move(self):
         receipt = self._create_receipt(
             move_commands=[
                 self._prepare_receipt_move_command(qty=5.0, pcs=5.0, carats=1.0, sr=1),
@@ -79,12 +79,16 @@ class TestSudiDiamondJobWork(TestStockCommon):
             ],
         )
 
-        billing_line = receipt.sudi_billing_line_ids.filtered(lambda line: line.job_type_id == self.job_type)
+        billing_lines = receipt.sudi_billing_line_ids.filtered(lambda line: line.job_type_id == self.job_type)
 
-        self.assertEqual(len(billing_line), 1)
-        self.assertEqual(billing_line.quantity, 12.0)
-        self.assertEqual(billing_line.price_unit, 100.0)
-        self.assertEqual(billing_line.price_source, "partner")
+        self.assertEqual(len(billing_lines), 2)
+        self.assertEqual(
+            billing_lines.sorted(key=lambda line: line.sudi_sr).mapped("quantity"),
+            [5.0, 7.0],
+        )
+        self.assertEqual(billing_lines.receipt_move_id, receipt.move_ids.sorted(key=lambda move: move.sudi_sr))
+        self.assertEqual(billing_lines.mapped("price_unit"), [100.0, 100.0])
+        self.assertEqual(billing_lines.mapped("price_source"), ["partner", "partner"])
 
     def test_manual_billing_price_is_preserved_after_recompute(self):
         receipt = self._create_receipt(qty=10.0, pcs=10.0, carats=2.5)
@@ -117,7 +121,7 @@ class TestSudiDiamondJobWork(TestStockCommon):
         self.assertEqual(backorder_move.sudi_carats, 12.5)
         self.assertEqual(backorder_move.sudi_job_type_id, self.job_type)
 
-    def test_partial_delivery_invoices_full_billing_line_once(self):
+    def test_partial_delivery_invoices_delivered_quantity_only(self):
         receipt = self._create_receipt()
         delivery = receipt.sudi_delivery_ids
 
@@ -129,9 +133,10 @@ class TestSudiDiamondJobWork(TestStockCommon):
         invoice = self.env["account.move"].browse(action["res_id"])
         billing_line = receipt.sudi_billing_line_ids.filtered(lambda line: line.job_type_id == self.job_type)
 
-        self.assertEqual(invoice.invoice_line_ids.quantity, 100.0)
+        self.assertEqual(invoice.invoice_line_ids.quantity, 50.0)
         self.assertEqual(invoice.invoice_line_ids.sudi_billing_line_id, billing_line)
         self.assertEqual(billing_line.invoice_line_id, invoice.invoice_line_ids)
+        self.assertEqual(invoice.invoice_line_ids.sudi_stock_move_id, delivery.move_ids)
         with self.assertRaises(UserError):
             receipt.action_sudi_create_invoice()
 
@@ -152,6 +157,34 @@ class TestSudiDiamondJobWork(TestStockCommon):
         self.assertEqual(invoice.invoice_line_ids.price_unit, 80.0)
         self.assertEqual(invoice.invoice_line_ids.quantity, 100.0)
         self.assertEqual(delivery.move_ids.sudi_invoice_line_id, invoice.invoice_line_ids)
+        self.assertEqual(invoice.invoice_line_ids.sudi_stock_move_id, delivery.move_ids)
+
+    def test_same_job_type_receipt_lines_create_separate_invoice_lines(self):
+        receipt = self._create_receipt(
+            move_commands=[
+                self._prepare_receipt_move_command(qty=5.0, pcs=5.0, carats=1.0, sr=1),
+                self._prepare_receipt_move_command(qty=7.0, pcs=7.0, carats=2.0, sr=2),
+            ],
+        )
+        delivery = receipt.sudi_delivery_ids
+        for move in delivery.move_ids:
+            move.quantity = move.product_uom_qty
+            move.picked = True
+        delivery.button_validate()
+
+        action = receipt.action_sudi_create_invoice()
+        invoice = self.env["account.move"].browse(action["res_id"])
+
+        self.assertEqual(len(invoice.invoice_line_ids), 2)
+        self.assertEqual(
+            invoice.invoice_line_ids.sorted(key=lambda line: line.quantity).mapped("quantity"),
+            [5.0, 7.0],
+        )
+        self.assertEqual(len(receipt.sudi_billing_line_ids.filtered("invoice_line_id")), 2)
+        self.assertEqual(
+            delivery.move_ids.sorted(key=lambda move: move.sudi_sr).sudi_invoice_line_id,
+            invoice.invoice_line_ids.sorted(key=lambda line: line.quantity),
+        )
 
     def test_job_type_base_price_used_without_partner_special_price(self):
         self._get_partner_price_line().unlink()
