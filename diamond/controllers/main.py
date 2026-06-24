@@ -151,8 +151,8 @@ class SudiDiamondJangadController(Controller):
     def jangad_webmanifest(self):
         manifest = {
             "id": request.env["ir.http"]._url_for("/diamond/jangad/"),
-            "name": "Jangad Upload",
-            "short_name": "Jangad",
+            "name": "SDPPL",
+            "short_name": "SDPPL",
             "description": "Upload Jangad images for diamond job-work receipts.",
             "scope": request.env["ir.http"]._url_for("/diamond/jangad/"),
             "start_url": request.env["ir.http"]._url_for("/diamond/jangad/upload"),
