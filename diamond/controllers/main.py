@@ -1,6 +1,5 @@
 import base64
 import json
-import time
 from urllib.parse import quote
 
 from odoo import _
@@ -16,30 +15,13 @@ ALLOWED_IMAGE_MIMETYPES = {
 }
 
 JANGAD_PWA_ICON_VERSION = "2"
+JANGAD_BASE = "/jangad"
+JANGAD_LEGACY_BASE = "/diamond/jangad"
 
 
 class SudiDiamondJangadController(Controller):
-    _DEBUG_LOG_PATH = "/opt/odoo19/.cursor/debug-1294e1.log"
-
-    def _debug_log(self, hypothesis_id, location, message, data=None, run_id="post-fix"):
-        # region agent log
-        try:
-            with open(self._DEBUG_LOG_PATH, "a", encoding="utf-8") as fp:
-                fp.write(json.dumps({
-                    "sessionId": "1294e1",
-                    "runId": run_id,
-                    "hypothesisId": hypothesis_id,
-                    "location": location,
-                    "message": message,
-                    "data": data or {},
-                    "timestamp": int(time.time() * 1000),
-                }) + "\n")
-        except OSError:
-            pass
-        # endregion
-
     def _get_jangad_upload_url(self):
-        return request.httprequest.url_root.rstrip("/") + request.env["ir.http"]._url_for("/diamond/jangad/upload")
+        return request.httprequest.url_root.rstrip("/") + request.env["ir.http"]._url_for(JANGAD_BASE)
 
     def _get_stock_picking_sudo(self):
         return request.env["stock.picking"].sudo()
@@ -77,7 +59,7 @@ class SudiDiamondJangadController(Controller):
         }
 
     @route(
-        "/diamond/jangad/upload",
+        [JANGAD_BASE, f"{JANGAD_LEGACY_BASE}/upload"],
         type="http",
         auth="public",
         website=True,
@@ -112,7 +94,7 @@ class SudiDiamondJangadController(Controller):
         })
 
     @route(
-        "/diamond/jangad/address_suggestions",
+        [f"{JANGAD_BASE}/address_suggestions", f"{JANGAD_LEGACY_BASE}/address_suggestions"],
         type="http",
         auth="public",
         website=True,
@@ -137,10 +119,10 @@ class SudiDiamondJangadController(Controller):
         })
 
     def _jangad_pwa_icon_src(self, size):
-        return f"/diamond/jangad/icon/{size}.png?v={JANGAD_PWA_ICON_VERSION}"
+        return f"{JANGAD_BASE}/icon/{size}.png?v={JANGAD_PWA_ICON_VERSION}"
 
     @route(
-        "/diamond/jangad/manifest.webmanifest",
+        [f"{JANGAD_BASE}/manifest.webmanifest", f"{JANGAD_LEGACY_BASE}/manifest.webmanifest"],
         type="http",
         auth="public",
         website=True,
@@ -150,12 +132,12 @@ class SudiDiamondJangadController(Controller):
     )
     def jangad_webmanifest(self):
         manifest = {
-            "id": request.env["ir.http"]._url_for("/diamond/jangad/"),
+            "id": request.env["ir.http"]._url_for(f"{JANGAD_BASE}/"),
             "name": "SDPPL",
             "short_name": "SDPPL",
             "description": "Upload Jangad images for diamond job-work receipts.",
-            "scope": request.env["ir.http"]._url_for("/diamond/jangad/"),
-            "start_url": request.env["ir.http"]._url_for("/diamond/jangad/upload"),
+            "scope": request.env["ir.http"]._url_for(f"{JANGAD_BASE}/"),
+            "start_url": request.env["ir.http"]._url_for(JANGAD_BASE),
             "display": "standalone",
             "background_color": "#ffffff",
             "theme_color": "#875A7B",
@@ -175,10 +157,6 @@ class SudiDiamondJangadController(Controller):
                 },
             ],
         }
-        self._debug_log("A", "main.py:jangad_webmanifest", "manifest served", {
-            "icon_count": len(manifest["icons"]),
-            "start_url": manifest["start_url"],
-        })
         return request.make_json_response(
             manifest,
             {
@@ -188,7 +166,7 @@ class SudiDiamondJangadController(Controller):
         )
 
     @route(
-        "/diamond/jangad/icon/<int:size>.png",
+        [f"{JANGAD_BASE}/icon/<int:size>.png", f"{JANGAD_LEGACY_BASE}/icon/<int:size>.png"],
         type="http",
         auth="public",
         website=True,
@@ -200,11 +178,6 @@ class SudiDiamondJangadController(Controller):
         size = 512 if size >= 512 else 192
         with file_open(f"diamond/static/src/img/jangad_pwa_icon_{size}.png", "rb") as fp:
             image = fp.read()
-        self._debug_log("A", "main.py:jangad_icon", "icon served", {
-            "size": size,
-            "byte_length": len(image),
-            "is_png": image[:8] == b"\x89PNG\r\n\x1a\n",
-        })
         return request.make_response(
             image,
             [
@@ -215,7 +188,7 @@ class SudiDiamondJangadController(Controller):
         )
 
     @route(
-        "/diamond/jangad/service-worker.js",
+        [f"{JANGAD_BASE}/service-worker.js", f"{JANGAD_LEGACY_BASE}/service-worker.js"],
         type="http",
         auth="public",
         website=True,
@@ -231,12 +204,12 @@ class SudiDiamondJangadController(Controller):
             [
                 ("Content-Type", "text/javascript"),
                 ("Cache-Control", "no-cache"),
-                ("Service-Worker-Allowed", request.env["ir.http"]._url_for("/diamond/jangad/")),
+                ("Service-Worker-Allowed", request.env["ir.http"]._url_for(f"{JANGAD_BASE}/")),
             ],
         )
 
     @route(
-        "/diamond/jangad/offline",
+        [f"{JANGAD_BASE}/offline", f"{JANGAD_LEGACY_BASE}/offline"],
         type="http",
         auth="public",
         website=True,
@@ -248,7 +221,7 @@ class SudiDiamondJangadController(Controller):
         return request.render("diamond.jangad_upload_offline")
 
     @route(
-        "/diamond/jangad/upload/qr",
+        [f"{JANGAD_BASE}/qr", f"{JANGAD_LEGACY_BASE}/upload/qr"],
         type="http",
         auth="public",
         website=True,
@@ -265,7 +238,7 @@ class SudiDiamondJangadController(Controller):
         })
 
     @route(
-        "/diamond/jangad/upload",
+        [JANGAD_BASE, f"{JANGAD_LEGACY_BASE}/upload"],
         type="http",
         auth="public",
         website=True,
@@ -299,7 +272,7 @@ class SudiDiamondJangadController(Controller):
         })
 
     @route(
-        "/diamond/jangad/upload/json",
+        [f"{JANGAD_BASE}/json", f"{JANGAD_LEGACY_BASE}/upload/json"],
         type="http",
         auth="public",
         website=True,

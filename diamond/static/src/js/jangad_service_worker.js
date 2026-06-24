@@ -1,12 +1,12 @@
 /* eslint-env serviceworker */
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = "sudi-jangad-pwa-v3";
-const SCOPE_PATH = "/diamond/jangad/";
-const OFFLINE_URL = "/diamond/jangad/offline";
+const CACHE_NAME = "sudi-jangad-pwa-v4";
+const SCOPE_PATH = "/jangad/";
+const OFFLINE_URL = "/jangad/offline";
 const SHELL_URLS = [
     OFFLINE_URL,
-    "/diamond/jangad/upload",
+    "/jangad",
 ];
 
 const shouldBypassServiceWorker = (url) =>
