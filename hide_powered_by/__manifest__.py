@@ -3,7 +3,6 @@
     'version': '19.0.1.0.0',
     'summary': 'FREE: Hide or customize the "Powered by Odoo" footer message with rich HTML.',
     'description': '''
-        🆓 FREE MODULE - No Cost, No Limitations!
 
         This completely free module gives you complete control over the "Powered by Odoo" footer branding. Hide the default message entirely or replace it with your own custom HTML content.
 
@@ -15,15 +14,8 @@
         • ⚡ Real-time changes without page refresh
         • 📱 Responsive design support
 
-        💡 Perfect for:
-        • White-label solutions
-        • Brand customization
-        • Professional website footers
-        • Custom branding requirements
-
-        🚀 100% Free - No hidden costs, no premium features!
     ''',
-    'author': 'Waqas Mustafa',
+    'author': 'Albatross IT Consultancy',
     'website': 'https://www.linkedin.com/in/waqas-mustafa-ba5701209/',
     'support': 'mustafawaqas0@gmail.com',
     'license': 'LGPL-3',
