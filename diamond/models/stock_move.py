@@ -88,6 +88,29 @@ class StockMove(models.Model):
             vals.update(move._sudi_prepare_split_quantity_vals(ratio))
         return vals
 
+    @api.model
+    def _prepare_merge_moves_distinct_fields(self):
+        fields = super()._prepare_merge_moves_distinct_fields()
+        if self.picking_id.filtered("sudi_is_diamond_job_work"):
+            fields.extend([
+                "sudi_sr",
+                "sudi_job_type_id",
+                "sudi_size",
+                "sudi_pcs_qty",
+                "sudi_carats",
+                "sudi_remarks",
+            ])
+        return fields
+
+    def _action_confirm(self, merge=True, merge_into=False, create_proc=True):
+        if self.picking_id.filtered("sudi_is_diamond_job_work"):
+            merge = False
+        return super()._action_confirm(
+            merge=merge,
+            merge_into=merge_into,
+            create_proc=create_proc,
+        )
+
     def _split(self, qty, restrict_partner_id=False):
         original_values = {}
         for move in self.filtered(lambda m: m.picking_id.sudi_is_diamond_job_work):

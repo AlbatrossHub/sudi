@@ -71,6 +71,34 @@ class TestSudiDiamondJobWork(TestStockCommon):
         self.assertEqual(delivery.move_ids.sudi_pcs_qty, 100.0)
         self.assertEqual(delivery.move_ids.sudi_carats, 25.0)
 
+    def test_confirm_preserves_multiple_operation_lines(self):
+        move_commands = [
+            self._prepare_receipt_move_command(
+                qty=float(sr), pcs=float(sr), carats=float(sr) / 2, sr=sr,
+            )
+            for sr in range(1, 6)
+        ]
+        receipt = self.env["stock.picking"].create({
+            "partner_id": self.partner.id,
+            "picking_type_id": self.picking_type_in.id,
+            "location_id": self.supplier_location.id,
+            "location_dest_id": self.stock_location.id,
+            "sudi_is_diamond_job_work": True,
+            "move_ids": move_commands,
+        })
+
+        self.assertEqual(len(receipt.move_ids), 5)
+        receipt.action_confirm()
+
+        self.assertEqual(receipt.state, "assigned")
+        self.assertEqual(len(receipt.move_ids), 5)
+        billing_lines = receipt.sudi_billing_line_ids.filtered("active")
+        self.assertEqual(len(billing_lines), 5)
+        self.assertEqual(
+            billing_lines.sorted(key=lambda line: line.sudi_sr).receipt_move_id,
+            receipt.move_ids.sorted(key=lambda move: move.sudi_sr),
+        )
+
     def test_billing_details_one_line_per_receipt_move(self):
         receipt = self._create_receipt(
             move_commands=[
