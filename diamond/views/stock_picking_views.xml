@@ -125,7 +125,7 @@
                        invisible="not sudi_origin_receipt_id"
                        readonly="1"/>
                 <field name="sudi_jangad_image"
-                       widget="image"
+                       widget="jangad_image_viewer"
                        invisible="not sudi_is_diamond_job_work"
                        readonly="state in ['cancel', 'done']"/>
             </xpath>
@@ -337,7 +337,7 @@
                         </group>
                     </group>
                     <group string="Jangad">
-                        <field name="sudi_jangad_image" widget="image" readonly="1" nolabel="1"/>
+                        <field name="sudi_jangad_image" widget="jangad_image_viewer" readonly="1" nolabel="1"/>
                     </group>
                 </sheet>
             </form>
@@ -521,7 +521,7 @@
                         </group>
                     </group>
                     <group string="Jangad">
-                        <field name="sudi_jangad_image" widget="image" readonly="1" nolabel="1"/>
+                        <field name="sudi_jangad_image" widget="jangad_image_viewer" readonly="1" nolabel="1"/>
                     </group>
                     <notebook>
                         <page string="Items" name="items">

@@ -30,7 +30,7 @@ class OwaCloudOnboarding(http.Controller):
         return request.env['ir.config_parameter'].sudo().get_param(key, default)
 
     @http.route('/open_whatsapp_connector/cloud/embedded_signup',
-                type='jsonrpc', auth='user', methods=['POST'])
+                type='json', auth='user', methods=['POST'])
     def embedded_signup(self, code=None, phone_number_id=None, waba_id=None,
                         account_id=None, **kw):
         if not request.env.user.has_group(
