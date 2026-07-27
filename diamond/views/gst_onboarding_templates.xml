@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- GST Onboarding Page/Popup Template -->
+    <template id="gst_onboarding_page" name="GST Onboarding">
+        <t t-call="website.layout">
+            <t t-set="head">
+                <t t-out="head"/>
+                <t t-call="diamond.jangad_pwa_head"/>
+            </t>
+            <div id="wrap" class="oe_structure">
+                <section class="container py-5">
+                    <div class="row justify-content-center">
+                        <div class="col-lg-6 col-md-8">
+                            <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
+                                <div class="card-header bg-primary text-white text-center py-4">
+                                    <h3 class="card-title fw-bold mb-1">GST Information Required</h3>
+                                    <p class="card-subtitle small opacity-75">Please update your GST details to continue</p>
+                                </div>
+                                <div class="card-body p-4">
+                                    <div t-if="error" class="alert alert-danger" role="alert">
+                                        <t t-out="error"/>
+                                    </div>
+
+                                    <form action="/web/gst_onboarding/submit" method="post">
+                                        <input type="hidden" name="csrf_token" t-att-value="csrf_token"/>
+                                        <input type="hidden" name="redirect" t-att-value="redirect"/>
+
+                                        <div class="mb-4">
+                                            <label for="gst_vat_number" class="form-label fw-bold">GST Number</label>
+                                            <input id="gst_vat_number"
+                                                   type="text"
+                                                   name="vat"
+                                                   class="form-control form-control-lg"
+                                                   placeholder="e.g. 24AAAAA0000A1Z5"
+                                                   t-att-value="partner.vat or ''"/>
+                                            <div class="form-text text-muted mt-2">
+                                                Enter your GST Identification Number if applicable.
+                                            </div>
+                                        </div>
+
+                                        <div class="form-check mb-4">
+                                            <input class="form-check-input" type="checkbox" name="skip_gst" id="skip_gst_checkbox" value="1"/>
+                                            <label class="form-check-label text-muted" for="skip_gst_checkbox">
+                                                Skip GST registration for now (Do not show this prompt again)
+                                            </label>
+                                        </div>
+
+                                        <div class="d-grid gap-2">
+                                            <button type="submit" name="submit_button" value="save" class="btn btn-primary btn-lg">
+                                                Save &amp; Continue
+                                            </button>
+                                            <button type="submit" name="skip_button" value="skip" class="btn btn-outline-secondary">
+                                                Skip for Now
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <!-- New Customer Registration Form (WhatsApp OTP Flow) Template -->
+    <template id="otp_new_customer_form" name="Customer Registration">
+        <t t-call="website.layout">
+            <t t-set="head">
+                <t t-out="head"/>
+                <t t-call="diamond.jangad_pwa_head"/>
+            </t>
+            <div id="wrap" class="oe_structure">
+                <section class="container py-5">
+                    <div class="row justify-content-center">
+                        <div class="col-lg-6 col-md-8">
+                            <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
+                                <div class="card-header bg-primary text-white text-center py-4">
+                                    <h3 class="card-title fw-bold mb-1">Complete Customer Registration</h3>
+                                    <p class="card-subtitle small opacity-75">Verified via WhatsApp OTP</p>
+                                </div>
+                                <div class="card-body p-4">
+                                    <div t-if="error" class="alert alert-danger" role="alert">
+                                        <t t-out="error"/>
+                                    </div>
+
+                                    <form action="/web/auth/otp/register/submit" method="post">
+                                        <input type="hidden" name="csrf_token" t-att-value="csrf_token"/>
+                                        <input type="hidden" name="redirect" t-att-value="redirect"/>
+
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold">Verified Phone Number</label>
+                                            <input type="text"
+                                                   class="form-control bg-light"
+                                                   t-att-value="phone"
+                                                   readonly="readonly"
+                                                   disabled="disabled"/>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label for="customer_name" class="form-label fw-bold">
+                                                Full Name <span class="text-danger">*</span>
+                                            </label>
+                                            <input id="customer_name"
+                                                   type="text"
+                                                   name="name"
+                                                   class="form-control form-control-lg"
+                                                   placeholder="Enter your full name"
+                                                   required="required"/>
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <label for="customer_vat" class="form-label fw-bold">
+                                                GST Number <span class="text-muted font-weight-normal">(Optional)</span>
+                                            </label>
+                                            <input id="customer_vat"
+                                                   type="text"
+                                                   name="vat"
+                                                   class="form-control form-control-lg"
+                                                   placeholder="e.g. 24AAAAA0000A1Z5"/>
+                                            <div class="form-text text-muted mt-2">
+                                                Entering a GST number automatically links your contact to your parent company profile and auto-populates state and address details.
+                                            </div>
+                                        </div>
+
+                                        <div class="form-check mb-4">
+                                            <input class="form-check-input" type="checkbox" name="skip_gst" id="otp_skip_gst_checkbox" value="1"/>
+                                            <label class="form-check-label text-muted" for="otp_skip_gst_checkbox">
+                                                Skip GST prompt for future logins
+                                            </label>
+                                        </div>
+
+                                        <div class="d-grid">
+                                            <button type="submit" class="btn btn-primary btn-lg">
+                                                Complete &amp; Continue to Jangad
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+</odoo>

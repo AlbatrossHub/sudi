@@ -16,6 +16,7 @@
         "uom",
         "website",
         "open_whatsapp_connector",
+        "web_auth_otp_login",
     ],
     "data": [
         "security/diamond_security.xml",
@@ -31,6 +32,7 @@
         "views/account_analytic_line_views.xml",
         "views/account_move_views.xml",
         "views/jangad_upload_templates.xml",
+        "views/gst_onboarding_templates.xml",
         "report/diamond_receipt_report.xml",
         "views/menu_views.xml",
     ],
