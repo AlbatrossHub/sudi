@@ -5,6 +5,7 @@ from odoo.exceptions import ValidationError
 class ResPartner(models.Model):
     _inherit = "res.partner"
 
+    x_skip_gst = fields.Boolean(string="Skip GST Prompt", default=False)
     sudi_diamond_service_price_ids = fields.One2many(
         "sudi.diamond.partner.service.price",
         "partner_id",

@@ -5,6 +5,9 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='vat']" position="after">
+                <field name="x_skip_gst"/>
+            </xpath>
             <page name="sales_purchases" position="after">
                 <page string="Diamond Service Prices" name="sudi_diamond_service_prices">
                     <field name="sudi_diamond_service_price_ids" context="{'default_partner_id': id}">
