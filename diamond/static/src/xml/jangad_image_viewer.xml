@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="diamond.JangadImageViewerField">
+        <div class="o_field_jangad_image_viewer position-relative d-inline-block">
+            <div t-ref="viewerContainer"
+                 class="o_jangad_viewer_container overflow-hidden position-relative rounded border bg-light"
+                 t-on-mouseenter="onMouseEnter"
+                 t-on-mouseleave="onMouseLeave"
+                 t-on-mousemove="onMouseMove"
+                 t-on-mousedown="onMouseDown"
+                 t-on-touchstart="onTouchStart"
+                 t-on-touchmove="onTouchMove"
+                 t-on-touchend="onTouchEnd">
+
+                <!-- Image Element -->
+                <img t-ref="viewerImg"
+                     t-att-src="getUrl(props.name)"
+                     t-att-alt="imgAlt"
+                     t-att-class="imgClass + ' o_jangad_img_target'"
+                     t-att-style="transformStyle"
+                     t-on-error="onLoadFailed"/>
+
+                <!-- Desktop Magnifier Lens Overlay -->
+                <t t-if="viewerState.isHovering &amp;&amp; props.record.data[props.name]">
+                    <div class="o_jangad_zoom_lens position-absolute rounded-circle shadow-lg"
+                         t-att-style="'left: ' + viewerState.lensX + 'px; top: ' + viewerState.lensY + 'px; width: 120px; height: 120px; border: 2px solid #fff; background-image: url(' + getUrl(props.name) + '); background-repeat: no-repeat; background-size: ' + (containerRef.el ? containerRef.el.getBoundingClientRect().width * 2.5 : 500) + 'px auto; background-position: ' + viewerState.lensBgX + 'px ' + viewerState.lensBgY + 'px;'"/>
+                </t>
+
+                <!-- Floating Toolbar Controls -->
+                <t t-if="props.record.data[props.name]">
+                    <div class="o_jangad_toolbar position-absolute bottom-0 start-50 translate-middle-x mb-2 d-flex gap-1 p-1 bg-dark bg-opacity-75 rounded-pill shadow z-2">
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="rotateCounterClockwise" title="Rotate Left (-90°)">
+                            <i class="fa fa-rotate-left"/>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="rotateClockwise" title="Rotate Right (+90°)">
+                            <i class="fa fa-rotate-right"/>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="zoomOut" title="Zoom Out (-)">
+                            <i class="fa fa-search-minus"/>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="zoomIn" title="Zoom In (+)">
+                            <i class="fa fa-search-plus"/>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="resetView" title="Reset View">
+                            <i class="fa fa-undo"/>
+                        </button>
+                    </div>
+                </t>
+            </div>
+
+            <!-- Edit Mode File Upload & Clear Controls -->
+            <t t-if="!props.readonly &amp;&amp; props.record.isInEdit">
+                <div class="o_field_image_controls mt-1 d-flex gap-1 justify-content-center">
+                    <FileUploader
+                        acceptedFileExtensions="props.acceptedFileExtensions"
+                        onUploaded.bind="onFileUploaded">
+                        <t t-set-slot="toggler">
+                            <button type="button" class="btn btn-sm btn-primary fa fa-pencil o_select_file_button" title="Edit"/>
+                        </t>
+                    </FileUploader>
+                    <t t-if="props.record.data[props.name]">
+                        <button type="button" class="btn btn-sm btn-danger fa fa-trash-o o_clear_file_button" t-on-click="onFileRemove" title="Clear"/>
+                    </t>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

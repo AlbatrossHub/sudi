@@ -34,6 +34,11 @@
         "views/menu_views.xml",
     ],
     "assets": {
+        "web.assets_backend": [
+            "diamond/static/src/js/jangad_image_viewer.js",
+            "diamond/static/src/xml/jangad_image_viewer.xml",
+            "diamond/static/src/scss/jangad_image_viewer.scss",
+        ],
         "web.assets_frontend": [
             "diamond/static/src/js/jangad_upload.js",
             "diamond/static/src/js/jangad_pwa.js",

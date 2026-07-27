@@ -1,0 +1,56 @@
+.o_field_jangad_image_viewer {
+    max-width: 100%;
+
+    .o_jangad_viewer_container {
+        cursor: grab;
+        min-height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        touch-action: none;
+
+        &:active {
+            cursor: grabbing;
+        }
+
+        .o_jangad_img_target {
+            transform-origin: center center;
+            max-height: 450px;
+            object-fit: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .o_jangad_zoom_lens {
+            pointer-events: none;
+            z-index: 10;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .o_jangad_toolbar {
+            opacity: 0.85;
+            transition: opacity 0.2s ease-in-out;
+            backdrop-filter: blur(4px);
+
+            &:hover {
+                opacity: 1;
+            }
+
+            .btn {
+                width: 32px;
+                height: 32px;
+                padding: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border-color: rgba(255, 255, 255, 0.4);
+
+                &:hover {
+                    background-color: rgba(255, 255, 255, 0.2);
+                    border-color: #fff;
+                }
+            }
+        }
+    }
+}
