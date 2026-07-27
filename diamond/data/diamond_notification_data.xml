@@ -9,5 +9,20 @@
             <field name="key">diamond.sudi_pickup_confirmed_notify_user_id</field>
             <field name="value">9</field>
         </record>
+
+        <record id="quick_reply_jangad_pickup_scheduled" model="owa.quick.reply">
+            <field name="name">Jangad Pickup Scheduled (Notify Pickup Person)</field>
+            <field name="body">We have received a new Jangad request from {{customer_name}}, address is {{address}}, contact number is {{phone}}</field>
+        </record>
+
+        <record id="quick_reply_jangad_pickup_done_customer" model="owa.quick.reply">
+            <field name="name">Jangad Pickup Done (Notify Customer)</field>
+            <field name="body">We have received your Jangad request. The uploaded photo has been attached. We will keep you posted on the status.</field>
+        </record>
+
+        <record id="quick_reply_jangad_pickup_done_admin" model="owa.quick.reply">
+            <field name="name">Jangad Pickup Done (Notify Admin)</field>
+            <field name="body">Pickup was successful for Jangad #{{picking_name}}. Please prepare data for job work.</field>
+        </record>
     </data>
 </odoo>

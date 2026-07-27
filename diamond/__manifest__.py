@@ -15,6 +15,7 @@
         "timesheet_grid",
         "uom",
         "website",
+        "open_whatsapp_connector",
     ],
     "data": [
         "security/diamond_security.xml",

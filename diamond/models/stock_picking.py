@@ -1,3 +1,4 @@
+import logging
 import re
 
 from markupsafe import Markup, escape
@@ -5,6 +6,8 @@ from markupsafe import Markup, escape
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools.float_utils import float_is_zero
+
+_logger = logging.getLogger(__name__)
 
 
 class StockPicking(models.Model):
@@ -121,6 +124,8 @@ class StockPicking(models.Model):
 
     def write(self, vals):
         res = super().write(vals)
+        if "sudi_jangad_image" in vals or "sudi_pickup_user_id" in vals:
+            self._sudi_notify_pickup_scheduled()
         if not self.env.context.get("sudi_skip_billing_sync"):
             trigger_fields = {
                 "move_ids",
@@ -192,38 +197,144 @@ class StockPicking(models.Model):
                 },
             )
 
+    def _sudi_send_whatsapp_message(self, recipient_phone, body_text, attachment=None, partner=None):
+        """Send a WhatsApp message via open_whatsapp_connector engine."""
+        if not recipient_phone:
+            _logger.warning("No recipient phone number provided for WhatsApp notification on %s", self.display_name)
+            return False
+        
+        wa_account = (
+            self.env['owa.account'].sudo().search([('session_state', '=', 'connected')], limit=1)
+            or self.env['owa.account'].sudo().search([], limit=1)
+        )
+        if not wa_account:
+            _logger.warning("No WhatsApp account found in open_whatsapp_connector for %s", self.display_name)
+            return False
+
+        mail_vals = {
+            'model': self._name,
+            'res_id': self.id,
+            'body': body_text,
+            'message_type': 'whatsapp_message',
+        }
+        if attachment:
+            mail_vals['attachment_ids'] = [(6, 0, attachment.ids)]
+        
+        mail_message = self.env['mail.message'].sudo().create(mail_vals)
+
+        msg_vals = {
+            'mobile_number': recipient_phone,
+            'message_type': 'outbound',
+            'state': 'outgoing',
+            'wa_account_id': wa_account.id,
+            'mail_message_id': mail_message.id,
+        }
+        if partner:
+            msg_vals['whatsapp_partner_id'] = partner.id
+
+        owa_msg = self.env['owa.message'].sudo().create(msg_vals)
+        try:
+            owa_msg._send_message()
+        except Exception:
+            _logger.exception("Failed to send WhatsApp message for %s to %s", self.display_name, recipient_phone)
+        return owa_msg
+
     def _sudi_notify_pickup_scheduled(self):
+        """Trigger 1: Notify pickup person on Jangad upload / schedule creation."""
         notify_user = self._sudi_get_pickup_notify_user()
-        if not notify_user:
-            return
         receipts = self.filtered(
             lambda picking: picking.sudi_is_diamond_job_work
             and picking.picking_type_code == "incoming"
-            and picking.state == "sudi_pickup_pending"
+            and (picking.state == "sudi_pickup_pending" or picking.sudi_jangad_image)
         )
         for receipt in receipts:
-            receipt._sudi_post_user_notification(
-                notify_user,
-                _("Pickup scheduled: %s") % receipt.name,
-                _("A pick has been scheduled for receipt %s.", receipt.name),
-                toast_type="info",
+            if notify_user:
+                receipt._sudi_post_user_notification(
+                    notify_user,
+                    _("Pickup scheduled: %s") % receipt.name,
+                    _("A pick has been scheduled for receipt %s.", receipt.name),
+                    toast_type="info",
+                )
+            
+            # Recipient: Pickup Person assigned to record or configured pickup notify user
+            pickup_partner = receipt.sudi_pickup_user_id.partner_id if receipt.sudi_pickup_user_id else (notify_user.partner_id if notify_user else False)
+            pickup_phone = (
+                (receipt.sudi_pickup_user_id.partner_id.phone if receipt.sudi_pickup_user_id and receipt.sudi_pickup_user_id.partner_id.phone else False)
+                or (notify_user.partner_id.phone if notify_user else False)
+                or receipt.sudi_customer_contact
             )
+            
+            customer_name = receipt.partner_id.name if receipt.partner_id else _("Customer")
+            address = receipt.sudi_pickup_address or receipt.sudi_partner_address or (receipt.partner_id.contact_address if receipt.partner_id else "") or ""
+            phone_no = receipt.sudi_customer_contact or (receipt.partner_id.phone if receipt.partner_id else "") or ""
+
+            wa_body = _(
+                "We have received a new Jangad request from %(customer_name)s, address is %(address)s, contact number is %(phone)s",
+                customer_name=customer_name,
+                address=address,
+                phone=phone_no,
+            )
+            if pickup_phone:
+                receipt._sudi_send_whatsapp_message(
+                    recipient_phone=pickup_phone,
+                    body_text=wa_body,
+                    partner=pickup_partner,
+                )
 
     def _sudi_notify_pickup_confirmed(self):
+        """Trigger 2 (Notify Customer with attachment) & Trigger 3 (Notify Admin) on Pickup Done."""
         notify_user = self._sudi_get_pickup_confirmed_notify_user()
-        if not notify_user:
-            return
         for receipt in self:
-            receipt._sudi_post_user_notification(
-                notify_user,
-                _("Pickup confirmed: %s") % receipt.name,
-                _(
-                    "Pickup for receipt %s was successful. "
-                    "Please validate the Jangad and fill in the job table for this order.",
-                    receipt.name,
-                ),
-                toast_type="success",
-            )
+            if notify_user:
+                receipt._sudi_post_user_notification(
+                    notify_user,
+                    _("Pickup confirmed: %s") % receipt.name,
+                    _(
+                        "Pickup for receipt %s was successful. "
+                        "Please validate the Jangad and fill in the job table for this order.",
+                        receipt.name,
+                    ),
+                    toast_type="success",
+                )
+
+            # Trigger 2: Notify Customer with attached Jangad photo
+            customer_partner = receipt.partner_id
+            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone if customer_partner else False)
+            if customer_phone:
+                attachment = False
+                if receipt.sudi_jangad_image:
+                    attachment = self.env['ir.attachment'].sudo().create({
+                        'name': f'jangad_{receipt.name}.jpg',
+                        'type': 'binary',
+                        'datas': receipt.sudi_jangad_image,
+                        'res_model': receipt._name,
+                        'res_id': receipt.id,
+                        'mimetype': 'image/jpeg',
+                    })
+                cust_body = _(
+                    "We have received your Jangad request. The uploaded photo has been attached. We will keep you posted on the status."
+                )
+                receipt._sudi_send_whatsapp_message(
+                    recipient_phone=customer_phone,
+                    body_text=cust_body,
+                    attachment=attachment,
+                    partner=customer_partner,
+                )
+
+            # Trigger 3: Notify Admin
+            admin_partner = notify_user.partner_id if notify_user else False
+            admin_phone = admin_partner.phone if admin_partner else False
+            if admin_phone:
+                admin_body = _(
+                    "Pickup was successful for Jangad #%(picking_name)s. Please prepare data for job work.",
+                    picking_name=receipt.name,
+                )
+                receipt._sudi_send_whatsapp_message(
+                    recipient_phone=admin_phone,
+                    body_text=admin_body,
+                    partner=admin_partner,
+                )
+
 
     @api.depends("sudi_delivery_ids")
     def _compute_sudi_counts(self):
