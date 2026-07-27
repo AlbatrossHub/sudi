@@ -59,9 +59,9 @@ class SudiDiamondJangadController(Controller):
         }
 
     @route(
-        [JANGAD_BASE, f"{JANGAD_LEGACY_BASE}/upload"],
+        [JANGAD_BASE, JANGAD_LEGACY_BASE, f"{JANGAD_LEGACY_BASE}/upload"],
         type="http",
-        auth="public",
+        auth="user",
         website=True,
         sitemap=False,
         methods=["GET"],
@@ -96,7 +96,7 @@ class SudiDiamondJangadController(Controller):
     @route(
         [f"{JANGAD_BASE}/address_suggestions", f"{JANGAD_LEGACY_BASE}/address_suggestions"],
         type="http",
-        auth="public",
+        auth="user",
         website=True,
         sitemap=False,
         methods=["GET"],
@@ -238,9 +238,9 @@ class SudiDiamondJangadController(Controller):
         })
 
     @route(
-        [JANGAD_BASE, f"{JANGAD_LEGACY_BASE}/upload"],
+        [JANGAD_BASE, JANGAD_LEGACY_BASE, f"{JANGAD_LEGACY_BASE}/upload"],
         type="http",
-        auth="public",
+        auth="user",
         website=True,
         sitemap=False,
         methods=["POST"],
@@ -274,7 +274,7 @@ class SudiDiamondJangadController(Controller):
     @route(
         [f"{JANGAD_BASE}/json", f"{JANGAD_LEGACY_BASE}/upload/json"],
         type="http",
-        auth="public",
+        auth="user",
         website=True,
         sitemap=False,
         methods=["POST"],
