@@ -2160,7 +2160,7 @@ class OwaAccount(models.Model):
 
         # Use the central WhatsApp channel helper so inbound and outbound
         # messages resolve to the same normalized thread and new channels are broadcast.
-        channel = self.env['discuss.channel'].sudo()._get_whatsapp_channel(
+        channel = self.env['discuss.channel'].sudo()._get_owa_whatsapp_channel(
             from_number,
             account,
             sender_name=sender_name,

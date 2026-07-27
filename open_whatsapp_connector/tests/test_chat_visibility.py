@@ -243,13 +243,13 @@ class TestChatVisibility(OwaTestCase):
             # Shared (default): _get_whatsapp_channel leaves assignee empty.
             self.env['ir.config_parameter'].sudo().set_param(
                 'open_whatsapp_connector.chat_visibility', 'shared')
-            ch_shared = self.Channel._get_whatsapp_channel(
+            ch_shared = self.Channel._get_owa_whatsapp_channel(
                 '+15551119001', self.account, create_if_not_found=True)
             self.assertFalse(ch_shared.assignee_id)
             # Restricted: a new inbound conversation is auto-assigned an owner.
             self.env['ir.config_parameter'].sudo().set_param(
                 'open_whatsapp_connector.chat_visibility', 'own_agent')
-            ch_owned = self.Channel._get_whatsapp_channel(
+            ch_owned = self.Channel._get_owa_whatsapp_channel(
                 '+15551119002', self.account, create_if_not_found=True)
         self.assertTrue(ch_owned.assignee_id)
         self.assertIn(ch_owned.assignee_id, self.account.notify_user_ids)

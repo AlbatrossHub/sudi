@@ -546,10 +546,10 @@ class DiscussChannel(models.Model):
                 Command.create({'partner_id': p.id}) for p in missing]
             channel._broadcast(missing.ids)
 
-    def _get_whatsapp_channel(self, whatsapp_number, wa_account_id,
-                              sender_name=False, create_if_not_found=False,
-                              related_message=False):
-        """Find or create a WhatsApp discuss channel."""
+    def _get_owa_whatsapp_channel(self, whatsapp_number, wa_account_id,
+                                  sender_name=False, create_if_not_found=False,
+                                  related_message=False):
+        """Find or create an Open WhatsApp Connector discuss channel."""
         # Group/community/newsletter JIDs are not phone numbers; passing them
         # through `wa_phone_format` would have phonenumbers reinterpret the
         # leading digits as a US number and silently drop the `@g.us` /
@@ -669,6 +669,25 @@ class DiscussChannel(models.Model):
             self._owa_topup_notify_members(channel, wa_account_id)
 
         return channel
+
+    def _get_whatsapp_channel(self, whatsapp_number, wa_account_id,
+                              sender_name=False, create_if_not_found=False,
+                              related_message=False):
+        """Dispatch helper: routes owa.account calls to _get_owa_whatsapp_channel,
+        and delegates to super() for standard enterprise whatsapp.account calls."""
+        if wa_account_id and getattr(wa_account_id, '_name', False) == 'owa.account':
+            return self._get_owa_whatsapp_channel(
+                whatsapp_number, wa_account_id,
+                sender_name=sender_name, create_if_not_found=create_if_not_found,
+                related_message=related_message,
+            )
+        if hasattr(super(), '_get_whatsapp_channel'):
+            return super()._get_whatsapp_channel(
+                whatsapp_number, wa_account_id,
+                sender_name=sender_name, create_if_not_found=create_if_not_found,
+                related_message=related_message,
+            )
+        return self.env['discuss.channel']
 
     # ------------------------------------------------------------------
     # OVERRIDES

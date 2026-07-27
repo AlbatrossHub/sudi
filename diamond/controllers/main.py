@@ -61,12 +61,19 @@ class SudiDiamondJangadController(Controller):
     @route(
         [JANGAD_BASE, JANGAD_LEGACY_BASE, f"{JANGAD_LEGACY_BASE}/upload"],
         type="http",
-        auth="user",
+        auth="public",
         website=True,
         sitemap=False,
         methods=["GET"],
     )
     def jangad_upload_form(self, **kwargs):
+        if request.env.user._is_public():
+            full_path = (request.httprequest.full_path or JANGAD_BASE).rstrip("?")
+            if not full_path or full_path.startswith(JANGAD_LEGACY_BASE):
+                full_path = JANGAD_BASE
+            redirect_target = quote(full_path)
+            return request.redirect(f"/web/login?redirect={redirect_target}&mode=otp")
+
         phone = kwargs.get("phone")
         portal_partner = self._get_portal_partner()
         if phone is None and portal_partner:

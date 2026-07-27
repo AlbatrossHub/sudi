@@ -217,9 +217,9 @@ class WebAuthOtpController(http.Controller):
         request.session.touch()
 
         # Determine target redirect
-        redirect_url = redirect or request.params.get('redirect') or '/shop/checkout'
+        redirect_url = redirect or request.params.get('redirect') or '/jangad'
         if not redirect_url.startswith('/'):
-            redirect_url = '/shop/checkout'
+            redirect_url = '/jangad'
 
         return {
             'success': True,

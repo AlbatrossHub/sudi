@@ -39,7 +39,7 @@ class TestNotifyBackfill(OwaTestCase):
         notify_partners = self.account.notify_user_ids.partner_id
         # Drive the REAL inbound get-or-create entry point: this is the exact
         # call owa.account._handle_inbound makes for every inbound message.
-        channel = self.env['discuss.channel'].sudo()._get_whatsapp_channel(
+        channel = self.env['discuss.channel'].sudo()._get_owa_whatsapp_channel(
             '15551239999', self.account, create_if_not_found=True)
         # The pre-existing channel must be the one resolved (no new create).
         self.assertEqual(channel, ch)

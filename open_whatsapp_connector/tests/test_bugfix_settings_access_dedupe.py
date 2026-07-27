@@ -103,7 +103,7 @@ class TestOwaBugfixBatch(OwaTestCase):
         agent = self._internal_user('wa_grp_agent1')
         group.sudo().write({'user_ids': [(4, agent.id)]})
         self.account.allowed_group_id = group.id
-        ch = self.Channel._get_whatsapp_channel(
+        ch = self.Channel._get_owa_whatsapp_channel(
             '919812300001', self.account, create_if_not_found=True)
         self.assertIn(agent.partner_id, ch.channel_member_ids.partner_id)
 

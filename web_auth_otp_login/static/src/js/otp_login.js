@@ -195,6 +195,15 @@ function initOtpLogin() {
         clearMessages();
     });
 
+    // Auto-switch to WhatsApp OTP tab if mode=otp or redirect URL contains jangad
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectParam = urlParams.get('redirect') || '';
+    const modeParam = urlParams.get('mode') || '';
+
+    if (modeParam === 'otp' || window.location.hash === '#otp' || redirectParam.includes('jangad')) {
+        tabOtp.click();
+    }
+
     // Handle OTP Sending
     function sendOtpRequest() {
         const phoneVal = getFullPhoneNumber();
@@ -301,9 +310,10 @@ function initOtpLogin() {
         btnVerifyOtp.disabled = true;
         btnVerifyOtp.textContent = 'Verifying...';
 
-        // Extract redirect from current URL query
+        // Extract redirect from current URL query or hidden field
         const urlParams = new URLSearchParams(window.location.search);
-        const redirect = urlParams.get('redirect') || '/shop/checkout';
+        const redirectInput = document.getElementById('otp_redirect');
+        const redirect = urlParams.get('redirect') || (redirectInput && redirectInput.value) || '/jangad';
 
         fetch('/web/auth/otp/verify', {
             method: 'POST',
@@ -333,7 +343,7 @@ function initOtpLogin() {
                 showSuccess(result.message + ' Redirecting...');
                 clearInterval(timerInterval);
                 setTimeout(function () {
-                    window.location.href = result.redirect || '/shop/checkout';
+                    window.location.href = result.redirect || redirect || '/jangad';
                 }, 1000);
             } else {
                 showError(result ? result.error : 'Incorrect verification code.');

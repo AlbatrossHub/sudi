@@ -359,11 +359,11 @@ class OwaImportJob(models.Model):
                 return Channel, False
         else:
             return Channel, False
-        existing = Channel._get_whatsapp_channel(
+        existing = Channel._get_owa_whatsapp_channel(
             key, self.account_id, create_if_not_found=False)
         if existing:
             return existing, False
-        ch = Channel._get_whatsapp_channel(
+        ch = Channel._get_owa_whatsapp_channel(
             key, self.account_id, sender_name=sender_name, create_if_not_found=True)
         return ch, bool(ch)
 

@@ -93,7 +93,7 @@ class OwaCloudSendWizard(models.TransientModel):
                                   self.body_text, footer=footer)
         # Thread into the contact's conversation and record the outbound as
         # already-sent (owa_recorded_outbound_uid → no re-send).
-        channel = self.env['discuss.channel'].sudo()._get_whatsapp_channel(
+        channel = self.env['discuss.channel'].sudo()._get_owa_whatsapp_channel(
             to, acc, create_if_not_found=True)
         if channel:
             channel.with_context(mail_create_nosubscribe=True).message_post(
