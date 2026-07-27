@@ -34,7 +34,7 @@ class SudiDiamondJangadController(Controller):
 
     def _get_portal_phone(self, partner):
         commercial_partner = partner.commercial_partner_id
-        phone = partner.mobile or partner.phone or commercial_partner.mobile or commercial_partner.phone or ""
+        phone = partner.phone or partner.phone or commercial_partner.phone or commercial_partner.phone or ""
         return self._get_stock_picking_sudo()._sudi_normalize_phone(phone)
 
     def _get_address_suggestions(self, phone=None, partner=None):
