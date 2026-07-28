@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="otp_message_body_template" model="ir.config_parameter">
+        <field name="key">web_auth_otp_login.message_body_template</field>
+        <field name="value">*{{otp}}* is your verification code. For your security, do not share this code.</field>
+    </record>
+</odoo>

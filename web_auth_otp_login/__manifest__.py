@@ -15,11 +15,10 @@
         'web',
         'portal',
         'website',
-        'whatsapp',
         'open_whatsapp_connector',
     ],
     'data': [
-        'data/whatsapp_template_data.xml',
+        'data/otp_config_data.xml',
         'views/web_auth_otp_templates.xml',
     ],
     'assets': {

@@ -61,15 +61,6 @@ class WebAuthOtpController(http.Controller):
                 create_vals['mobile'] = phone_clean
             partner = request.env['res.partner'].with_user(SUPERUSER_ID).create(create_vals)
 
-        template = request.env.ref('web_auth_otp_login.wa_template_otp_auth_generic', raise_if_not_found=False)
-        if template:
-            template = template.with_user(SUPERUSER_ID)
-        if not template:
-            template = request.env['whatsapp.template'].with_user(SUPERUSER_ID).search([
-                ('status', '=', 'approved'),
-                ('template_name', '=', 'otp_auth_generic')
-            ], limit=1)
-
         # Generate a secure 6-digit OTP
         otp = str(random.randint(100000, 999999))
 
@@ -89,11 +80,12 @@ class WebAuthOtpController(http.Controller):
         if not wa_account:
             return {'success': False, 'error': _('WhatsApp sending failed: No WhatsApp account configured or connected in Open WhatsApp Connector.')}
 
-        # Build message body using the template if available
-        if template and template.body:
-            otp_body = template.body.replace('{{1}}', otp).replace('{1}', otp)
-        else:
-            otp_body = _("*%s* is your verification code. For your security, do not share this code.") % otp
+        # Build message body from configurable template (Settings > Technical > Parameters)
+        body_template = request.env['ir.config_parameter'].sudo().get_param(
+            'web_auth_otp_login.message_body_template',
+            default=_("*{{otp}}* is your verification code. For your security, do not share this code."),
+        )
+        otp_body = body_template.replace('{{otp}}', otp).replace('{{1}}', otp).replace('{1}', otp)
 
         try:
             mail_message = request.env['mail.message'].with_user(SUPERUSER_ID).create({
