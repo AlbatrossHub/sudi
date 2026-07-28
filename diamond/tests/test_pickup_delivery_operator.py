@@ -39,16 +39,10 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
         )
 
     def _set_pickup_notify_user(self, user):
-        self.env["ir.config_parameter"].sudo().set_param(
-            "diamond.sudi_pickup_notify_user_id",
-            str(user.id),
-        )
+        user.sudi_notify_pickup_scheduled = True
 
     def _set_pickup_confirmed_notify_user(self, user):
-        self.env["ir.config_parameter"].sudo().set_param(
-            "diamond.sudi_pickup_confirmed_notify_user_id",
-            str(user.id),
-        )
+        user.sudi_notify_pickup_confirmed = True
 
     def _receipt_move_command(self, qty=10.0):
         return Command.create({
@@ -141,17 +135,22 @@ class TestSudiPickupDeliveryOperator(TestStockCommon):
             delivery.with_user(self.internal_user).read(["name", "date_done"])
 
     def test_operator_menus_are_bound_to_internal_users(self):
-        internal_group = self.env.ref("base.group_user")
+        operator_group = self.env.ref("diamond.group_sudi_pickup_delivery_operator")
         pickup_menu = self.env.ref("diamond.menu_sudi_operator_pickup_root")
         delivery_menu = self.env.ref("diamond.menu_sudi_operator_deliveries_root")
         job_work_menu = self.env.ref("diamond.menu_sudi_operator_job_work_root")
 
-        self.assertIn(internal_group, pickup_menu.groups_id)
-        self.assertIn(internal_group, delivery_menu.groups_id)
-        self.assertIn(internal_group, job_work_menu.groups_id)
+        self.assertIn(operator_group, pickup_menu.groups_id)
+        self.assertIn(operator_group, delivery_menu.groups_id)
+        self.assertIn(operator_group, job_work_menu.groups_id)
         self.assertEqual(pickup_menu.action, self.env.ref("diamond.action_sudi_operator_pickups"))
         self.assertEqual(delivery_menu.action, self.env.ref("diamond.action_sudi_operator_deliveries"))
         self.assertEqual(job_work_menu.action, self.env.ref("diamond.action_sudi_operator_job_work"))
+
+    def test_pickup_notify_user_is_granted_operator_group(self):
+        self.assertFalse(self.notify_user.has_group("diamond.group_sudi_pickup_delivery_operator"))
+        self.notify_user.write({"sudi_notify_pickup_scheduled": True})
+        self.assertTrue(self.notify_user.has_group("diamond.group_sudi_pickup_delivery_operator"))
 
     def test_internal_user_can_read_assigned_receipt(self):
         receipt = self._create_assigned_receipt()
