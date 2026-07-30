@@ -147,26 +147,12 @@ class StockPicking(models.Model):
             receipts.with_context(sudi_skip_billing_sync=True)._sudi_sync_billing_details()
 
     @api.model
-    def _sudi_get_notify_user(self, config_key, default_user_id):
-        param = self.env["ir.config_parameter"].sudo().get_param(
-            config_key, str(default_user_id)
-        )
-        try:
-            user_id = int(param)
-        except (TypeError, ValueError):
-            return self.env["res.users"]
-        user = self.env["res.users"].browse(user_id).exists()
-        if not user.active:
-            return self.env["res.users"]
-        return user
+    def _sudi_get_pickup_notify_users(self):
+        return self.env["res.users"]._sudi_get_notification_users("sudi_notify_pickup_scheduled")
 
     @api.model
-    def _sudi_get_pickup_notify_user(self):
-        return self._sudi_get_notify_user("diamond.sudi_pickup_notify_user_id", 10)
-
-    @api.model
-    def _sudi_get_pickup_confirmed_notify_user(self):
-        return self._sudi_get_notify_user("diamond.sudi_pickup_confirmed_notify_user_id", 9)
+    def _sudi_get_pickup_confirmed_notify_users(self):
+        return self.env["res.users"]._sudi_get_notification_users("sudi_notify_pickup_confirmed")
 
     @api.model
     def _sudi_build_partner_mention_body(self, text, partner):
@@ -176,26 +162,30 @@ class StockPicking(models.Model):
         ) % (partner.id, escape(partner.display_name))
         return Markup("%s %s") % (escape(text), mention_html)
 
-    def _sudi_post_user_notification(self, notify_user, subject, body_text, toast_type="info"):
-        partner = notify_user.partner_id
-        body = self._sudi_build_partner_mention_body(body_text, partner)
-        for record in self:
-            record.sudo().message_post(
-                body=body,
-                subject=subject,
-                message_type="comment",
-                partner_ids=partner.ids,
-                subtype_xmlid="mail.mt_comment",
-            )
-            notify_user._bus_send(
-                "simple_notification",
-                {
-                    "title": subject,
-                    "message": body_text,
-                    "type": toast_type,
-                    "sticky": True,
-                },
-            )
+    def _sudi_post_user_notification(self, notify_users, subject, body_text, toast_type="info"):
+        notify_users = notify_users.exists()
+        if not notify_users:
+            return
+        for notify_user in notify_users:
+            partner = notify_user.partner_id
+            body = self._sudi_build_partner_mention_body(body_text, partner)
+            for record in self:
+                record.sudo().message_post(
+                    body=body,
+                    subject=subject,
+                    message_type="comment",
+                    partner_ids=partner.ids,
+                    subtype_xmlid="mail.mt_comment",
+                )
+                notify_user._bus_send(
+                    "simple_notification",
+                    {
+                        "title": subject,
+                        "message": body_text,
+                        "type": toast_type,
+                        "sticky": True,
+                    },
+                )
 
     def _sudi_send_whatsapp_message(self, recipient_phone, body_text, attachment=None, partner=None):
         """Send a WhatsApp message via open_whatsapp_connector engine."""
@@ -240,30 +230,22 @@ class StockPicking(models.Model):
         return owa_msg
 
     def _sudi_notify_pickup_scheduled(self):
-        """Trigger 1: Notify pickup person on Jangad upload / schedule creation."""
-        notify_user = self._sudi_get_pickup_notify_user()
+        """Trigger 1: Notify pickup person(s) on Jangad upload / schedule creation."""
+        notify_users = self._sudi_get_pickup_notify_users()
         receipts = self.filtered(
             lambda picking: picking.sudi_is_diamond_job_work
             and picking.picking_type_code == "incoming"
             and (picking.state == "sudi_pickup_pending" or picking.sudi_jangad_image)
         )
         for receipt in receipts:
-            if notify_user:
+            if notify_users:
                 receipt._sudi_post_user_notification(
-                    notify_user,
+                    notify_users,
                     _("Pickup scheduled: %s") % receipt.name,
                     _("A pick has been scheduled for receipt %s.", receipt.name),
                     toast_type="info",
                 )
-            
-            # Recipient: Pickup Person assigned to record or configured pickup notify user
-            pickup_partner = receipt.sudi_pickup_user_id.partner_id if receipt.sudi_pickup_user_id else (notify_user.partner_id if notify_user else False)
-            pickup_phone = (
-                (receipt.sudi_pickup_user_id.partner_id.phone if receipt.sudi_pickup_user_id and receipt.sudi_pickup_user_id.partner_id.phone else False)
-                or (notify_user.partner_id.phone if notify_user else False)
-                or receipt.sudi_customer_contact
-            )
-            
+
             customer_name = receipt.partner_id.name if receipt.partner_id else _("Customer")
             address = receipt.sudi_pickup_address or receipt.sudi_partner_address or (receipt.partner_id.contact_address if receipt.partner_id else "") or ""
             phone_no = receipt.sudi_customer_contact or (receipt.partner_id.phone if receipt.partner_id else "") or ""
@@ -274,20 +256,29 @@ class StockPicking(models.Model):
                 address=address,
                 phone=phone_no,
             )
-            if pickup_phone:
-                receipt._sudi_send_whatsapp_message(
-                    recipient_phone=pickup_phone,
-                    body_text=wa_body,
-                    partner=pickup_partner,
-                )
+
+            # Prefer the pickup person already assigned on the receipt; otherwise notify all flagged users.
+            if receipt.sudi_pickup_user_id:
+                wa_recipients = receipt.sudi_pickup_user_id
+            else:
+                wa_recipients = notify_users
+
+            for user in wa_recipients:
+                pickup_phone = user.partner_id.phone or user.partner_id.mobile
+                if pickup_phone:
+                    receipt._sudi_send_whatsapp_message(
+                        recipient_phone=pickup_phone,
+                        body_text=wa_body,
+                        partner=user.partner_id,
+                    )
 
     def _sudi_notify_pickup_confirmed(self):
         """Trigger 2 (Notify Customer with attachment) & Trigger 3 (Notify Admin) on Pickup Done."""
-        notify_user = self._sudi_get_pickup_confirmed_notify_user()
+        notify_users = self._sudi_get_pickup_confirmed_notify_users()
         for receipt in self:
-            if notify_user:
+            if notify_users:
                 receipt._sudi_post_user_notification(
-                    notify_user,
+                    notify_users,
                     _("Pickup confirmed: %s") % receipt.name,
                     _(
                         "Pickup for receipt %s was successful. "
@@ -321,19 +312,20 @@ class StockPicking(models.Model):
                     partner=customer_partner,
                 )
 
-            # Trigger 3: Notify Admin
-            admin_partner = notify_user.partner_id if notify_user else False
-            admin_phone = admin_partner.phone if admin_partner else False
-            if admin_phone:
-                admin_body = _(
-                    "Pickup was successful for Jangad #%(picking_name)s. Please prepare data for job work.",
-                    picking_name=receipt.name,
-                )
-                receipt._sudi_send_whatsapp_message(
-                    recipient_phone=admin_phone,
-                    body_text=admin_body,
-                    partner=admin_partner,
-                )
+            # Trigger 3: Notify Admin(s) flagged on res.users
+            admin_body = _(
+                "Pickup was successful for Jangad #%(picking_name)s. Please prepare data for job work.",
+                picking_name=receipt.name,
+            )
+            for notify_user in notify_users:
+                admin_partner = notify_user.partner_id
+                admin_phone = admin_partner.phone or admin_partner.mobile
+                if admin_phone:
+                    receipt._sudi_send_whatsapp_message(
+                        recipient_phone=admin_phone,
+                        body_text=admin_body,
+                        partner=admin_partner,
+                    )
 
 
     @api.depends("sudi_delivery_ids")

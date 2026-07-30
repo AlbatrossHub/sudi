@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_users_form_diamond_notifications" model="ir.ui.view">
+        <field name="name">res.users.form.diamond.notifications</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <page name="preferences" position="after">
+                <page string="Diamond Notifications" name="sudi_diamond_notifications" invisible="share">
+                    <group string="Jangad / Pickup Alerts">
+                        <field name="sudi_notify_pickup_scheduled"/>
+                        <div class="text-muted" colspan="2">
+                            Enabling this also grants access to the Pickup app.
+                        </div>
+                        <field name="sudi_notify_pickup_confirmed"/>
+                    </group>
+                </page>
+            </page>
+        </field>
+    </record>
+</odoo>

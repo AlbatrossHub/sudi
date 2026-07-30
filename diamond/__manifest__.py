@@ -1,6 +1,6 @@
 {
     "name": "Sudi Diamond Job Work",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.2.2",
     "summary": "Diamond job-work receipts, deliveries, and GST invoicing",
     "category": "Inventory/Inventory",
     "author": "Sudi",
@@ -26,6 +26,7 @@
         "data/diamond_timesheet_project_data.xml",
         "data/diamond_notification_data.xml",
         "views/job_type_views.xml",
+        "views/res_users_views.xml",
         "views/res_partner_views.xml",
         "views/department_transfer_wizard_views.xml",
         "views/stock_picking_views.xml",
