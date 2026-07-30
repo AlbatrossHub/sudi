@@ -13,5 +13,5 @@ def migrate(cr, version):
         ("share", "=", False),
     ])
     for user in users:
-        if operator_group not in user.groups_id:
+        if operator_group not in user.group_ids:
             user.write({"group_ids": [Command.link(operator_group.id)]})

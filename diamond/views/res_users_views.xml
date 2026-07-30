@@ -9,6 +9,9 @@
                 <page string="Diamond Notifications" name="sudi_diamond_notifications" invisible="share">
                     <group string="Jangad / Pickup Alerts">
                         <field name="sudi_notify_pickup_scheduled"/>
+                        <div class="text-muted" colspan="2">
+                            Enabling this also grants access to the Pickup app.
+                        </div>
                         <field name="sudi_notify_pickup_confirmed"/>
                     </group>
                 </page>

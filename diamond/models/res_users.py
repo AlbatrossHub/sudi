@@ -11,7 +11,8 @@ class ResUsers(models.Model):
     sudi_notify_pickup_scheduled = fields.Boolean(
         string="Notify on Jangad Upload",
         help="When enabled, this user is notified (Discuss + WhatsApp) when a "
-             "Jangad attachment is uploaded and a diamond inventory receipt is created.",
+             "Jangad attachment is uploaded and a diamond inventory receipt is created. "
+             "It also makes the Pickup app visible for this user.",
     )
     sudi_notify_pickup_confirmed = fields.Boolean(
         string="Notify on Pickup Confirmed",
@@ -28,23 +29,34 @@ class ResUsers(models.Model):
             ("share", "=", False),
         ])
 
-    def _sudi_sync_pickup_operator_group_from_notification_flag(self):
-        """Grant onfield operator group to users enabled for pickup notifications."""
-        operator_group = self.env.ref("diamond.group_sudi_pickup_delivery_operator", raise_if_not_found=False)
-        if not operator_group:
+    def _sudi_get_pickup_app_group(self):
+        return self.env.ref("diamond.group_sudi_pickup_app", raise_if_not_found=False)
+
+    def _sudi_sync_pickup_app_access_from_notification_flag(self):
+        """Keep Pickup app group in sync with Notify on Jangad Upload."""
+        pickup_group = self._sudi_get_pickup_app_group()
+        if not pickup_group:
             return
-        users_to_grant = self.filtered(
-            lambda user: user.sudi_notify_pickup_scheduled and operator_group not in user.groups_id
-        )
-        for user in users_to_grant.sudo():
-            user.with_context(sudi_skip_pickup_group_sync=True).write({
-                "group_ids": [Command.link(operator_group.id)],
-            })
+
+        for user in self.sudo():
+            has_group = pickup_group in user.group_ids
+            should_have = bool(user.sudi_notify_pickup_scheduled)
+            if should_have and not has_group:
+                user.with_context(sudi_skip_pickup_group_sync=True).write({
+                    "group_ids": [Command.link(pickup_group.id)],
+                })
+            elif not should_have and has_group:
+                # Do not remove if user is an Onfield operator (group implies Pickup App).
+                if user.has_group("diamond.group_sudi_pickup_delivery_operator"):
+                    continue
+                user.with_context(sudi_skip_pickup_group_sync=True).write({
+                    "group_ids": [Command.unlink(pickup_group.id)],
+                })
 
     @api.model_create_multi
     def create(self, vals_list):
         users = super().create(vals_list)
-        users._sudi_sync_pickup_operator_group_from_notification_flag()
+        users._sudi_sync_pickup_app_access_from_notification_flag()
         return users
 
     def write(self, vals):
@@ -53,7 +65,7 @@ class ResUsers(models.Model):
             "sudi_notify_pickup_scheduled" in vals
             and not self.env.context.get("sudi_skip_pickup_group_sync")
         ):
-            self._sudi_sync_pickup_operator_group_from_notification_flag()
+            self._sudi_sync_pickup_app_access_from_notification_flag()
         return res
 
     def _sudi_operator_today_bounds_utc(self):

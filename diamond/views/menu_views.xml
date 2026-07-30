@@ -4,7 +4,7 @@
               name="Pickup"
               action="action_sudi_operator_pickups"
               sequence="135"
-              groups="diamond.group_sudi_pickup_delivery_operator"
+              groups="diamond.group_sudi_pickup_app"
               web_icon="diamond,static/description/icon.svg"/>
 
     <menuitem id="menu_sudi_operator_deliveries_root"

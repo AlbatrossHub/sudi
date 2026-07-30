@@ -1,6 +1,6 @@
 {
     "name": "Sudi Diamond Job Work",
-    "version": "19.0.1.2.1",
+    "version": "19.0.1.2.2",
     "summary": "Diamond job-work receipts, deliveries, and GST invoicing",
     "category": "Inventory/Inventory",
     "author": "Sudi",
