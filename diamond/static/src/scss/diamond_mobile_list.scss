@@ -1,0 +1,46 @@
+/* Custom SCSS for List View text wrapping & mobile one2many table readability */
+
+.o_list_renderer .o_list_table.o_sudi_list_wrap_text,
+.o_list_renderer.o_sudi_list_wrap_text .o_list_table,
+.o_sudi_list_wrap_text td.o_data_cell {
+    td.o_data_cell, th {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-overflow: clip !important;
+        vertical-align: top !important;
+    }
+}
+
+/* Make list view text wrap into new lines instead of displaying dots (...) */
+.o_list_renderer .o_list_table td.o_data_cell {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    text-overflow: clip;
+    vertical-align: top;
+}
+
+/* Mobile responsive styling for form view One2many tables & kanban cards */
+@media (max-width: 767.98px) {
+    .o_form_view .o_field_one2many {
+        .o_list_renderer {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            .o_list_table {
+                min-width: 100%;
+                th, td {
+                    padding: 0.4rem 0.5rem;
+                    font-size: 0.875rem;
+                    white-space: normal !important;
+                    word-break: break-word !important;
+                }
+            }
+        }
+    }
+    .o_kanban_mobile .o_kanban_record {
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.5rem;
+        border-radius: 0.375rem;
+    }
+}

@@ -179,7 +179,7 @@
                       name="sudi_billing_details"
                       groups="stock.group_stock_manager"
                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'">
-                    <field name="sudi_billing_line_ids" context="{'default_picking_id': id}">
+                    <field name="sudi_billing_line_ids" mode="list,kanban" context="{'default_picking_id': id}">
                         <list editable="bottom">
                             <field name="sequence" widget="handle"/>
                             <field name="active" widget="boolean_toggle"/>
@@ -198,6 +198,24 @@
                             <field name="manual_price" optional="hide"/>
                             <field name="invoice_line_id" readonly="1" optional="show"/>
                         </list>
+                        <kanban class="o_kanban_mobile">
+                            <templates>
+                                <t t-name="card" class="row g-0 p-2 border-bottom">
+                                    <div class="col-8 fw-bold">
+                                        <field name="sudi_sr"/> <field name="job_type_id"/>
+                                    </div>
+                                    <div class="col-4 text-end fw-bold">
+                                        <field name="price_subtotal"/>
+                                    </div>
+                                    <div class="col-6 text-muted">
+                                        Qty: <field name="quantity"/>
+                                    </div>
+                                    <div class="col-6 text-end text-muted">
+                                        Price: <field name="price_unit"/>
+                                    </div>
+                                </t>
+                            </templates>
+                        </kanban>
                     </field>
                 </page>
                 <page string="Timesheets"
@@ -271,6 +289,7 @@
         <field name="arch" type="xml">
             <xpath expr="//list" position="attributes">
                 <attribute name="default_order">create_date desc, id desc</attribute>
+                <attribute name="class">o_sudi_list_wrap_text</attribute>
             </xpath>
             <xpath expr="/list//field[@name='partner_id']" position="attributes">
                 <attribute name="string">Party Name/Company</attribute>
@@ -285,7 +304,7 @@
         <field name="name">stock.picking.list.sudi.operator.pickup</field>
         <field name="model">stock.picking</field>
         <field name="arch" type="xml">
-            <list string="Pickup" create="0" delete="0" edit="0" default_order="create_date desc, id desc">
+            <list string="Pickup" class="o_sudi_list_wrap_text" create="0" delete="0" edit="0" default_order="create_date desc, id desc">
                 <field name="name"/>
                 <field name="partner_id" string="Customer" options="{'no_open': True, 'no_create': True}"/>
                 <field name="sudi_customer_contact"/>
@@ -348,7 +367,7 @@
         <field name="name">stock.picking.list.sudi.operator.delivery</field>
         <field name="model">stock.picking</field>
         <field name="arch" type="xml">
-            <list string="Deliveries" create="0" delete="0" edit="0" default_order="state, scheduled_date, id">
+            <list string="Deliveries" class="o_sudi_list_wrap_text" create="0" delete="0" edit="0" default_order="state, scheduled_date, id">
                 <field name="name"/>
                 <field name="partner_id" string="Customer" options="{'no_open': True, 'no_create': True}"/>
                 <field name="sudi_origin_receipt_name"/>
@@ -397,7 +416,7 @@
                     </group>
                     <notebook>
                         <page string="Items" name="items">
-                            <field name="move_ids" readonly="1">
+                            <field name="move_ids" readonly="1" mode="list,kanban">
                                 <list create="0" delete="0" edit="0">
                                     <field name="sudi_sr"/>
                                     <field name="product_id"/>
@@ -407,6 +426,30 @@
                                     <field name="sudi_job_type_id"/>
                                     <field name="sudi_remarks"/>
                                 </list>
+                                <kanban class="o_kanban_mobile">
+                                    <templates>
+                                        <t t-name="card" class="row g-0 p-2 border-bottom">
+                                            <div class="col-8 fw-bold">
+                                                <field name="sudi_sr"/> <field name="product_id"/>
+                                            </div>
+                                            <div class="col-4 text-end text-muted fs-7">
+                                                <field name="sudi_job_type_id"/>
+                                            </div>
+                                            <div class="col-4 text-muted">
+                                                Size: <field name="sudi_size"/>
+                                            </div>
+                                            <div class="col-4 text-center">
+                                                Pcs: <field name="sudi_pcs_qty"/>
+                                            </div>
+                                            <div class="col-4 text-end">
+                                                Cts: <field name="sudi_carats"/>
+                                            </div>
+                                            <div class="col-12 text-muted small mt-1" t-if="record.sudi_remarks.raw_value">
+                                                Remarks: <field name="sudi_remarks"/>
+                                            </div>
+                                        </t>
+                                    </templates>
+                                </kanban>
                             </field>
                         </page>
                     </notebook>
@@ -419,13 +462,13 @@
         <field name="name">stock.picking.list.sudi.operator.job.work</field>
         <field name="model">stock.picking</field>
         <field name="arch" type="xml">
-            <list string="Job Work" create="0" delete="0" edit="0" default_order="scheduled_date, id">
+            <list string="Job Work" class="o_sudi_list_wrap_text" create="0" delete="0" edit="0" default_order="scheduled_date, id">
                 <field name="name"/>
                 <field name="partner_id" string="Customer" options="{'no_open': True, 'no_create': True}"/>
                 <field name="scheduled_date"/>
                 <field name="user_id" widget="many2one_avatar_user" string="Responsible"/>
                 <field name="sudi_current_department_id" string="Current Department" options="{'no_open': True, 'no_create': True}"/>
-                <field name="sudi_involved_department_ids" string="Involved Department" widget="many2many_tags" options="{'no_open': True, 'no_create': True}"/>
+                <field name="sudi_involved_department_ids" string="Involved Department" widget="many2many_tags" options="{'no_create': True}"/>
                 <field name="sudi_total_hours_spent" widget="timesheet_uom" groups="hr_timesheet.group_hr_timesheet_user"/>
                 <field name="state" widget="badge"
                        decoration-info="state == 'assigned'"
@@ -525,7 +568,7 @@
                     </group>
                     <notebook>
                         <page string="Items" name="items">
-                            <field name="move_ids" readonly="1">
+                            <field name="move_ids" readonly="1" mode="list,kanban">
                                 <list create="0" delete="0" edit="0">
                                     <field name="sudi_sr"/>
                                     <field name="product_id"/>
@@ -535,6 +578,30 @@
                                     <field name="sudi_job_type_id"/>
                                     <field name="sudi_remarks"/>
                                 </list>
+                                <kanban class="o_kanban_mobile">
+                                    <templates>
+                                        <t t-name="card" class="row g-0 p-2 border-bottom">
+                                            <div class="col-8 fw-bold">
+                                                <field name="sudi_sr"/> <field name="product_id"/>
+                                            </div>
+                                            <div class="col-4 text-end text-muted fs-7">
+                                                <field name="sudi_job_type_id"/>
+                                            </div>
+                                            <div class="col-4 text-muted">
+                                                Size: <field name="sudi_size"/>
+                                            </div>
+                                            <div class="col-4 text-center">
+                                                Pcs: <field name="sudi_pcs_qty"/>
+                                            </div>
+                                            <div class="col-4 text-end">
+                                                Cts: <field name="sudi_carats"/>
+                                            </div>
+                                            <div class="col-12 text-muted small mt-1" t-if="record.sudi_remarks.raw_value">
+                                                Remarks: <field name="sudi_remarks"/>
+                                            </div>
+                                        </t>
+                                    </templates>
+                                </kanban>
                             </field>
                         </page>
                         <page string="Timesheets"

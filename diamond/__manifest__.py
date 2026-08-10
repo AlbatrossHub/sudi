@@ -42,6 +42,7 @@
             "diamond/static/src/js/jangad_image_viewer.js",
             "diamond/static/src/xml/jangad_image_viewer.xml",
             "diamond/static/src/scss/jangad_image_viewer.scss",
+            "diamond/static/src/scss/diamond_mobile_list.scss",
         ],
         "web.assets_frontend": [
             "diamond/static/src/js/jangad_upload.js",
