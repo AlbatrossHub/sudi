@@ -19,6 +19,11 @@ class ResUsers(models.Model):
         help="When enabled, this user is notified (Discuss + WhatsApp) when a "
              "diamond pickup is confirmed by the operator.",
     )
+    sudi_notify_due_data_entry = fields.Boolean(
+        string="Notify on Pending Data Entry",
+        help="When enabled, this user receives daily WhatsApp digests of Jangad "
+             "receipts due for data entry.",
+    )
 
     @api.model
     def _sudi_get_notification_users(self, field_name):

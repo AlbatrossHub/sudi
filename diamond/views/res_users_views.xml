@@ -13,6 +13,7 @@
                             Enabling this also grants access to the Pickup app.
                         </div>
                         <field name="sudi_notify_pickup_confirmed"/>
+                        <field name="sudi_notify_due_data_entry"/>
                     </group>
                 </page>
             </page>

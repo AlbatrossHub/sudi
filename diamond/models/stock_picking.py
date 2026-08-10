@@ -229,8 +229,26 @@ class StockPicking(models.Model):
             _logger.exception("Failed to send WhatsApp message for %s to %s", self.display_name, recipient_phone)
         return owa_msg
 
+    def _sudi_get_form_view_url(self):
+        self.ensure_one()
+        base_url = self.get_base_url().rstrip("/")
+        return f"{base_url}/web#id={self.id}&model={self._name}&view_type=form"
+
+    def _sudi_get_jangad_image_attachment(self):
+        self.ensure_one()
+        if not self.sudi_jangad_image:
+            return self.env["ir.attachment"]
+        return self.env["ir.attachment"].sudo().create({
+            "name": f"jangad_{self.name}.jpg",
+            "type": "binary",
+            "datas": self.sudi_jangad_image,
+            "res_model": self._name,
+            "res_id": self.id,
+            "mimetype": "image/jpeg",
+        })
+
     def _sudi_notify_pickup_scheduled(self):
-        """Trigger 1: Notify pickup person(s) on Jangad upload / schedule creation."""
+        """Trigger 1: Notify pickup person(s) and customer on Jangad upload / schedule creation."""
         notify_users = self._sudi_get_pickup_notify_users()
         receipts = self.filtered(
             lambda picking: picking.sudi_is_diamond_job_work
@@ -246,34 +264,67 @@ class StockPicking(models.Model):
                     toast_type="info",
                 )
 
-            customer_name = receipt.partner_id.name if receipt.partner_id else _("Customer")
-            address = receipt.sudi_pickup_address or receipt.sudi_partner_address or (receipt.partner_id.contact_address if receipt.partner_id else "") or ""
-            phone_no = receipt.sudi_customer_contact or (receipt.partner_id.phone if receipt.partner_id else "") or ""
+            customer_partner = receipt.partner_id
+            customer_name = customer_partner.name if customer_partner else _("Customer")
+            address = receipt.sudi_pickup_address or receipt.sudi_partner_address or (customer_partner.contact_address if customer_partner else "") or ""
+            phone_no = receipt.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else "") or ""
+            url = receipt._sudi_get_form_view_url()
+            attachment = receipt._sudi_get_jangad_image_attachment()
 
-            wa_body = _(
-                "We have received a new Jangad request from %(customer_name)s, address is %(address)s, contact number is %(phone)s",
+            # Message 1A: Send To Pickup Person
+            wa_body_pickup = _(
+                "New Jangad Pickup Request\n\n"
+                "A new Jangad pickup request has been received.\n\n"
+                "Customer: %(customer_name)s\n\n"
+                "Address: %(address)s\n\n"
+                "Contact: %(phone)s\n\n"
+                "Please coordinate with the customer (if required) and proceed with the pickup.\n\n"
+                "Thank you.\n\n"
+                "🔗 View Receipt:\n\n"
+                "%(url)s",
                 customer_name=customer_name,
                 address=address,
                 phone=phone_no,
+                url=url,
             )
 
-            # Prefer the pickup person already assigned on the receipt; otherwise notify all flagged users.
-            if receipt.sudi_pickup_user_id:
-                wa_recipients = receipt.sudi_pickup_user_id
-            else:
-                wa_recipients = notify_users
-
+            wa_recipients = receipt.sudi_pickup_user_id or notify_users
             for user in wa_recipients:
                 pickup_phone = user.partner_id.phone or user.partner_id.mobile
                 if pickup_phone:
                     receipt._sudi_send_whatsapp_message(
                         recipient_phone=pickup_phone,
-                        body_text=wa_body,
+                        body_text=wa_body_pickup,
+                        attachment=attachment,
                         partner=user.partner_id,
                     )
 
+            # Message 1B: Send To Customer
+            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
+            if customer_phone:
+                wa_body_cust = _(
+                    "Dear %(customer_name)s,\n\n"
+                    "Jangad Pickup Request Received\n\n"
+                    "We have successfully received your pickup request.\n\n"
+                    "Our pickup person will collect the items as per the details provided in your Jangad request.\n\n"
+                    "Pickup Reference: #%(pickup_reference)s\n\n"
+                    "If you need to get in touch with our pickup team regarding your pickup, you may contact us at:\n\n"
+                    "📞 +91 9653402615\n\n"
+                    "📞 +91 8080809288\n\n"
+                    "Thank you for choosing SDPPL. We look forward to serving you.\n\n"
+                    "Best regards,\n\n"
+                    "Team SDPPL",
+                    customer_name=customer_name,
+                    pickup_reference=receipt.name,
+                )
+                receipt._sudi_send_whatsapp_message(
+                    recipient_phone=customer_phone,
+                    body_text=wa_body_cust,
+                    partner=customer_partner,
+                )
+
     def _sudi_notify_pickup_confirmed(self):
-        """Trigger 2 (Notify Customer with attachment) & Trigger 3 (Notify Admin) on Pickup Done."""
+        """Trigger 2: Notify Customer & Admin on Pickup Done."""
         notify_users = self._sudi_get_pickup_confirmed_notify_users()
         for receipt in self:
             if notify_users:
@@ -288,34 +339,47 @@ class StockPicking(models.Model):
                     toast_type="success",
                 )
 
-            # Trigger 2: Notify Customer with attached Jangad photo
             customer_partner = receipt.partner_id
-            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone if customer_partner else False)
+            customer_name = customer_partner.name if customer_partner else _("Customer")
+
+            # Message 2A: Send To Customer
+            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
             if customer_phone:
-                attachment = False
-                if receipt.sudi_jangad_image:
-                    attachment = self.env['ir.attachment'].sudo().create({
-                        'name': f'jangad_{receipt.name}.jpg',
-                        'type': 'binary',
-                        'datas': receipt.sudi_jangad_image,
-                        'res_model': receipt._name,
-                        'res_id': receipt.id,
-                        'mimetype': 'image/jpeg',
-                    })
                 cust_body = _(
-                    "We have received your Jangad request. The uploaded photo has been attached. We will keep you posted on the status."
+                    "Dear %(customer_name)s,\n\n"
+                    "Jangad Pickup Completed\n\n"
+                    "Your items have been successfully picked up as per your Jangad request.\n\n"
+                    "Pickup Reference: #%(pickup_reference)s\n\n"
+                    "Thank you for choosing SDPPL. We appreciate your trust and look forward to serving you again.\n\n"
+                    "Best regards,\n\n"
+                    "Team SDPPL",
+                    customer_name=customer_name,
+                    pickup_reference=receipt.name,
                 )
                 receipt._sudi_send_whatsapp_message(
                     recipient_phone=customer_phone,
                     body_text=cust_body,
-                    attachment=attachment,
                     partner=customer_partner,
                 )
 
-            # Trigger 3: Notify Admin(s) flagged on res.users
+            # Message 2B: Send To Admin
+            pickup_person_name = receipt.sudi_pickup_user_id.name if receipt.sudi_pickup_user_id else (self.env.user.name or _("N/A"))
+            url = receipt._sudi_get_form_view_url()
+            attachment = receipt._sudi_get_jangad_image_attachment()
+
             admin_body = _(
-                "Pickup was successful for Jangad #%(picking_name)s. Please prepare data for job work.",
-                picking_name=receipt.name,
+                "Jangad Pickup Completed\n\n"
+                "Please prepare data tables for job work and Billing \n\n"
+                "Customer: %(customer_name)s\n\n"
+                "Pickup Reference: #%(pickup_reference)s\n\n"
+                "Pickup Person: %(pickup_person)s\n\n"
+                "The items have been successfully collected as per the Jangad request.\n\n"
+                "🔗 View Receipt:\n\n"
+                "%(url)s",
+                customer_name=customer_name,
+                pickup_reference=receipt.name,
+                pickup_person=pickup_person_name,
+                url=url,
             )
             for notify_user in notify_users:
                 admin_partner = notify_user.partner_id
@@ -324,7 +388,177 @@ class StockPicking(models.Model):
                     receipt._sudi_send_whatsapp_message(
                         recipient_phone=admin_phone,
                         body_text=admin_body,
+                        attachment=attachment,
                         partner=admin_partner,
+                    )
+
+    @api.model
+    def _cron_sudi_notify_due_data_entry(self):
+        """Daily evening cron (7:30 PM) to identify receipts due for data entry."""
+        notify_users = self.env["res.users"]._sudi_get_notification_users("sudi_notify_due_data_entry")
+        if not notify_users:
+            return
+
+        due_receipts = self.sudo().search([
+            ("sudi_is_diamond_job_work", "=", True),
+            ("picking_type_code", "=", "incoming"),
+            ("state", "in", ("draft", "assigned")),
+            ("move_ids", "=", False),
+        ])
+        if not due_receipts:
+            return
+
+        lines = []
+        for receipt in due_receipts:
+            customer_name = receipt.partner_id.name if receipt.partner_id else _("Customer")
+            url = receipt._sudi_get_form_view_url()
+            lines.append(f"• #{receipt.name} - {customer_name}: {url}")
+
+        compiled_list = "\n".join(lines)
+
+        for user in notify_users:
+            user_phone = user.partner_id.phone or user.partner_id.mobile
+            if not user_phone:
+                continue
+            body = _(
+                "Dear %(name)s,\n\n"
+                "Following Jangad requests are due for data entry, pls fill them earliest.\n\n"
+                "%(compiled_list)s",
+                name=user.name,
+                compiled_list=compiled_list,
+            )
+            self.env["stock.picking"]._sudi_send_whatsapp_message(
+                recipient_phone=user_phone,
+                body_text=body,
+                partner=user.partner_id,
+            )
+
+    def _sudi_notify_delivery_assigned(self):
+        """Notify customer and delivery person when delivery picking state turns 'assigned'."""
+        deliveries = self.filtered(
+            lambda picking: picking.sudi_is_diamond_job_work
+            and picking.picking_type_code == "outgoing"
+            and picking.state == "assigned"
+        )
+        for delivery in deliveries:
+            customer_partner = delivery.partner_id
+            customer_name = customer_partner.name if customer_partner else _("Customer")
+            customer_phone = delivery.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
+
+            # 1. Send To Customer
+            if customer_phone:
+                cust_body = _(
+                    "Dear %(customer_name)s,\n\n"
+                    "📦 Your Order is Ready for Delivery\n\n"
+                    "Your order is now ready and has been assigned for delivery.\n\n"
+                    "Delivery Reference: #%(delivery_reference)s\n\n"
+                    "Our delivery person will contact you shortly and deliver your order.\n\n"
+                    "If you have any questions regarding the delivery, please feel free to contact us.\n\n"
+                    "Thank you for choosing SDPPL. We look forward to serving you.\n\n"
+                    "Best regards,\n\n"
+                    "Team SDPPL",
+                    customer_name=customer_name,
+                    delivery_reference=delivery.name,
+                )
+                delivery._sudi_send_whatsapp_message(
+                    recipient_phone=customer_phone,
+                    body_text=cust_body,
+                    partner=customer_partner,
+                )
+
+            # 2. Send To Delivery Person / Flagged users
+            notify_users = self._sudi_get_pickup_notify_users()
+            delivery_recipients = delivery.sudi_pickup_user_id or notify_users
+            address = delivery.sudi_pickup_address or delivery.sudi_partner_address or (customer_partner.contact_address if customer_partner else "") or ""
+            phone_no = delivery.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else "") or ""
+            url = delivery._sudi_get_form_view_url()
+
+            deliv_body = _(
+                "New Delivery Assigned\n\n"
+                "A delivery order has been assigned to you.\n\n"
+                "Customer: %(customer_name)s\n\n"
+                "Address: %(address)s\n\n"
+                "Contact: %(phone)s\n\n"
+                "Delivery Reference: #%(delivery_reference)s\n\n"
+                "Please coordinate with the customer and proceed with the delivery.\n\n"
+                "🔗 View Delivery Order:\n\n"
+                "%(url)s\n\n"
+                "Thank you.",
+                customer_name=customer_name,
+                address=address,
+                phone=phone_no,
+                delivery_reference=delivery.name,
+                url=url,
+            )
+
+            for user in delivery_recipients:
+                user_phone = user.partner_id.phone or user.partner_id.mobile
+                if user_phone:
+                    delivery._sudi_send_whatsapp_message(
+                        recipient_phone=user_phone,
+                        body_text=deliv_body,
+                        partner=user.partner_id,
+                    )
+
+    def _sudi_notify_delivery_completed(self):
+        """Notify customer and admin when delivery is completed."""
+        deliveries = self.filtered(
+            lambda picking: picking.sudi_is_diamond_job_work
+            and picking.picking_type_code == "outgoing"
+            and picking.state == "done"
+        )
+        for delivery in deliveries:
+            customer_partner = delivery.partner_id
+            customer_name = customer_partner.name if customer_partner else _("Customer")
+            customer_phone = delivery.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
+
+            # 1. Send To Customer
+            if customer_phone:
+                cust_body = _(
+                    "Dear %(customer_name)s,\n\n"
+                    "✅ Delivery Completed\n\n"
+                    "Your order has been successfully delivered.\n\n"
+                    "Delivery Reference: #%(delivery_reference)s\n\n"
+                    "We hope you had a smooth experience with SDPPL.\n\n"
+                    "Thank you for choosing us. We look forward to serving you again.\n\n"
+                    "Warm regards,\n\n"
+                    "Team SDPPL",
+                    customer_name=customer_name,
+                    delivery_reference=delivery.name,
+                )
+                delivery._sudi_send_whatsapp_message(
+                    recipient_phone=customer_phone,
+                    body_text=cust_body,
+                    partner=customer_partner,
+                )
+
+            # 2. Send To Back Office Admin
+            notify_users = self._sudi_get_pickup_confirmed_notify_users()
+            delivery_person = delivery.sudi_pickup_user_id.name if delivery.sudi_pickup_user_id else (self.env.user.name or _("N/A"))
+            url = delivery._sudi_get_form_view_url()
+
+            admin_body = _(
+                "✅ Delivery Completed \n\n"
+                "A delivery order has been successfully completed.\n\n"
+                "Customer: %(customer_name)s\n\n"
+                "Delivery Reference: #%(delivery_reference)s\n\n"
+                "Delivery Person: %(delivery_person)s\n\n"
+                "The order has been marked as delivered successfully.\n\n"
+                "🔗 View Delivery Order:\n\n"
+                "%(url)s",
+                customer_name=customer_name,
+                delivery_reference=delivery.name,
+                delivery_person=delivery_person,
+                url=url,
+            )
+
+            for user in notify_users:
+                user_phone = user.partner_id.phone or user.partner_id.mobile
+                if user_phone:
+                    delivery._sudi_send_whatsapp_message(
+                        recipient_phone=user_phone,
+                        body_text=admin_body,
+                        partner=user.partner_id,
                     )
 
 
@@ -804,6 +1038,17 @@ class StockPicking(models.Model):
         self._sudi_validate_job_work_pickings()
         return True
 
+    def action_assign(self):
+        res = super().action_assign()
+        assigned_deliveries = self.filtered(
+            lambda picking: picking.sudi_is_diamond_job_work
+            and picking.picking_type_code == "outgoing"
+            and picking.state == "assigned"
+        )
+        if assigned_deliveries:
+            assigned_deliveries._sudi_notify_delivery_assigned()
+        return res
+
     def _action_done(self):
         res = super()._action_done()
         diamond_receipts = self.filtered(
@@ -813,6 +1058,15 @@ class StockPicking(models.Model):
         )
         diamond_receipts._sudi_sync_billing_details()
         diamond_receipts.filtered(lambda picking: not picking.sudi_delivery_ids)._sudi_create_delivery_from_receipt()
+
+        completed_deliveries = self.filtered(
+            lambda picking: picking.sudi_is_diamond_job_work
+            and picking.picking_type_code == "outgoing"
+            and picking.state == "done"
+        )
+        if completed_deliveries:
+            completed_deliveries._sudi_notify_delivery_completed()
+
         return res
 
     def _sudi_validate_job_work_pickings(self):
