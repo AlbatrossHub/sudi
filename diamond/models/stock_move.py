@@ -1,4 +1,5 @@
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 from odoo.tools.float_utils import float_is_zero, float_round
 
 
@@ -44,6 +45,15 @@ class StockMove(models.Model):
         for vals in vals_list:
             picking_id = vals.get("picking_id")
             picking = pickings.get(picking_id)
+            if (
+                picking
+                and picking.sudi_is_diamond_job_work
+                and picking.picking_type_code == "incoming"
+                and picking.state == "sudi_pickup_pending"
+                and not self.env.context.get("sudi_allow_pickup_edit")
+            ):
+                raise UserError(_("This pickup is still pending you can not input the data please confirm the pick up"))
+
             if picking and picking.sudi_is_diamond_job_work and not vals.get("sudi_sr"):
                 if picking_id not in next_sr_by_picking:
                     existing_sr = picking.move_ids.mapped("sudi_sr")
@@ -55,6 +65,32 @@ class StockMove(models.Model):
                 vals["product_uom_qty"] = vals["sudi_pcs_qty"]
                 if vals.get("state") not in ("done", "cancel"):
                     vals["quantity"] = vals["sudi_pcs_qty"]
+
+    def write(self, vals):
+        if not self.env.context.get("sudi_allow_pickup_edit"):
+            for move in self:
+                picking = move.picking_id
+                if (
+                    picking
+                    and picking.sudi_is_diamond_job_work
+                    and picking.picking_type_code == "incoming"
+                    and picking.state == "sudi_pickup_pending"
+                ):
+                    raise UserError(_("This pickup is still pending you can not input the data please confirm the pick up"))
+        return super().write(vals)
+
+    def unlink(self):
+        if not self.env.context.get("sudi_allow_pickup_edit"):
+            for move in self:
+                picking = move.picking_id
+                if (
+                    picking
+                    and picking.sudi_is_diamond_job_work
+                    and picking.picking_type_code == "incoming"
+                    and picking.state == "sudi_pickup_pending"
+                ):
+                    raise UserError(_("This pickup is still pending you can not input the data please confirm the pick up"))
+        return super().unlink()
 
     @api.onchange("sudi_pcs_qty")
     def _onchange_sudi_pcs_qty(self):

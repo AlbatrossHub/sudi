@@ -1,5 +1,5 @@
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 
 class SudiDiamondBillingLine(models.Model):
@@ -155,13 +155,35 @@ class SudiDiamondBillingLine(models.Model):
             if not line.receipt_move_id:
                 raise ValidationError(_("Active billing lines must be linked to a receipt line."))
 
+    def _check_pickup_pending_lock(self):
+        if self.env.context.get("sudi_skip_billing_sync") or self.env.context.get("sudi_allow_pickup_billing_edit"):
+            return
+        for line in self:
+            picking = line.picking_id
+            if picking and picking.sudi_is_diamond_job_work and picking.picking_type_code == "incoming" and picking.state == "sudi_pickup_pending":
+                raise UserError(_("This pickup is still pending you can not input the data please confirm the pick up"))
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.context.get("sudi_skip_billing_sync") and not self.env.context.get("sudi_allow_pickup_billing_edit"):
+            picking_ids = [vals.get("picking_id") for vals in vals_list if vals.get("picking_id")]
+            if picking_ids:
+                pickings = self.env["stock.picking"].browse(picking_ids)
+                for picking in pickings:
+                    if picking.sudi_is_diamond_job_work and picking.picking_type_code == "incoming" and picking.state == "sudi_pickup_pending":
+                        raise UserError(_("This pickup is still pending you can not input the data please confirm the pick up"))
+        return super().create(vals_list)
+
     def write(self, vals):
+        self._check_pickup_pending_lock()
         protected_fields = {"job_type_id", "receipt_move_id", "quantity", "price_unit", "name", "active"}
         if protected_fields.intersection(vals) and any(self.mapped("invoice_line_id")):
             raise ValidationError(_("You cannot modify a billing line that has already been invoiced."))
         return super().write(vals)
 
     def unlink(self):
+        self._check_pickup_pending_lock()
         if any(self.mapped("invoice_line_id")):
             raise ValidationError(_("You cannot delete a billing line that has already been invoiced."))
         return super().unlink()
+
