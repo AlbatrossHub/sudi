@@ -37,7 +37,7 @@
                 <button name="action_sudi_open_cancel_pickup_wizard"
                         string="Cancel Pickup"
                         type="object"
-                        class="btn-dark"
+                        class="btn-secondary btn-dark"
                         icon="fa-times"
                         groups="base.group_user"
                         invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state != 'sudi_pickup_pending'"/>
@@ -321,7 +321,7 @@
                     <button name="action_sudi_open_cancel_pickup_wizard"
                             string="Cancel Pickup"
                             type="object"
-                            class="btn-dark"
+                            class="btn-secondary btn-dark"
                             icon="fa-times"
                             groups="base.group_user"
                             invisible="state != 'sudi_pickup_pending'"/>

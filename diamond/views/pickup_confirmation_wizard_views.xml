@@ -20,7 +20,7 @@
                     <button name="action_process"
                             string="Cancel Pickup"
                             type="object"
-                            class="btn-dark"
+                            class="btn-secondary btn-dark"
                             icon="fa-times"
                             invisible="action_type != 'cancel'"
                             data-hotkey="q"/>

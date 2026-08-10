@@ -13,6 +13,10 @@ _logger = logging.getLogger(__name__)
 class StockPicking(models.Model):
     _inherit = ["stock.picking", "timer.parent.mixin"]
 
+    active = fields.Boolean(
+        string="Active",
+        default=True,
+    )
     state = fields.Selection(selection_add=[
         ("sudi_pickup_pending", "Pick up pending"),
         ("draft",),
