@@ -28,10 +28,17 @@
                         icon="fa-flag-checkered"
                         groups="stock.group_stock_user"
                         data-hotkey="q"/>
-                <button name="action_sudi_confirm_pickup"
+                <button name="action_sudi_open_confirm_pickup_wizard"
                         string="Confirm Pickup"
                         type="object"
                         icon="fa-check-square-o"
+                        groups="base.group_user"
+                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state != 'sudi_pickup_pending'"/>
+                <button name="action_sudi_open_cancel_pickup_wizard"
+                        string="Cancel Pickup"
+                        type="object"
+                        class="btn-dark"
+                        icon="fa-times"
                         groups="base.group_user"
                         invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state != 'sudi_pickup_pending'"/>
                 <field name="sudi_display_timesheet_timer" invisible="1"/>
@@ -305,10 +312,17 @@
         <field name="arch" type="xml">
             <form string="Pickup" create="0" delete="0">
                 <header>
-                    <button name="action_sudi_confirm_pickup"
+                    <button name="action_sudi_open_confirm_pickup_wizard"
                             string="Confirm Pickup"
                             type="object"
                             class="btn-primary"
+                            groups="base.group_user"
+                            invisible="state != 'sudi_pickup_pending'"/>
+                    <button name="action_sudi_open_cancel_pickup_wizard"
+                            string="Cancel Pickup"
+                            type="object"
+                            class="btn-dark"
+                            icon="fa-times"
                             groups="base.group_user"
                             invisible="state != 'sudi_pickup_pending'"/>
                     <field name="state" widget="statusbar" statusbar_visible="sudi_pickup_pending,draft,assigned,done"/>
