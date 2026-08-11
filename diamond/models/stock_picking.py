@@ -127,6 +127,14 @@ class StockPicking(models.Model):
         return pickings
 
     def write(self, vals):
+        if (
+            ("move_ids" in vals or "move_line_ids" in vals or "sudi_billing_line_ids" in vals)
+            and not self.env.context.get("sudi_skip_billing_sync")
+            and not self.env.context.get("sudi_allow_pickup_edit")
+        ):
+            for picking in self:
+                if picking.sudi_is_diamond_job_work and picking.picking_type_code == "incoming" and picking.state == "sudi_pickup_pending":
+                    raise UserError(_("This pickup is still pending you can not input the data please confirm the pick up"))
         res = super().write(vals)
         if "sudi_jangad_image" in vals or "sudi_pickup_user_id" in vals:
             self._sudi_notify_pickup_scheduled()
@@ -953,8 +961,28 @@ class StockPicking(models.Model):
                 if move.sudi_pcs_qty < 0 or move.sudi_carats < 0:
                     raise ValidationError(_("Pieces/Qty and Carats must be zero or positive."))
 
+    def action_sudi_create_delivery_order(self):
+        self.ensure_one()
+        self._sudi_check_pickup_delivery_operator_access()
+        if not self.sudi_is_diamond_job_work or self.picking_type_code != "incoming":
+            raise UserError(_("Delivery Order creation is only supported on diamond job-work receipts."))
+        if self.state != "done":
+            raise UserError(_("Job work is currently in progress. Complete the job work before creating a delivery order."))
+        if self.sudi_delivery_ids:
+            return self.action_sudi_view_deliveries()
+        self._sudi_create_delivery_from_receipt()
+        return self.action_sudi_view_deliveries()
+
     def _sudi_create_delivery_from_receipt(self):
         for receipt in self:
+            if (
+                receipt.sudi_is_diamond_job_work
+                and receipt.picking_type_code == "incoming"
+                and receipt.state != "done"
+            ):
+                raise UserError(
+                    _("Job work is currently in progress. Complete the job work before creating a delivery order.")
+                )
             delivery_type = receipt._sudi_get_delivery_picking_type()
             source_location = delivery_type.default_location_src_id or receipt.location_dest_id
             destination_location = (

@@ -80,6 +80,13 @@
             </xpath>
 
             <xpath expr="//header/button[@name='button_validate'][1]" position="after">
+                <button name="action_sudi_create_delivery_order"
+                        string="Create Delivery Order"
+                        type="object"
+                        class="btn-primary"
+                        icon="fa-truck"
+                        groups="base.group_user"
+                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state != 'done' or sudi_delivery_count &gt; 0"/>
                 <button name="action_sudi_mark_delivered"
                         string="Mark Delivered"
                         type="object"
@@ -186,6 +193,13 @@
                       name="sudi_billing_details"
                       groups="stock.group_stock_manager"
                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'">
+                    <div class="alert alert-warning text-center fw-bold mb-3 p-2 rounded"
+                         role="alert"
+                         invisible="state != 'sudi_pickup_pending' or not sudi_is_diamond_job_work or picking_type_code != 'incoming'">
+                        <i class="fa fa-exclamation-triangle me-2"/>
+                        <span>This pickup is still pending you can not input the data please confirm the pick up</span>
+                    </div>
+<!--                     <field name="sudi_billing_line_ids" context="{'default_picking_id': id}" readonly="state in ('sudi_pickup_pending', 'cancel', 'done')"> -->
                     <field name="sudi_billing_line_ids" mode="list,kanban" context="{'default_picking_id': id}">
                         <list editable="bottom">
                             <field name="sequence" widget="handle"/>
@@ -266,6 +280,19 @@
                         </group>
                     </group>
                 </page>
+            </xpath>
+
+            <xpath expr="//field[@name='move_ids']" position="before">
+                <div class="alert alert-warning text-center fw-bold mb-3 p-2 rounded"
+                     role="alert"
+                     invisible="state != 'sudi_pickup_pending' or not sudi_is_diamond_job_work or picking_type_code != 'incoming'">
+                    <i class="fa fa-exclamation-triangle me-2"/>
+                    <span>This pickup is still pending you can not input the data please confirm the pick up</span>
+                </div>
+            </xpath>
+
+            <xpath expr="//field[@name='move_ids']" position="attributes">
+                <attribute name="readonly">state in ('sudi_pickup_pending', 'cancel', 'done')</attribute>
             </xpath>
 
             <xpath expr="//field[@name='move_ids']/list/field[@name='product_id']" position="before">
