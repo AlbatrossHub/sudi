@@ -167,6 +167,43 @@ class StockPicking(models.Model):
         return self.env["res.users"]._sudi_get_notification_users("sudi_notify_pickup_confirmed")
 
     @api.model
+    def _sudi_get_due_data_entry_notify_users(self):
+        return self.env["res.users"]._sudi_get_notification_users("sudi_notify_due_data_entry")
+
+    @api.model
+    def _cron_sudi_notify_due_data_entry(self):
+        """Cron job to send daily WhatsApp notifications/reminders for pending Jangad receipts due for data entry."""
+        notify_users = self._sudi_get_due_data_entry_notify_users()
+        if not notify_users:
+            return
+
+        pending_receipts = self.search([
+            ("sudi_is_diamond_job_work", "=", True),
+            ("picking_type_code", "=", "incoming"),
+            ("state", "not in", ("done", "cancel")),
+        ])
+        if not pending_receipts:
+            return
+
+        body_lines = [
+            _("📋 *Daily Jangad Data Entry Reminder*\n"),
+            _("The following Jangad receipts are pending data entry:\n"),
+        ]
+        for receipt in pending_receipts:
+            customer_name = receipt.partner_id.name if receipt.partner_id else _("Customer")
+            body_lines.append(f"• #{receipt.name} - {customer_name}")
+
+        body_text = "\n".join(body_lines)
+        for user in notify_users:
+            user_phone = user.partner_id.phone or user.partner_id.mobile
+            if user_phone:
+                pending_receipts[:1]._sudi_send_whatsapp_message(
+                    recipient_phone=user_phone,
+                    body_text=body_text,
+                    partner=user.partner_id,
+                )
+
+    @api.model
     def _sudi_build_partner_mention_body(self, text, partner):
         mention_html = Markup(
             "<a href=\"#\" class=\"o_mail_redirect\" data-oe-model=\"res.partner\" "
