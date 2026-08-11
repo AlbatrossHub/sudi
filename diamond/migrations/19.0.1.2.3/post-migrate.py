@@ -33,7 +33,7 @@ def migrate(cr, version):
         sms_notifications.write({"notification_status": "canceled", "is_read": True})
 
     failed_sms = env["sms.sms"].sudo().search([
-        ("model", "=", "stock.picking"),
+        ("mail_message_id.model", "=", "stock.picking"),
         ("state", "=", "error"),
     ])
     if failed_sms:
