@@ -20,7 +20,9 @@ class ResUsers(models.Model):
              "diamond pickup is confirmed by the operator.",
     )
     sudi_notify_due_data_entry = fields.Boolean(
-        string="Notify on Due Data Entry",
+        string="Notify on Pending Data Entry",
+        help="When enabled, this user receives daily WhatsApp digests of Jangad "
+             "receipts due for data entry.",
     )
 
     def _on_webclient_bootstrap(self):
