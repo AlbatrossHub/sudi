@@ -29,6 +29,7 @@
         "views/res_users_views.xml",
         "views/res_partner_views.xml",
         "views/department_transfer_wizard_views.xml",
+        "views/pickup_confirmation_wizard_views.xml",
         "views/stock_picking_views.xml",
         "views/account_analytic_line_views.xml",
         "views/account_move_views.xml",

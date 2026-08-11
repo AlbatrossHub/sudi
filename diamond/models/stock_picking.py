@@ -13,6 +13,10 @@ _logger = logging.getLogger(__name__)
 class StockPicking(models.Model):
     _inherit = ["stock.picking", "timer.parent.mixin"]
 
+    active = fields.Boolean(
+        string="Active",
+        default=True,
+    )
     state = fields.Selection(selection_add=[
         ("sudi_pickup_pending", "Pick up pending"),
         ("draft",),
@@ -327,6 +331,44 @@ class StockPicking(models.Model):
                         partner=admin_partner,
                     )
 
+    def _sudi_notify_pickup_cancelled(self):
+        """Send WhatsApp cancellation intimation to customer with Jangad attachment."""
+        for receipt in self:
+            customer_partner = receipt.partner_id
+            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone if customer_partner else False) or (customer_partner.mobile if customer_partner else False)
+            customer_name = customer_partner.name if customer_partner else (receipt.sudi_customer_contact or _("Customer"))
+
+            if customer_phone:
+                attachment = False
+                if receipt.sudi_jangad_image:
+                    attachment = self.env['ir.attachment'].sudo().create({
+                        'name': f'jangad_{receipt.name}.jpg',
+                        'type': 'binary',
+                        'datas': receipt.sudi_jangad_image,
+                        'res_model': receipt._name,
+                        'res_id': receipt.id,
+                        'mimetype': 'image/jpeg',
+                    })
+
+                wa_body = (
+                    f"Dear {customer_name},\n\n"
+                    f"As per your request, we have cancelled your pickup.\n\n"
+                    f"Pickup Reference: #{receipt.name}\n\n"
+                    f"The pickup Jangad is attached for your reference.\n\n"
+                    f"For any future requirements, you can easily upload a new Jangad here:\n\n"
+                    f"https://manage.sdppl.com/jangad\n\n"
+                    f"Thank you for choosing us. We look forward to serving you again.\n\n"
+                    f"Best regards,\n\n"
+                    f"Team SDPPL"
+                )
+
+                receipt._sudi_send_whatsapp_message(
+                    recipient_phone=customer_phone,
+                    body_text=wa_body,
+                    attachment=attachment,
+                    partner=customer_partner,
+                )
+
 
     @api.depends("sudi_delivery_ids")
     def _compute_sudi_counts(self):
@@ -417,6 +459,36 @@ class StockPicking(models.Model):
             timesheet_id = picking.user_timer_id.res_id if picking.user_timer_id else False
             picking.sudi_timesheet_unit_amount = unit_amount_by_timesheet_id.get(timesheet_id, 0.0)
 
+    def action_sudi_open_confirm_pickup_wizard(self):
+        self.ensure_one()
+        self._sudi_check_pickup_delivery_operator_access()
+        return {
+            "name": _("Confirm Pickup"),
+            "type": "ir.actions.act_window",
+            "res_model": "sudi.pickup.confirmation.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_picking_id": self.id,
+                "default_action_type": "confirm",
+            },
+        }
+
+    def action_sudi_open_cancel_pickup_wizard(self):
+        self.ensure_one()
+        self._sudi_check_pickup_delivery_operator_access()
+        return {
+            "name": _("Cancel Pickup"),
+            "type": "ir.actions.act_window",
+            "res_model": "sudi.pickup.confirmation.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_picking_id": self.id,
+                "default_action_type": "cancel",
+            },
+        }
+
     def action_sudi_confirm_pickup(self):
         self._sudi_check_pickup_delivery_operator_access()
         invalid_pickings = self.filtered(
@@ -432,6 +504,23 @@ class StockPicking(models.Model):
             "sudi_pickup_datetime": fields.Datetime.now(),
         })
         self._sudi_notify_pickup_confirmed()
+        return True
+
+    def action_sudi_cancel_pickup(self):
+        self._sudi_check_pickup_delivery_operator_access()
+        invalid_pickings = self.filtered(
+            lambda picking: not picking.sudi_is_diamond_job_work
+            or picking.picking_type_code != "incoming"
+            or picking.state != "sudi_pickup_pending"
+        )
+        if invalid_pickings:
+            raise UserError(_("Pickup can only be cancelled on diamond job-work receipts waiting for pickup."))
+
+        self._sudi_notify_pickup_cancelled()
+        self.write({
+            "active": False,
+            "state": "cancel",
+        })
         return True
 
     def _sudi_check_pickup_delivery_operator_access(self):

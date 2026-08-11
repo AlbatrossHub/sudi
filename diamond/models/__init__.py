@@ -1,5 +1,6 @@
 from . import job_type
 from . import department_transfer_wizard
+from . import pickup_confirmation_wizard
 from . import res_partner
 from . import res_users
 from . import billing_line
