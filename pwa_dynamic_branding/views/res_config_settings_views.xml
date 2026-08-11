@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+      <!-- ========================================
+         Inherit res.config.settings view to add PWA section
+    ======================================== -->
+      <record id="res_config_settings_view_form_pwa" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.pwa</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="base_setup.res_config_settings_view_form" />
+            <field name="priority">99</field>
+            <field name="arch" type="xml">
+                  <xpath expr="//block[@id='pwa_settings']" position="replace">
+                        <!-- Enhanced Progressive Web App Block -->
+                        <block title="Progressive Web App" id="pwa_settings"
+                              groups="base.group_no_one">
+                              <setting
+                                    help="Configure your Progressive Web App branding and behavior.">
+                                    <div class="content-group">
+                                          <div class="mt16 row">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_app_name" />
+                                                <field name="pwa_app_name"
+                                                      placeholder="My Awesome App" />
+                                          </div>
+                                          <div class="mt8 row">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_app_short_name" />
+                                                <field name="pwa_app_short_name" placeholder="MyApp" />
+                                          </div>
+                                    </div>
+                                    <div class="mt16">
+                                          <button name="%(action_pwa_config)d" type="action"
+                                                string="⚙️ Advanced PWA Settings" class="btn-link" />
+                                    </div>
+                              </setting>
+
+                              <!-- Theme Colors -->
+                              <setting string="🎨 Theme Colors"
+                                    help="Set the colors for your PWA splash screen and browser UI.">
+                                    <div class="content-group">
+                                          <div class="row mt16">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_theme_color" />
+                                                <field name="pwa_theme_color" widget="color" />
+                                          </div>
+                                          <div class="row mt8">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_background_color" />
+                                                <field name="pwa_background_color" widget="color" />
+                                          </div>
+                                    </div>
+                              </setting>
+
+                              <!-- App Icons -->
+                              <setting string="📱 App Icons"
+                                    help="Upload custom icons for your PWA. Recommended: PNG format, 512x512 pixels.">
+                                    <div class="content-group">
+                                          <div class="row mt16">
+                                                <div class="col-lg-6">
+                                                      <label for="pwa_icon_512" />
+                                                      <field name="pwa_icon_512" widget="image"
+                                                            class="oe_avatar" />
+                                                      <span class="text-muted">512x512 (Required)</span>
+                                                </div>
+                                                <div class="col-lg-6">
+                                                      <label for="pwa_icon_192" />
+                                                      <field name="pwa_icon_192" widget="image"
+                                                            class="oe_avatar" />
+                                                      <span class="text-muted">192x192 (Required)</span>
+                                                </div>
+                                          </div>
+                                          <div class="mt8">
+                                                <button name="action_generate_icons" type="object"
+                                                      string="🔄 Generate All Sizes from 512x512"
+                                                      class="btn-link" />
+                                          </div>
+                                    </div>
+                              </setting>
+
+                              <!-- Live Preview -->
+                              <setting string="👁️ Live Preview"
+                                    help="See how your PWA will look when installed.">
+                                    <div class="content-group">
+                                          <field name="pwa_preview_html" class="o_pwa_preview w-100"
+                                                nolabel="1" />
+                                    </div>
+                              </setting>
+
+                              <!-- PWA Behavior -->
+                              <setting string="⚙️ PWA Behavior"
+                                    help="Configure how your PWA behaves when launched.">
+                                    <div class="content-group">
+                                          <div class="row mt16">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_display_mode" />
+                                                <field name="pwa_display_mode" />
+                                          </div>
+                                          <div class="row mt8">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_orientation" />
+                                                <field name="pwa_orientation" />
+                                          </div>
+                                          <div class="row mt8">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_start_url" />
+                                                <field name="pwa_start_url" />
+                                          </div>
+                                    </div>
+                              </setting>
+
+                              <!-- Offline Mode -->
+                              <setting string="📴 Offline Mode"
+                                    help="Configure offline behavior for your PWA.">
+                                    <div class="content-group">
+                                          <div class="mt16">
+                                                <field name="pwa_enable_offline" />
+                                                <label for="pwa_enable_offline" />
+                                          </div>
+                                          <div class="row mt8" invisible="not pwa_enable_offline">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_offline_page_title" />
+                                                <field name="pwa_offline_page_title" />
+                                          </div>
+                                          <div class="row mt8" invisible="not pwa_enable_offline">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_offline_page_message" />
+                                                <field name="pwa_offline_page_message" />
+                                          </div>
+                                    </div>
+                              </setting>
+
+                              <!-- Customer Portal PWA -->
+                              <setting string="🌐 Customer Portal PWA"
+                                    help="Enable a separate PWA for your customer portal.">
+                                    <div class="content-group">
+                                          <div class="mt16">
+                                                <field name="pwa_enable_portal" />
+                                                <label for="pwa_enable_portal" />
+                                          </div>
+                                          <div class="row mt8" invisible="not pwa_enable_portal">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_portal_app_name" />
+                                                <field name="pwa_portal_app_name" />
+                                          </div>
+                                          <div class="row mt8" invisible="not pwa_enable_portal">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_portal_theme_color" />
+                                                <field name="pwa_portal_theme_color" widget="color" />
+                                          </div>
+                                    </div>
+                              </setting>
+
+                              <!-- AI Branding Generator -->
+                              <setting string="🤖 AI Branding Generator"
+                                    help="Use AI to generate a beautiful color scheme for your PWA.">
+                                    <div class="content-group">
+                                          <div class="mt16">
+                                                <field name="pwa_ai_enabled" />
+                                                <label for="pwa_ai_enabled" />
+                                          </div>
+                                          <div class="row mt8" invisible="not pwa_ai_enabled">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_ai_brand_prompt" />
+                                                <field name="pwa_ai_brand_prompt"
+                                                      placeholder="Describe your brand for AI suggestions..." />
+                                          </div>
+                                          <div class="mt8" invisible="not pwa_ai_enabled">
+                                                <button name="action_open_ai_branding_wizard"
+                                                      type="object"
+                                                      string="🎨 Generate AI Branding"
+                                                      class="btn-primary" />
+                                          </div>
+                                    </div>
+                              </setting>
+
+                              <!-- Splash Screen -->
+                              <setting string="🚀 Splash Screen"
+                                    help="Customize the loading screen shown when your PWA starts.">
+                                    <div class="content-group">
+                                          <div class="row mt16">
+                                                <div class="col-lg-6">
+                                                      <label for="pwa_splash_image" />
+                                                      <field name="pwa_splash_image" widget="image" />
+                                                </div>
+                                          </div>
+                                          <div class="row mt8">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_splash_background_color" />
+                                                <field name="pwa_splash_background_color"
+                                                      widget="color" />
+                                          </div>
+                                          <div class="row mt8">
+                                                <label class="col-lg-3 o_light_label"
+                                                      for="pwa_splash_tagline" />
+                                                <field name="pwa_splash_tagline"
+                                                      placeholder="Your tagline here..." />
+                                          </div>
+                                          <div class="mt8">
+                                                <field name="pwa_show_splash_logo" />
+                                                <label for="pwa_show_splash_logo" />
+                                          </div>
+                                    </div>
+                              </setting>
+
+                              <!-- Quick Actions -->
+                              <setting string="🛠️ Quick Actions"
+                                    help="Useful tools for managing your PWA.">
+                                    <div class="content-group">
+                                          <div class="mt16 d-flex gap-2 flex-wrap">
+                                                <button name="action_preview_pwa" type="object"
+                                                      string="📄 View Manifest"
+                                                      class="btn-secondary btn-sm" />
+                                                <button name="action_reset_pwa_defaults"
+                                                      type="object"
+                                                      string="🔄 Reset to Defaults"
+                                                      class="btn-secondary btn-sm"
+                                                      confirm="This will reset all PWA settings to Odoo defaults. Continue?" />
+                                          </div>
+                                    </div>
+                              </setting>
+                        </block>
+                  </xpath>
+
+                  <!-- Add hidden fields for PWA config reference -->
+                  <xpath expr="//form" position="inside">
+                        <field name="pwa_config_id" invisible="1" />
+                  </xpath>
+            </field>
+      </record>
+
+</odoo>

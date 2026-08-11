@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+      <!-- ========================================
+         PWA Config Form View
+    ======================================== -->
+      <record id="view_pwa_config_form" model="ir.ui.view">
+            <field name="name">pwa.config.form</field>
+            <field name="model">pwa.config</field>
+            <field name="arch" type="xml">
+                  <form string="PWA Configuration">
+                        <header>
+                              <button name="action_apply_colors" type="object" string="Apply Colors"
+                                    class="btn-primary" />
+                              <button name="action_generate_icons" type="object"
+                                    string="Generate All Icons" class="btn-secondary" />
+                              <button name="action_reset_defaults" type="object"
+                                    string="Reset to Defaults" class="btn-secondary"
+                                    confirm="This will reset all PWA settings to Odoo defaults. Continue?" />
+                        </header>
+                        <sheet>
+                              <div class="oe_button_box" name="button_box" />
+                              <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                                    invisible="active" />
+
+                              <div class="oe_title">
+                                    <label for="app_name" />
+                                    <h1>
+                                          <field name="app_name" placeholder="My Awesome App" />
+                                    </h1>
+                                    <field name="app_short_name"
+                                          placeholder="Short name (max 12 chars)" />
+                              </div>
+
+                              <group>
+                                    <group string="📱 App Identity">
+                                          <field name="app_description"
+                                                placeholder="Describe your app..." />
+                                          <field name="company_id" groups="base.group_multi_company" />
+                                    </group>
+                                    <group string="👁️ Live Preview">
+                                          <field name="preview_html" nolabel="1"
+                                                class="o_pwa_preview" />
+                                    </group>
+                              </group>
+
+                              <notebook>
+                                    <page string="🎨 App Icons" name="icons">
+                                          <group>
+                                                <group string="Required Icons">
+                                                      <field name="icon_192" widget="image"
+                                                            class="oe_avatar" />
+                                                      <field name="icon_512" widget="image"
+                                                            class="oe_avatar" />
+                                                </group>
+                                                <group string="Additional Icons">
+                                                      <field name="icon_maskable" widget="image"
+                                                            class="oe_avatar" />
+                                                      <field name="apple_touch_icon" widget="image"
+                                                            class="oe_avatar" />
+                                                </group>
+                                          </group>
+                                          <div class="alert alert-info" role="alert">
+                                                <strong>💡 Tip:</strong> Upload a 512x512 PNG icon,
+                                                then click "Generate All Icons" to automatically
+                                                create all required sizes. </div>
+                                    </page>
+
+                                    <page string="🎨 Colors &amp; Theme" name="colors">
+                                          <group>
+                                                <group string="Primary Colors">
+                                                      <field name="theme_color" widget="color" />
+                                                      <field name="background_color" widget="color" />
+                                                </group>
+                                                <group string="Brand Palette">
+                                                      <field name="primary_color" widget="color" />
+                                                      <field name="secondary_color" widget="color" />
+                                                      <field name="accent_color" widget="color" />
+                                                </group>
+                                          </group>
+                                    </page>
+
+                                    <page string="🚀 Splash Screen" name="splash">
+                                          <group>
+                                                <group string="Splash Branding">
+                                                      <field name="splash_image" widget="image" />
+                                                      <field name="splash_background_color"
+                                                            widget="color" />
+                                                      <field name="show_splash_logo" />
+                                                      <field name="splash_tagline"
+                                                            placeholder="Your tagline here..." />
+                                                </group>
+                                          </group>
+                                    </page>
+
+                                    <page string="⚙️ PWA Behavior" name="behavior">
+                                          <group>
+                                                <group string="Display Settings">
+                                                      <field name="display_mode" />
+                                                      <field name="orientation" />
+                                                      <field name="start_url" />
+                                                      <field name="scope" />
+                                                </group>
+                                                <group string="Offline Settings">
+                                                      <field name="enable_offline" />
+                                                      <field name="offline_page_title"
+                                                            invisible="not enable_offline" />
+                                                      <field name="offline_page_message"
+                                                            invisible="not enable_offline" />
+                                                </group>
+                                          </group>
+                                    </page>
+
+                                    <page string="🌐 Customer Portal PWA" name="portal">
+                                          <group>
+                                                <group string="Portal Settings">
+                                                      <field name="enable_portal_pwa" />
+                                                      <field name="portal_app_name"
+                                                            invisible="not enable_portal_pwa" />
+                                                      <field name="portal_start_url"
+                                                            invisible="not enable_portal_pwa" />
+                                                </group>
+                                                <group string="Portal Theme"
+                                                      invisible="not enable_portal_pwa">
+                                                      <field name="portal_theme_color"
+                                                            widget="color" />
+                                                      <field name="portal_background_color"
+                                                            widget="color" />
+                                                </group>
+                                          </group>
+                                          <group string="Portal Icons"
+                                                invisible="not enable_portal_pwa">
+                                                <group>
+                                                      <field name="portal_icon_192" widget="image"
+                                                            class="oe_avatar" />
+                                                </group>
+                                                <group>
+                                                      <field name="portal_icon_512" widget="image"
+                                                            class="oe_avatar" />
+                                                </group>
+                                          </group>
+                                    </page>
+
+                                    <page string="🤖 AI Branding" name="ai">
+                                          <group>
+                                                <group string="AI Configuration">
+                                                      <field name="ai_brand_prompt"
+                                                            placeholder="Describe your brand for AI suggestions..." />
+                                                </group>
+                                                <group string="Generated Palette">
+                                                      <field name="ai_generated_colors" readonly="1" />
+                                                </group>
+                                          </group>
+                                    </page>
+                              </notebook>
+                              <field name="active" invisible="1" />
+                              <field name="sequence" invisible="1" />
+                        </sheet>
+                  </form>
+            </field>
+      </record>
+
+      <!-- ========================================
+         PWA Config Tree View
+    ======================================== -->
+      <record id="view_pwa_config_tree" model="ir.ui.view">
+            <field name="name">pwa.config.tree</field>
+            <field name="model">pwa.config</field>
+            <field name="arch" type="xml">
+                  <list string="PWA Configurations">
+                        <field name="sequence" widget="handle" />
+                        <field name="app_name" />
+                        <field name="company_id" groups="base.group_multi_company" />
+                        <field name="theme_color" widget="color" />
+                        <field name="background_color" widget="color" />
+                        <field name="display_mode" />
+                        <field name="enable_portal_pwa" />
+                  </list>
+            </field>
+      </record>
+
+
+      <!-- ========================================
+         PWA Config Action
+    ======================================== -->
+      <record id="action_pwa_config" model="ir.actions.act_window">
+            <field name="name">PWA Configuration</field>
+            <field name="res_model">pwa.config</field>
+            <field name="view_mode">list,form</field>
+            <field name="view_ids"
+                  eval="[(5, 0, 0), (0, 0, {'view_mode': 'list', 'view_id': ref('view_pwa_config_tree')}), (0, 0, {'view_mode': 'form', 'view_id': ref('view_pwa_config_form')})]" />
+            <field name="context">{'search_default_active': 1}</field>
+            <field name="help" type="html">
+                  <p class="o_view_nocontent_smiling_face">
+                        Create your first PWA Configuration
+                  </p>
+                  <p>
+                        Configure your Progressive Web App branding, colors, icons, and behavior.
+                  </p>
+            </field>
+      </record>
+
+      <!-- ========================================
+         AI Branding Form View
+    ======================================== -->
+      <record id="view_pwa_ai_branding_form" model="ir.ui.view">
+            <field name="name">pwa.ai.branding.form</field>
+            <field name="model">pwa.ai.branding</field>
+            <field name="arch" type="xml">
+                  <form string="AI Branding Generator">
+                        <header>
+                              <button name="action_generate_ai_branding" type="object"
+                                    string="🎨 Generate Branding" class="btn-primary"
+                                    invisible="state != 'draft'" />
+                              <button name="action_apply_to_pwa" type="object"
+                                    string="✅ Apply to PWA" class="btn-success"
+                                    invisible="state != 'generated'" />
+                              <field name="state" widget="statusbar" />
+                        </header>
+                        <sheet>
+                              <div class="oe_title">
+                                    <label for="name" />
+                                    <h1>
+                                          <field name="name" placeholder="My Brand" />
+                                    </h1>
+                              </div>
+
+                              <group>
+                                    <group string="📝 Brand Information">
+                                          <field name="brand_description"
+                                                placeholder="Tell us about your brand, what you do, your values..." />
+                                          <field name="industry" />
+                                          <field name="brand_personality" />
+                                          <field name="target_audience"
+                                                placeholder="e.g., Young professionals, families, businesses" />
+                                          <field name="existing_brand_colors"
+                                                placeholder="e.g., #FF5722, #2196F3" />
+                                    </group>
+                                    <group string="🎨 Generated Colors" invisible="state == 'draft'">
+                                          <field name="generated_theme_color" widget="color" />
+                                          <field name="generated_background_color" widget="color" />
+                                          <field name="generated_primary_color" widget="color" />
+                                          <field name="generated_secondary_color" widget="color" />
+                                          <field name="generated_accent_color" widget="color" />
+                                          <field name="generated_tagline" />
+                                    </group>
+                              </group>
+
+                              <group string="📋 App Name Suggestions" invisible="state == 'draft'">
+                                    <field name="generated_app_name_suggestions" nolabel="1" />
+                              </group>
+
+                              <field name="pwa_config_id" invisible="1" />
+                              <field name="company_id" invisible="1" />
+                        </sheet>
+                  </form>
+            </field>
+      </record>
+
+      <!-- ========================================
+         AI Branding Wizard Form
+    ======================================== -->
+      <record id="view_pwa_ai_branding_wizard_form" model="ir.ui.view">
+            <field name="name">pwa.ai.branding.wizard.form</field>
+            <field name="model">pwa.ai.branding.wizard</field>
+            <field name="arch" type="xml">
+                  <form string="🎨 AI PWA Branding Generator">
+                        <sheet>
+                              <div class="alert alert-info text-center mb-4">
+                                    <h4>✨ AI-Powered PWA Branding</h4>
+                                    <p class="mb-0">Tell us about your brand and we'll generate a
+                                          beautiful color scheme for your PWA!</p>
+                              </div>
+
+                              <group>
+                                    <group string="📝 Describe Your Brand">
+                                          <field name="brand_description" nolabel="1"
+                                                placeholder="We are a modern tech company focused on helping small businesses grow. Our values include innovation, simplicity, and customer success..." />
+                                    </group>
+                              </group>
+
+                              <group>
+                                    <group>
+                                          <field name="industry" />
+                                    </group>
+                                    <group>
+                                          <field name="brand_personality" />
+                                    </group>
+                              </group>
+
+                              <separator string="🎨 Generated Color Preview" />
+                              <field name="preview_html" nolabel="1" />
+
+                              <group>
+                                    <group>
+                                          <field name="preview_theme_color" widget="color" />
+                                          <field name="preview_background_color" widget="color" />
+                                          <field name="preview_primary_color" widget="color" />
+                                    </group>
+                                    <group>
+                                          <field name="preview_secondary_color" widget="color" />
+                                          <field name="preview_accent_color" widget="color" />
+                                          <field name="preview_tagline" readonly="1" />
+                                    </group>
+                              </group>
+
+                              <field name="pwa_config_id" invisible="1" />
+                        </sheet>
+                        <footer>
+                              <button name="action_generate_preview" type="object"
+                                    string="🔄 Generate Preview" class="btn-secondary" />
+                              <button name="action_apply_branding" type="object"
+                                    string="✅ Apply Branding" class="btn-primary" />
+                              <button string="Cancel" class="btn-secondary" special="cancel" />
+                        </footer>
+                  </form>
+            </field>
+      </record>
+
+      <!-- ========================================
+         AI Branding Action
+    ======================================== -->
+      <record id="action_pwa_ai_branding" model="ir.actions.act_window">
+            <field name="name">AI Branding History</field>
+            <field name="res_model">pwa.ai.branding</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                  <p class="o_view_nocontent_smiling_face">
+                        Generate AI-powered PWA branding
+                  </p>
+            </field>
+      </record>
+
+      <!-- ========================================
+         Menu Items
+    ======================================== -->
+      <menuitem id="menu_pwa_root"
+            name="PWA Branding"
+            web_icon="pwa_dynamic_branding,static/description/icon.png"
+            groups="base.group_system"
+            sequence="100" />
+
+      <menuitem id="menu_pwa_config"
+            name="PWA Configuration"
+            parent="menu_pwa_root"
+            action="action_pwa_config"
+            sequence="10" />
+
+      <menuitem id="menu_pwa_ai_branding"
+            name="AI Branding Generator"
+            parent="menu_pwa_root"
+            action="action_pwa_ai_branding"
+            sequence="20" />
+
+</odoo>

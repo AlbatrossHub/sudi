@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pwa_config_user,pwa.config.user,model_pwa_config,group_pwa_user,1,0,0,0
+access_pwa_config_manager,pwa.config.manager,model_pwa_config,group_pwa_manager,1,1,1,1
+access_pwa_config_system,pwa.config.system,model_pwa_config,base.group_system,1,1,1,1
+access_pwa_ai_branding_user,pwa.ai.branding.user,model_pwa_ai_branding,group_pwa_user,1,0,0,0
+access_pwa_ai_branding_manager,pwa.ai.branding.manager,model_pwa_ai_branding,group_pwa_manager,1,1,1,1
+access_pwa_ai_branding_system,pwa.ai.branding.system,model_pwa_ai_branding,base.group_system,1,1,1,1
+access_pwa_ai_branding_wizard,pwa.ai.branding.wizard.all,model_pwa_ai_branding_wizard,base.group_user,1,1,1,1

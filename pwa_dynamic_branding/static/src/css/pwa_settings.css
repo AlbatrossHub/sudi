@@ -1,0 +1,320 @@
+/* PWA Dynamic Branding - Settings Styles */
+
+/* ========================================
+   PWA Preview Container
+======================================== */
+.o_pwa_preview {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.pwa-preview-wrapper {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.pwa-preview-container {
+  transition: all 0.3s ease;
+}
+
+/* ========================================
+   Color Picker Enhancements
+======================================== */
+.o_field_color input[type="color"] {
+  width: 60px;
+  height: 36px;
+  padding: 2px;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.o_field_color input[type="color"]:hover {
+  border-color: #714b67;
+}
+
+.o_field_color input[type="color"]:focus {
+  border-color: #714b67;
+  box-shadow: 0 0 0 3px rgba(113, 75, 103, 0.2);
+  outline: none;
+}
+
+/* ========================================
+   Icon Upload Fields
+======================================== */
+.o_field_image.oe_avatar {
+  border: 2px dashed #dee2e6;
+  border-radius: 12px;
+  padding: 8px;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.o_field_image.oe_avatar:hover {
+  border-color: #714b67;
+  background-color: rgba(113, 75, 103, 0.05);
+}
+
+.o_field_image.oe_avatar img {
+  border-radius: 8px;
+}
+
+/* ========================================
+   Settings Block Styling
+======================================== */
+.o_setting_box[id*="pwa"] {
+  border-left: 4px solid #714b67;
+  padding-left: 16px;
+  margin-bottom: 24px;
+}
+
+.o_setting_box[id*="pwa"] .o_setting_left_pane {
+  color: #714b67;
+}
+
+/* ========================================
+   PWA Settings Section Header
+======================================== */
+.o_app_settings_block[data-key="pwa_settings"] .o_setting_box:first-child {
+  padding-top: 16px;
+  border-top: 2px solid #714b67;
+}
+
+/* ========================================
+   Button Styling
+======================================== */
+.btn-link[name*="pwa"],
+.btn-link[name*="action_generate"],
+.btn-link[name*="action_open_ai"] {
+  color: #714b67;
+  font-weight: 500;
+}
+
+.btn-link[name*="pwa"]:hover,
+.btn-link[name*="action_generate"]:hover,
+.btn-link[name*="action_open_ai"]:hover {
+  color: #5a3a52;
+  text-decoration: underline;
+}
+
+/* ========================================
+   AI Branding Wizard Styles
+======================================== */
+.o_dialog .modal-content[data-model="pwa.ai.branding.wizard"] {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.o_dialog .modal-content[data-model="pwa.ai.branding.wizard"] .modal-header {
+  background: linear-gradient(135deg, #714b67 0%, #875a7b 100%);
+  color: white;
+  border-bottom: none;
+}
+
+.o_dialog
+  .modal-content[data-model="pwa.ai.branding.wizard"]
+  .modal-header
+  .btn-close {
+  filter: invert(1);
+}
+
+/* ========================================
+   Color Palette Preview Grid
+======================================== */
+.pwa-color-palette {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.pwa-color-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.pwa-color-swatch:hover {
+  transform: scale(1.1);
+}
+
+/* ========================================
+   Mobile Preview Styling
+======================================== */
+.pwa-mobile-preview {
+  width: 200px;
+  height: 350px;
+  border-radius: 24px;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.pwa-mobile-preview::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.pwa-mobile-preview .pwa-app-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.pwa-mobile-preview .pwa-app-name {
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* ========================================
+   Loading Animation
+======================================== */
+.pwa-loading-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 24px;
+}
+
+.pwa-loading-bar-inner {
+  width: 60%;
+  height: 100%;
+  background: white;
+  border-radius: 2px;
+  animation: pwa-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes pwa-loading {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ========================================
+   Install Button Preview
+======================================== */
+.pwa-install-button {
+  display: inline-block;
+  padding: 8px 16px;
+  background: var(--pwa-theme-color, #714b67);
+  color: white;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pwa-install-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ========================================
+   Tooltip Enhancements
+======================================== */
+.o_field_widget[name*="pwa"] .o_field_tooltip {
+  max-width: 300px;
+}
+
+/* ========================================
+   Form Tab Icons
+======================================== */
+.o_notebook .nav-link[name="icons"]::before {
+  content: "🎨 ";
+}
+
+.o_notebook .nav-link[name="colors"]::before {
+  content: "🎨 ";
+}
+
+.o_notebook .nav-link[name="splash"]::before {
+  content: "🚀 ";
+}
+
+.o_notebook .nav-link[name="behavior"]::before {
+  content: "⚙️ ";
+}
+
+.o_notebook .nav-link[name="portal"]::before {
+  content: "🌐 ";
+}
+
+.o_notebook .nav-link[name="ai"]::before {
+  content: "🤖 ";
+}
+
+/* ========================================
+   Alert Styling
+======================================== */
+.alert-info {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border: none;
+  border-left: 4px solid #2196f3;
+}
+
+/* ========================================
+   Responsive Adjustments
+======================================== */
+@media (max-width: 768px) {
+  .pwa-preview-wrapper {
+    flex-direction: column;
+  }
+
+  .pwa-mobile-preview {
+    width: 100%;
+    max-width: 200px;
+    margin: 0 auto;
+  }
+
+  .pwa-color-palette {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ========================================
+   Dark Mode Support
+======================================== */
+@media (prefers-color-scheme: dark) {
+  .pwa-preview-wrapper {
+    background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+  }
+
+  .o_field_image.oe_avatar {
+    border-color: #444;
+  }
+
+  .o_field_image.oe_avatar:hover {
+    background-color: rgba(113, 75, 103, 0.1);
+  }
+}

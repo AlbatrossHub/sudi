@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+      <data noupdate="1">
+            <!-- ========================================
+             Default PWA Configuration
+        ======================================== -->
+            <record id="pwa_config_default" model="pwa.config">
+                  <field name="app_name">Odoo</field>
+                  <field name="app_short_name">Odoo</field>
+                  <field name="app_description">Odoo - All-in-one business software to manage your
+                        company</field>
+                  <field name="theme_color">#714B67</field>
+                  <field name="background_color">#714B67</field>
+                  <field name="primary_color">#714B67</field>
+                  <field name="secondary_color">#875A7B</field>
+                  <field name="accent_color">#00A09D</field>
+                  <field name="splash_background_color">#FFFFFF</field>
+                  <field name="display_mode">standalone</field>
+                  <field name="orientation">any</field>
+                  <field name="start_url">/odoo</field>
+                  <field name="scope">/odoo</field>
+                  <field name="enable_offline">True</field>
+                  <field name="offline_page_title">You are offline</field>
+                  <field name="offline_page_message">Please check your internet connection and try
+                        again.</field>
+                  <field name="enable_portal_pwa">False</field>
+                  <field name="portal_app_name">Customer Portal</field>
+                  <field name="portal_theme_color">#00A09D</field>
+                  <field name="portal_background_color">#FFFFFF</field>
+                  <field name="portal_start_url">/my</field>
+                  <field name="company_id" ref="base.main_company" />
+            </record>
+
+            <!-- ========================================
+             Default System Parameters
+        ======================================== -->
+            <record id="pwa_param_app_name" model="ir.config_parameter">
+                  <field name="key">pwa.app_name</field>
+                  <field name="value">Odoo</field>
+            </record>
+
+            <record id="pwa_param_theme_color" model="ir.config_parameter">
+                  <field name="key">pwa.theme_color</field>
+                  <field name="value">#714B67</field>
+            </record>
+
+            <record id="pwa_param_background_color" model="ir.config_parameter">
+                  <field name="key">pwa.background_color</field>
+                  <field name="value">#714B67</field>
+            </record>
+
+            <record id="pwa_param_display_mode" model="ir.config_parameter">
+                  <field name="key">pwa.display_mode</field>
+                  <field name="value">standalone</field>
+            </record>
+
+            <record id="pwa_param_start_url" model="ir.config_parameter">
+                  <field name="key">pwa.start_url</field>
+                  <field name="value">/odoo</field>
+            </record>
+
+            <record id="pwa_param_scope" model="ir.config_parameter">
+                  <field name="key">pwa.scope</field>
+                  <field name="value">/odoo</field>
+            </record>
+
+            <record id="pwa_param_enable_offline" model="ir.config_parameter">
+                  <field name="key">pwa.enable_offline</field>
+                  <field name="value">True</field>
+            </record>
+
+            <!-- ========================================
+             Sample AI Branding Templates
+        ======================================== -->
+            <record id="ai_branding_template_tech" model="pwa.ai.branding">
+                  <field name="name">Tech Startup Template</field>
+                  <field name="brand_description">A modern technology startup focused on innovation
+                        and digital transformation. We help businesses leverage cutting-edge
+                        technology to grow and succeed.</field>
+                  <field name="industry">technology</field>
+                  <field name="brand_personality">tech</field>
+                  <field name="target_audience">Tech-savvy business owners and startups</field>
+                  <field name="generated_theme_color">#2196F3</field>
+                  <field name="generated_background_color">#1976D2</field>
+                  <field name="generated_primary_color">#2196F3</field>
+                  <field name="generated_secondary_color">#64B5F6</field>
+                  <field name="generated_accent_color">#00BCD4</field>
+                  <field name="generated_tagline">Innovate. Connect. Succeed.</field>
+                  <field name="state">generated</field>
+                  <field name="company_id" ref="base.main_company" />
+            </record>
+
+            <record id="ai_branding_template_healthcare" model="pwa.ai.branding">
+                  <field name="name">Healthcare Template</field>
+                  <field name="brand_description">A trusted healthcare provider focused on patient
+                        care and wellbeing. We combine modern technology with compassionate service.</field>
+                  <field name="industry">healthcare</field>
+                  <field name="brand_personality">professional</field>
+                  <field name="target_audience">Patients, healthcare professionals, medical
+                        facilities</field>
+                  <field name="generated_theme_color">#00897B</field>
+                  <field name="generated_background_color">#004D40</field>
+                  <field name="generated_primary_color">#00897B</field>
+                  <field name="generated_secondary_color">#4DB6AC</field>
+                  <field name="generated_accent_color">#26A69A</field>
+                  <field name="generated_tagline">Your Health, Our Priority</field>
+                  <field name="state">generated</field>
+                  <field name="company_id" ref="base.main_company" />
+            </record>
+
+            <record id="ai_branding_template_retail" model="pwa.ai.branding">
+                  <field name="name">E-commerce Template</field>
+                  <field name="brand_description">A vibrant e-commerce platform making shopping fun
+                        and easy. We offer great products with excellent customer service.</field>
+                  <field name="industry">retail</field>
+                  <field name="brand_personality">friendly</field>
+                  <field name="target_audience">Online shoppers, young adults, families</field>
+                  <field name="generated_theme_color">#E91E63</field>
+                  <field name="generated_background_color">#C2185B</field>
+                  <field name="generated_primary_color">#E91E63</field>
+                  <field name="generated_secondary_color">#F48FB1</field>
+                  <field name="generated_accent_color">#FF5722</field>
+                  <field name="generated_tagline">Shop Smarter, Live Better</field>
+                  <field name="state">generated</field>
+                  <field name="company_id" ref="base.main_company" />
+            </record>
+
+      </data>
+</odoo>
