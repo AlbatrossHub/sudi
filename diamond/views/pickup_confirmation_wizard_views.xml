@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sudi_pickup_confirmation_wizard_form" model="ir.ui.view">
+        <field name="name">sudi.pickup.confirmation.wizard.form</field>
+        <field name="model">sudi.pickup.confirmation.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Pickup Confirmation">
+                <field name="picking_id" invisible="1"/>
+                <field name="action_type" invisible="1"/>
+                <div class="py-2">
+                    <field name="message" widget="html" readonly="1" nolabel="1"/>
+                </div>
+                <footer>
+                    <button name="action_process"
+                            string="Confirm Pickup"
+                            type="object"
+                            class="btn-primary"
+                            invisible="action_type != 'confirm'"
+                            data-hotkey="q"/>
+                    <button name="action_process"
+                            string="Cancel Pickup"
+                            type="object"
+                            class="btn-secondary btn-dark"
+                            icon="fa-times"
+                            invisible="action_type != 'cancel'"
+                            data-hotkey="q"/>
+                    <button string="Discard" special="cancel" class="btn-secondary" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

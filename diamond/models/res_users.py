@@ -25,6 +25,25 @@ class ResUsers(models.Model):
              "receipts due for data entry.",
     )
 
+    def _on_webclient_bootstrap(self):
+        super()._on_webclient_bootstrap()
+        if "odoobot_state" in self._fields and self.odoobot_state != "disabled":
+            self.sudo().odoobot_state = "disabled"
+        odoobot_partner = self.env.ref("base.partner_root", raise_if_not_found=False)
+        if odoobot_partner and self.partner_id:
+            odoobot_channels = self.env["discuss.channel"].sudo().search([
+                ("channel_partner_ids", "in", [odoobot_partner.id]),
+                ("channel_partner_ids", "in", [self.partner_id.id]),
+                ("active", "=", True),
+            ])
+            if odoobot_channels:
+                odoobot_channels.write({"active": False})
+
+    def _init_odoobot(self):
+        if "odoobot_state" in self._fields:
+            self.sudo().odoobot_state = "disabled"
+        return False
+
     @api.model
     def _sudi_get_notification_users(self, field_name):
         """Return active internal users flagged for a diamond notification type."""

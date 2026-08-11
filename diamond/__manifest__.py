@@ -1,6 +1,6 @@
 {
     "name": "Sudi Diamond Job Work",
-    "version": "19.0.1.2.2",
+    "version": "19.0.1.2.3",
     "summary": "Diamond job-work receipts, deliveries, and GST invoicing",
     "category": "Inventory/Inventory",
     "author": "Sudi",
@@ -29,6 +29,7 @@
         "views/res_users_views.xml",
         "views/res_partner_views.xml",
         "views/department_transfer_wizard_views.xml",
+        "views/pickup_confirmation_wizard_views.xml",
         "views/stock_picking_views.xml",
         "views/account_analytic_line_views.xml",
         "views/account_move_views.xml",
@@ -42,6 +43,7 @@
             "diamond/static/src/js/jangad_image_viewer.js",
             "diamond/static/src/xml/jangad_image_viewer.xml",
             "diamond/static/src/scss/jangad_image_viewer.scss",
+            "diamond/static/src/scss/diamond_mobile_list.scss",
         ],
         "web.assets_frontend": [
             "diamond/static/src/js/jangad_upload.js",
