@@ -1,0 +1,63 @@
+/* Custom SCSS for List View text wrapping & mobile one2many table readability */
+
+/* Target list table cells AND inner elements (.o_text_overflow, .text-truncate, .o_field_widget, etc.) */
+.o_list_renderer .o_list_table.o_sudi_list_wrap_text,
+.o_list_renderer.o_sudi_list_wrap_text .o_list_table,
+.o_sudi_list_wrap_text {
+    td.o_data_cell,
+    th,
+    td.o_data_cell *,
+    td.o_data_cell .o_text_overflow,
+    td.o_data_cell .text-truncate,
+    td.o_data_cell .o_field_widget {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-overflow: clip !important;
+        vertical-align: top !important;
+        max-width: none !important;
+    }
+}
+
+/* Make all list view cell text and inner spans wrap into new lines instead of displaying dots (...) */
+.o_list_renderer .o_list_table {
+    td.o_data_cell,
+    td.o_data_cell *,
+    td.o_data_cell .o_text_overflow,
+    td.o_data_cell .text-truncate,
+    td.o_data_cell .o_field_widget {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-overflow: clip !important;
+        vertical-align: top !important;
+        max-width: none !important;
+    }
+}
+
+/* Mobile responsive styling for form view One2many tables & kanban cards */
+@media (max-width: 767.98px) {
+    .o_form_view .o_field_one2many {
+        .o_list_renderer {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            .o_list_table {
+                min-width: 100%;
+                th,
+                td,
+                td * {
+                    padding: 0.4rem 0.5rem;
+                    font-size: 0.875rem;
+                    white-space: normal !important;
+                    word-break: break-word !important;
+                    overflow-wrap: break-word !important;
+                }
+            }
+        }
+    }
+    .o_kanban_mobile .o_kanban_record {
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.5rem;
+        border-radius: 0.375rem;
+    }
+}
