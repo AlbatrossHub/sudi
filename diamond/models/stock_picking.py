@@ -186,13 +186,19 @@ class StockPicking(models.Model):
             return
 
         body_lines = [
-            _("📋 *Daily Jangad Data Entry Reminder*\n"),
-            _("The following Jangad receipts are pending data entry:\n"),
+            "===============================",
+            "             *SDPPL*",
+            "    _Daily Data Entry Reminder_",
+            "===============================\n\n",
+            "📋  *DAILY JANGAD DATA ENTRY REMINDER*",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
+            "The following Jangad receipts are pending data entry:\n",
         ]
         for receipt in pending_receipts:
             customer_name = receipt.partner_id.name if receipt.partner_id else _("Customer")
-            body_lines.append(f"• #{receipt.name} - {customer_name}")
+            body_lines.append(f"    ▪ *#{receipt.name}*  -  {customer_name}")
 
+        body_lines.append(_("\nPlease update data entry for these orders at the earliest.\n\n\nThank you,\n\n*Team SDPPL*"))
         body_text = "\n".join(body_lines)
         for user in notify_users:
             user_phone = user.partner_id.phone or user.partner_id.mobile
@@ -322,15 +328,25 @@ class StockPicking(models.Model):
 
             # Message 1A: Send To Pickup Person
             wa_body_pickup = _(
-                "New Jangad Pickup Request\n\n"
-                "A new Jangad pickup request has been received.\n\n"
-                "Customer: %(customer_name)s\n\n"
-                "Address: %(address)s\n\n"
-                "Contact: %(phone)s\n\n"
-                "Please coordinate with the customer (if required) and proceed with the pickup.\n\n"
-                "Thank you.\n\n"
-                "🔗 View Receipt:\n\n"
-                "%(url)s",
+                "===============================\n"
+                "             *SDPPL*\n"
+                "    _Pickup Task Assignment_\n"
+                "===============================\n\n"
+                "🚚  *NEW JANGAD PICKUP ASSIGNED*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "A new Jangad pickup request has been received and assigned to you.\n\n\n"
+                "📌  *PICKUP DETAILS*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "    ▪ *Customer :*  %(customer_name)s\n"
+                "    ▪ *Address  :*  %(address)s\n"
+                "    ▪ *Contact  :*  %(phone)s\n\n"
+                "Please coordinate with the customer (if required) and proceed with the pickup.\n\n\n"
+                "🔗  *RECEIPT LINK*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "View full details and receipt form here:\n"
+                "%(url)s\n\n\n"
+                "Thank you,\n\n"
+                "*Team SDPPL*",
                 customer_name=customer_name,
                 address=address,
                 phone=phone_no,
@@ -352,17 +368,26 @@ class StockPicking(models.Model):
             customer_phone = receipt.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
             if customer_phone:
                 wa_body_cust = _(
-                    "Dear %(customer_name)s,\n\n"
-                    "Jangad Pickup Request Received\n\n"
-                    "We have successfully received your pickup request.\n\n"
-                    "Our pickup person will collect the items as per the details provided in your Jangad request.\n\n"
-                    "Pickup Reference: #%(pickup_reference)s\n\n"
-                    "If you need to get in touch with our pickup team regarding your pickup, you may contact us at:\n\n"
-                    "📞 +91 9653402615\n\n"
-                    "📞 +91 8080809288\n\n"
-                    "Thank you for choosing SDPPL. We look forward to serving you.\n\n"
-                    "Best regards,\n\n"
-                    "Team SDPPL",
+                    "===============================\n"
+                    "             *SDPPL*\n"
+                    "    _Pickup Request Confirmation_\n"
+                    "===============================\n\n"
+                    "Dear *%(customer_name)s*,\n\n"
+                    "📦  *JANGAD PICKUP REQUEST RECEIVED*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    "We have successfully received your request! Our pickup representative will collect the items as per the details provided in your Jangad request.\n\n\n"
+                    "📌  *PICKUP DETAILS*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    "    ▪ *Reference No :*  #%(pickup_reference)s\n"
+                    "    ▪ *Status       :*  Scheduled for Pickup\n\n\n"
+                    "📞  *NEED ASSISTANCE?*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    "If you need to reach our team regarding this pickup, feel free to contact us:\n\n"
+                    "    📱 *Phone 1 :* +91 9653402615\n"
+                    "    📱 *Phone 2 :* +91 8080809288\n\n\n"
+                    "Thank you for choosing *SDPPL*. We look forward to serving you!\n\n\n"
+                    "Best Regards,\n\n"
+                    "*Team SDPPL*",
                     customer_name=customer_name,
                     pickup_reference=receipt.name,
                 )
@@ -395,13 +420,21 @@ class StockPicking(models.Model):
             customer_phone = receipt.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
             if customer_phone:
                 cust_body = _(
-                    "Dear %(customer_name)s,\n\n"
-                    "Jangad Pickup Completed\n\n"
-                    "Your items have been successfully picked up as per your Jangad request.\n\n"
-                    "Pickup Reference: #%(pickup_reference)s\n\n"
-                    "Thank you for choosing SDPPL. We appreciate your trust and look forward to serving you again.\n\n"
-                    "Best regards,\n\n"
-                    "Team SDPPL",
+                    "===============================\n"
+                    "             *SDPPL*\n"
+                    "    _Pickup Completion Notice_\n"
+                    "===============================\n\n"
+                    "Dear *%(customer_name)s*,\n\n"
+                    "✅  *JANGAD PICKUP COMPLETED*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    "Your items have been successfully collected as per your Jangad request.\n\n\n"
+                    "📌  *PICKUP DETAILS*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    "    ▪ *Reference No :*  #%(pickup_reference)s\n"
+                    "    ▪ *Status       :*  Completed\n\n\n"
+                    "Thank you for choosing *SDPPL*. We appreciate your trust and look forward to serving you again!\n\n\n"
+                    "Best Regards,\n\n"
+                    "*Team SDPPL*",
                     customer_name=customer_name,
                     pickup_reference=receipt.name,
                 )
@@ -417,14 +450,23 @@ class StockPicking(models.Model):
             attachment = receipt._sudi_get_jangad_image_attachment()
 
             admin_body = _(
-                "Jangad Pickup Completed\n\n"
-                "Please prepare data tables for job work and Billing \n\n"
-                "Customer: %(customer_name)s\n\n"
-                "Pickup Reference: #%(pickup_reference)s\n\n"
-                "Pickup Person: %(pickup_person)s\n\n"
-                "The items have been successfully collected as per the Jangad request.\n\n"
-                "🔗 View Receipt:\n\n"
-                "%(url)s",
+                "===============================\n"
+                "             *SDPPL*\n"
+                "    _Admin Intimation Notice_\n"
+                "===============================\n\n"
+                "📋  *JANGAD PICKUP COMPLETED*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "The items have been successfully collected as per the Jangad request. Please prepare data tables for job work and billing.\n\n\n"
+                "📌  *PICKUP SUMMARY*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "    ▪ *Customer     :*  %(customer_name)s\n"
+                "    ▪ *Reference No :*  #%(pickup_reference)s\n"
+                "    ▪ *Pickup Person:*  %(pickup_person)s\n\n\n"
+                "🔗  *RECEIPT LINK*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "%(url)s\n\n\n"
+                "Thank you,\n\n"
+                "*Team SDPPL*",
                 customer_name=customer_name,
                 pickup_reference=receipt.name,
                 pickup_person=pickup_person_name,
@@ -461,15 +503,26 @@ class StockPicking(models.Model):
                     })
 
                 wa_body = (
-                    f"Dear {customer_name},\n\n"
-                    f"As per your request, we have cancelled your pickup.\n\n"
-                    f"Pickup Reference: #{receipt.name}\n\n"
-                    f"The pickup Jangad is attached for your reference.\n\n"
-                    f"For any future requirements, you can easily upload a new Jangad here:\n\n"
-                    f"https://manage.sdppl.com/jangad\n\n"
-                    f"Thank you for choosing us. We look forward to serving you again.\n\n"
-                    f"Best regards,\n\n"
-                    f"Team SDPPL"
+                    f"===============================\n"
+                    f"             *SDPPL*\n"
+                    f"    _Pickup Cancellation Notice_\n"
+                    f"===============================\n\n"
+                    f"Dear *{customer_name}*,\n\n"
+                    f"🚫  *JANGAD PICKUP CANCELLED*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"As per your request, we have cancelled your pickup.\n\n\n"
+                    f"📌  *CANCELLATION DETAILS*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"    ▪ *Reference No :*  #{receipt.name}\n"
+                    f"    ▪ *Status       :*  Cancelled\n\n"
+                    f"The pickup Jangad document is attached for your reference.\n\n\n"
+                    f"🌐  *UPLOAD NEW JANGAD*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"For any future requirements, you can easily upload a new Jangad here:\n"
+                    f"https://manage.sdppl.com/jangad\n\n\n"
+                    f"Thank you for choosing *SDPPL*. We look forward to serving you again!\n\n\n"
+                    f"Best Regards,\n\n"
+                    f"*Team SDPPL*"
                 )
 
                 receipt._sudi_send_whatsapp_message(
@@ -494,15 +547,22 @@ class StockPicking(models.Model):
             # 1. Send To Customer
             if customer_phone:
                 cust_body = _(
-                    "Dear %(customer_name)s,\n\n"
-                    "📦 Your Order is Ready for Delivery\n\n"
-                    "Your order is now ready and has been assigned for delivery.\n\n"
-                    "Delivery Reference: #%(delivery_reference)s\n\n"
-                    "Our delivery person will contact you shortly and deliver your order.\n\n"
-                    "If you have any questions regarding the delivery, please feel free to contact us.\n\n"
-                    "Thank you for choosing SDPPL. We look forward to serving you.\n\n"
-                    "Best regards,\n\n"
-                    "Team SDPPL",
+                    "===============================\n"
+                    "             *SDPPL*\n"
+                    "    _Delivery Update_\n"
+                    "===============================\n\n"
+                    "Dear *%(customer_name)s*,\n\n"
+                    "📦  *YOUR ORDER IS READY FOR DELIVERY*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    "Your order is now ready and has been assigned for delivery.\n\n\n"
+                    "📌  *DELIVERY DETAILS*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    "    ▪ *Reference No :*  #%(delivery_reference)s\n"
+                    "    ▪ *Status       :*  Out for Delivery\n\n"
+                    "Our delivery representative will contact you shortly to deliver your order.\n\n\n"
+                    "Thank you for choosing *SDPPL*. We look forward to serving you!\n\n\n"
+                    "Best Regards,\n\n"
+                    "*Team SDPPL*",
                     customer_name=customer_name,
                     delivery_reference=delivery.name,
                 )
@@ -520,16 +580,25 @@ class StockPicking(models.Model):
             url = delivery._sudi_get_form_view_url()
 
             deliv_body = _(
-                "New Delivery Assigned\n\n"
-                "A delivery order has been assigned to you.\n\n"
-                "Customer: %(customer_name)s\n\n"
-                "Address: %(address)s\n\n"
-                "Contact: %(phone)s\n\n"
-                "Delivery Reference: #%(delivery_reference)s\n\n"
-                "Please coordinate with the customer and proceed with the delivery.\n\n"
-                "🔗 View Delivery Order:\n\n"
-                "%(url)s\n\n"
-                "Thank you.",
+                "===============================\n"
+                "             *SDPPL*\n"
+                "    _Delivery Task Assignment_\n"
+                "===============================\n\n"
+                "🚚  *NEW DELIVERY TASK ASSIGNED*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "A delivery order has been assigned to you.\n\n\n"
+                "📌  *DELIVERY DETAILS*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "    ▪ *Customer     :*  %(customer_name)s\n"
+                "    ▪ *Address      :*  %(address)s\n"
+                "    ▪ *Contact      :*  %(phone)s\n"
+                "    ▪ *Reference No :*  #%(delivery_reference)s\n\n"
+                "Please coordinate with the customer and proceed with the delivery.\n\n\n"
+                "🔗  *DELIVERY ORDER LINK*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "%(url)s\n\n\n"
+                "Thank you,\n\n"
+                "*Team SDPPL*",
                 customer_name=customer_name,
                 address=address,
                 phone=phone_no,
@@ -561,14 +630,21 @@ class StockPicking(models.Model):
             # 1. Send To Customer
             if customer_phone:
                 cust_body = _(
-                    "Dear %(customer_name)s,\n\n"
-                    "✅ Delivery Completed\n\n"
-                    "Your order has been successfully delivered.\n\n"
-                    "Delivery Reference: #%(delivery_reference)s\n\n"
-                    "We hope you had a smooth experience with SDPPL.\n\n"
-                    "Thank you for choosing us. We look forward to serving you again.\n\n"
-                    "Warm regards,\n\n"
-                    "Team SDPPL",
+                    "===============================\n"
+                    "             *SDPPL*\n"
+                    "    _Delivery Confirmation_\n"
+                    "===============================\n\n"
+                    "Dear *%(customer_name)s*,\n\n"
+                    "✅  *DELIVERY COMPLETED*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    "Your order has been successfully delivered.\n\n\n"
+                    "📌  *DELIVERY DETAILS*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    "    ▪ *Reference No :*  #%(delivery_reference)s\n"
+                    "    ▪ *Status       :*  Delivered\n\n"
+                    "We hope you had a smooth experience with *SDPPL*. Thank you for choosing us!\n\n\n"
+                    "Warm Regards,\n\n"
+                    "*Team SDPPL*",
                     customer_name=customer_name,
                     delivery_reference=delivery.name,
                 )
@@ -584,14 +660,23 @@ class StockPicking(models.Model):
             url = delivery._sudi_get_form_view_url()
 
             admin_body = _(
-                "✅ Delivery Completed \n\n"
-                "A delivery order has been successfully completed.\n\n"
-                "Customer: %(customer_name)s\n\n"
-                "Delivery Reference: #%(delivery_reference)s\n\n"
-                "Delivery Person: %(delivery_person)s\n\n"
-                "The order has been marked as delivered successfully.\n\n"
-                "🔗 View Delivery Order:\n\n"
-                "%(url)s",
+                "===============================\n"
+                "             *SDPPL*\n"
+                "    _Delivery Admin Intimation_\n"
+                "===============================\n\n"
+                "✅  *DELIVERY ORDER COMPLETED*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "A delivery order has been marked as delivered successfully.\n\n\n"
+                "📌  *SUMMARY*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "    ▪ *Customer       :*  %(customer_name)s\n"
+                "    ▪ *Reference No   :*  #%(delivery_reference)s\n"
+                "    ▪ *Delivery Person:*  %(delivery_person)s\n\n\n"
+                "🔗  *DELIVERY ORDER LINK*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "%(url)s\n\n\n"
+                "Thank you,\n\n"
+                "*Team SDPPL*",
                 customer_name=customer_name,
                 delivery_reference=delivery.name,
                 delivery_person=delivery_person,

@@ -23,15 +23,24 @@ class AccountMove(models.Model):
         due_date = self.invoice_date_due.strftime('%Y-%m-%d') if self.invoice_date_due else 'N/A'
 
         body_text = _(
-            "Hello %(partner_name)s,\n\n"
-            "Please find your invoice details below:\n"
-            "• Invoice Number: %(invoice_name)s\n"
-            "• Total Amount: %(currency)s %(amount)s\n"
-            "• Due Date: %(due_date)s\n"
-            "• Contact Phone: %(phone)s\n\n"
-            "The invoice PDF is attached to this message.\n\n"
-            "If you have any questions, please let us know.\n\n"
-            "Thank you!"
+            "===============================\n"
+            "             *SDPPL*\n"
+            "    _Invoice Details Notice_\n"
+            "===============================\n\n"
+            "Dear *%(partner_name)s*,\n\n"
+            "📄  *INVOICE DETAILS*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Please find your invoice details below:\n\n\n"
+            "📌  *SUMMARY*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "    ▪ *Invoice No   :*  #%(invoice_name)s\n"
+            "    ▪ *Total Amount :*  %(currency)s %(amount)s\n"
+            "    ▪ *Due Date     :*  %(due_date)s\n"
+            "    ▪ *Contact Phone:*  %(phone)s\n\n"
+            "📎 The invoice PDF document is attached to this message.\n\n\n"
+            "Thank you for your business!\n\n\n"
+            "Best Regards,\n\n"
+            "*Team SDPPL*"
         ) % {
             'partner_name': partner.name or '',
             'invoice_name': self.name or '',

@@ -3,17 +3,17 @@
     <data noupdate="1">
         <record id="quick_reply_jangad_pickup_scheduled" model="owa.quick.reply">
             <field name="name">Jangad Pickup Scheduled (Notify Pickup Person)</field>
-            <field name="body">We have received a new Jangad request from {{customer_name}}, address is {{address}}, contact number is {{phone}}</field>
+            <field name="body">===============================&#10;             *SDPPL*&#10;    _Pickup Task Assignment_&#10;===============================&#10;&#10;🚚  *NEW JANGAD PICKUP ASSIGNED*&#10;━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━&#10;&#10;We have received a new Jangad pickup request.&#10;&#10;&#10;📌  *PICKUP DETAILS*&#10;━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━&#10;&#10;    ▪ *Customer :*  {{customer_name}}&#10;    ▪ *Address  :*  {{address}}&#10;    ▪ *Contact  :*  {{phone}}&#10;&#10;Please coordinate with the customer and proceed with the pickup.</field>
         </record>
 
         <record id="quick_reply_jangad_pickup_done_customer" model="owa.quick.reply">
             <field name="name">Jangad Pickup Done (Notify Customer)</field>
-            <field name="body">We have received your Jangad request. The uploaded photo has been attached. We will keep you posted on the status.</field>
+            <field name="body">===============================&#10;             *SDPPL*&#10;    _Pickup Completion Notice_&#10;===============================&#10;&#10;✅  *JANGAD PICKUP COMPLETED*&#10;━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━&#10;&#10;We have successfully collected your items as per your Jangad request. The uploaded photo has been attached.&#10;&#10;We will keep you posted on the progress of your order.&#10;&#10;&#10;Thank you for choosing *SDPPL*!</field>
         </record>
 
         <record id="quick_reply_jangad_pickup_done_admin" model="owa.quick.reply">
             <field name="name">Jangad Pickup Done (Notify Admin)</field>
-            <field name="body">Pickup was successful for Jangad #{{picking_name}}. Please prepare data for job work.</field>
+            <field name="body">===============================&#10;             *SDPPL*&#10;    _Admin Intimation Notice_&#10;===============================&#10;&#10;📋  *JANGAD PICKUP COMPLETED*&#10;━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━&#10;&#10;Pickup was successful for Jangad `{{picking_name}}`.&#10;&#10;Please prepare the data tables for job work and billing.</field>
         </record>
 
         <record id="ir_cron_sudi_notify_due_data_entry" model="ir.cron">
