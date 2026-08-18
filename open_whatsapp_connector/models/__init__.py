@@ -39,3 +39,4 @@ from . import res_partner
 from . import res_partner_phase26
 from . import res_users_settings
 from . import owa_cloud_template
+from . import sudi_whatsapp_template
