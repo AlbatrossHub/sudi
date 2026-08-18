@@ -119,6 +119,7 @@ Compliance & polish (v19.0.26+)
         # auto-replies and a Main Menu chatbot (all ship inactive).
         'data/owa_starter_templates.xml',
         'data/owa_starter_automations.xml',
+        'data/sudi_whatsapp_template_data.xml',
         # Root menu must load BEFORE any view file that uses
         # parent="open_whatsapp_connector.menu_owa_root" on a <menuitem>.
         'views/owa_menu_root.xml',
@@ -160,7 +161,7 @@ Compliance & polish (v19.0.26+)
         'views/owa_dashboard_views.xml',
         'views/owa_group_session_views.xml',
         'views/owa_community_views.xml',
-        'views/owa_newsletter_views.xml',
+        'views/sudi_whatsapp_template_views.xml',
         'views/owa_menus.xml',
         'views/owa_status_views.xml',
         'views/owa_cloud_template_views.xml',

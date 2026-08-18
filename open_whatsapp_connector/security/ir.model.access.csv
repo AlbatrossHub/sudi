@@ -102,3 +102,5 @@ access_owa_reply_account_wizard_user,owa.reply.account.wizard.user,model_owa_rep
 access_owa_cloud_phone_wizard_user,owa.cloud.phone.wizard.user,model_owa_cloud_phone_wizard,base.group_user,1,1,1,1
 access_owa_cloud_send_wizard_user,owa.cloud.send.wizard.user,model_owa_cloud_send_wizard,base.group_user,1,1,1,1
 access_owa_import_job_user,owa.import.job.user,model_owa_import_job,base.group_user,1,1,1,1
+access_sudi_whatsapp_template_user,sudi.whatsapp.template.user,model_sudi_whatsapp_template,base.group_user,1,0,0,0
+access_sudi_whatsapp_template_admin,sudi.whatsapp.template.admin,model_sudi_whatsapp_template,open_whatsapp_connector.group_owa_admin,1,1,1,1

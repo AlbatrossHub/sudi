@@ -21,12 +21,17 @@ _logger = logging.getLogger(__name__)
 # keeps the readable text (the mention name, or a typed URL as-is) but leaks no
 # Odoo Discuss link into the group.
 _WA_ANCHOR_RE = re.compile(r'<a\b[^>]*>(.*?)</a>', re.IGNORECASE | re.DOTALL)
+_WA_HTML_TAG_RE = re.compile(r'<(?:p|br|div|a|span|b|i|strong|em|ul|ol|li|h[1-6])\b', re.IGNORECASE)
 
 
 def _html_to_wa_text(html):
     if not html:
         return ''
+    # If the text is already plain text (doesn't contain HTML tags), preserve all user newlines & spaces exactly
+    if not _WA_HTML_TAG_RE.search(html):
+        return html.strip()
     return html2plaintext(_WA_ANCHOR_RE.sub(lambda m: m.group(1), html))
+
 
 
 class OwaMessage(models.Model):
