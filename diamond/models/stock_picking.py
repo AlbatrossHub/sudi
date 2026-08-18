@@ -136,7 +136,9 @@ class StockPicking(models.Model):
                 if picking.sudi_is_diamond_job_work and picking.picking_type_code == "incoming" and picking.state == "sudi_pickup_pending":
                     raise UserError(_("This pickup is still pending you can not input the data please confirm the pick up"))
         res = super().write(vals)
-        if "sudi_jangad_image" in vals or "sudi_pickup_user_id" in vals:
+        if not self.env.context.get("sudi_skip_pickup_scheduled_notify") and (
+            "sudi_jangad_image" in vals or "sudi_pickup_user_id" in vals
+        ):
             self._sudi_notify_pickup_scheduled()
         if not self.env.context.get("sudi_skip_billing_sync"):
             trigger_fields = {
@@ -415,6 +417,7 @@ class StockPicking(models.Model):
 
             customer_partner = receipt.partner_id
             customer_name = customer_partner.name if customer_partner else _("Customer")
+            attachment = receipt._sudi_get_jangad_image_attachment()
 
             # Message 2A: Send To Customer
             customer_phone = receipt.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
@@ -441,13 +444,13 @@ class StockPicking(models.Model):
                 receipt._sudi_send_whatsapp_message(
                     recipient_phone=customer_phone,
                     body_text=cust_body,
+                    attachment=attachment,
                     partner=customer_partner,
                 )
 
             # Message 2B: Send To Admin
             pickup_person_name = receipt.sudi_pickup_user_id.name if receipt.sudi_pickup_user_id else (self.env.user.name or _("N/A"))
             url = receipt._sudi_get_form_view_url()
-            attachment = receipt._sudi_get_jangad_image_attachment()
 
             admin_body = _(
                 "===============================\n"
@@ -822,7 +825,7 @@ class StockPicking(models.Model):
         if invalid_pickings:
             raise UserError(_("Pickup can only be confirmed on diamond job-work receipts waiting for pickup."))
 
-        self.write({
+        self.with_context(sudi_skip_pickup_scheduled_notify=True).write({
             "sudi_pickup_user_id": self.env.user.id,
             "sudi_pickup_datetime": fields.Datetime.now(),
         })
