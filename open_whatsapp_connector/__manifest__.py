@@ -162,6 +162,7 @@ Compliance & polish (v19.0.26+)
         'views/owa_group_session_views.xml',
         'views/owa_community_views.xml',
         'views/sudi_whatsapp_template_views.xml',
+        'views/owa_newsletter_views.xml',
         'views/owa_menus.xml',
         'views/owa_status_views.xml',
         'views/owa_cloud_template_views.xml',

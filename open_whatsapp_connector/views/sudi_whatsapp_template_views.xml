@@ -71,7 +71,7 @@
                 <filter string="Active" name="active" domain="[('active', '=', True)]"/>
                 <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                 <separator/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter string="Event" name="group_event" context="{'group_by': 'event'}"/>
                     <filter string="Company" name="group_company" context="{'group_by': 'company_id'}"/>
                 </group>
