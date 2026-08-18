@@ -1,3 +1,4 @@
+import base64
 import logging
 import re
 
@@ -304,7 +305,42 @@ class StockPicking(models.Model):
             "mimetype": "image/jpeg",
         })
 
+    def _sudi_get_delivery_pdf_attachment(self):
+        """Render and return the PDF attachment of Diamond Job Work Receipt / Delivery report."""
+        self.ensure_one()
+        try:
+            report_xml_id = "diamond.action_report_diamond_job_work"
+            pdf_content = False
+            report = self.env.ref(report_xml_id, raise_if_not_found=False)
+            if report:
+                try:
+                    res = report.sudo()._render_qweb_pdf([self.id])
+                    pdf_content = res[0] if isinstance(res, (tuple, list)) else res
+                except Exception:
+                    res = self.env["ir.actions.report"].sudo()._render_qweb_pdf(report_xml_id, [self.id])
+                    pdf_content = res[0] if isinstance(res, (tuple, list)) else res
+
+            if not pdf_content:
+                return self.env["ir.attachment"]
+
+            clean_name = self.name.replace("/", "_")
+            attachment_name = f"Delivery_{clean_name}.pdf"
+            attachment = self.env["ir.attachment"].sudo().create({
+                "name": attachment_name,
+                "type": "binary",
+                "datas": base64.b64encode(pdf_content),
+                "res_model": self._name,
+                "res_id": self.id,
+                "mimetype": "application/pdf",
+            })
+            return attachment
+        except Exception:
+            _logger.exception("Failed to render delivery PDF report for %s", self.display_name)
+            return self.env["ir.attachment"]
+
+
     def _sudi_get_whatsapp_template_context(self, event):
+
         """Centralized controlled variable resolver for Sudi WhatsApp templates."""
         self.ensure_one()
         customer_partner = self.partner_id
@@ -557,6 +593,9 @@ class StockPicking(models.Model):
             customer_partner = delivery.partner_id
             customer_phone = delivery.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
 
+            # Generate PDF attachment for delivery report
+            pdf_attachment = delivery._sudi_get_delivery_pdf_attachment()
+
             # 1. Send To Customer
             if customer_phone:
                 cust_body = delivery._sudi_render_event_whatsapp_message("delivery_completed")
@@ -564,6 +603,7 @@ class StockPicking(models.Model):
                     delivery._sudi_send_whatsapp_message(
                         recipient_phone=customer_phone,
                         body_text=cust_body,
+                        attachment=pdf_attachment,
                         partner=customer_partner,
                     )
 
@@ -577,8 +617,10 @@ class StockPicking(models.Model):
                         delivery._sudi_send_whatsapp_message(
                             recipient_phone=user_phone,
                             body_text=admin_body,
+                            attachment=pdf_attachment,
                             partner=user.partner_id,
                         )
+
 
 
 
