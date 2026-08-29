@@ -559,14 +559,14 @@ class StockPicking(models.Model):
             customer_phone = delivery.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
 
             # 1. Send To Customer
-            if customer_phone:
-                cust_body = delivery._sudi_render_event_whatsapp_message("delivery_assigned")
-                if cust_body:
-                    delivery._sudi_send_whatsapp_message(
-                        recipient_phone=customer_phone,
-                        body_text=cust_body,
-                        partner=customer_partner,
-                    )
+            # if customer_phone:
+            #     cust_body = delivery._sudi_render_event_whatsapp_message("delivery_assigned")
+            #     if cust_body:
+            #         delivery._sudi_send_whatsapp_message(
+            #             recipient_phone=customer_phone,
+            #             body_text=cust_body,
+            #             partner=customer_partner,
+            #         )
 
             # 2. Send To Delivery Person / Flagged users
             notify_users = self._sudi_get_pickup_notify_users()
