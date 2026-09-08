@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_sudi_diamond_dashboard" model="ir.actions.client">
+        <field name="name">Job Work Analytics</field>
+        <field name="tag">sudi_diamond_dashboard</field>
+    </record>
+
+    <!-- Top-level app entry. Visibility is enforced twice: this groups= hides the
+         tile, and get_dashboard_data() re-checks the group, because hiding a menu
+         does not stop a crafted JSON-RPC call. -->
+    <menuitem id="menu_sudi_diamond_dashboard_root"
+              name="Job Work Analytics"
+              action="action_sudi_diamond_dashboard"
+              sequence="134"
+              groups="stock.group_stock_manager"
+              web_icon="sudi_diamond_dashboard,static/description/icon.svg"/>
+</odoo>
