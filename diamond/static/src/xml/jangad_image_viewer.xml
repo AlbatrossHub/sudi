@@ -48,19 +48,73 @@
                 </t>
             </div>
 
-            <!-- Edit Mode File Upload & Clear Controls -->
-            <t t-if="!props.readonly &amp;&amp; props.record.isInEdit">
+            <!-- Upload / replace / clear.
+                 NB: this used to be gated on props.record.isInEdit, which does not
+                 exist in Odoo 19 (the record property is isInEdition), so the block
+                 was always false and nobody could attach a Jangad from the backend.
+                 Core gates on props.readonly alone; do the same. -->
+            <t t-if="!props.readonly">
                 <div class="o_field_image_controls mt-1 d-flex gap-1 justify-content-center">
                     <FileUploader
                         acceptedFileExtensions="props.acceptedFileExtensions"
                         onUploaded.bind="onFileUploaded">
                         <t t-set-slot="toggler">
-                            <button type="button" class="btn btn-sm btn-primary fa fa-pencil o_select_file_button" title="Edit"/>
+                            <button t-if="!hasJangad"
+                                    type="button"
+                                    class="btn btn-sm btn-primary o_select_file_button"
+                                    title="Upload Jangad">
+                                <i class="fa fa-upload me-1"/>Upload Jangad
+                            </button>
+                            <button t-else=""
+                                    type="button"
+                                    class="btn btn-sm btn-secondary fa fa-pencil o_select_file_button"
+                                    title="Replace Jangad"/>
                         </t>
                     </FileUploader>
-                    <t t-if="props.record.data[props.name]">
+                    <t t-if="hasJangad">
                         <button type="button" class="btn btn-sm btn-danger fa fa-trash-o o_clear_file_button" t-on-click="onFileRemove" title="Clear"/>
                     </t>
+                </div>
+            </t>
+
+            <!-- Floating viewer: keeps the Jangad readable while the job table is
+                 filled in. Fixed over the chatter column once the inline viewer
+                 scrolls off the top. -->
+            <t t-if="showFloatingViewer">
+                <div class="o_jangad_float shadow-lg rounded border" t-att-style="floatStyle">
+                    <div class="o_jangad_float_head d-flex align-items-center gap-1 px-2 py-1">
+                        <i class="fa fa-picture-o"/>
+                        <span class="flex-grow-1 fw-bold">Jangad</span>
+                        <button type="button" class="btn btn-sm p-0 px-1" t-on-click="scrollToInlineViewer" title="Back to the Jangad field">
+                            <i class="fa fa-arrow-up"/>
+                        </button>
+                        <button type="button" class="btn btn-sm p-0 px-1" t-on-click="dismissFloatingViewer" title="Hide until I scroll back up">
+                            <i class="fa fa-times"/>
+                        </button>
+                    </div>
+                    <div class="o_jangad_float_body">
+                        <img t-att-src="getUrl(props.name)"
+                             t-att-alt="imgAlt"
+                             t-att-style="floatImgStyle"
+                             t-on-error="onLoadFailed"/>
+                    </div>
+                    <div class="o_jangad_float_toolbar d-flex justify-content-center gap-1 p-1">
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="rotateCounterClockwise" title="Rotate Left (-90°)">
+                            <i class="fa fa-rotate-left"/>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="rotateClockwise" title="Rotate Right (+90°)">
+                            <i class="fa fa-rotate-right"/>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="zoomOut" title="Zoom Out (-)">
+                            <i class="fa fa-search-minus"/>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="zoomIn" title="Zoom In (+)">
+                            <i class="fa fa-search-plus"/>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="resetView" title="Reset View">
+                            <i class="fa fa-undo"/>
+                        </button>
+                    </div>
                 </div>
             </t>
         </div>
