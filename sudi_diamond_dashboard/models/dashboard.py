@@ -415,12 +415,19 @@ class SudiDiamondDashboard(models.AbstractModel):
                 domain.append(("state", "in", states))
                 name = next(spec[1] for spec in self.STAGE_SPEC if spec[0] == record_id)
 
-        return {
-            "type": "ir.actions.act_window",
+        # Reuse the module's own receipts action rather than returning a bare dict:
+        # the web client's _preprocessAction() calls action.views.map() with no
+        # guard, so an action without a resolved "views" list raises
+        # "can't access property map, action.views is undefined". Going through
+        # _for_xml_id() also lands the drilldown on the Diamond list, with its
+        # Sr / Size / Carats / Job Type columns, instead of the plain picking list.
+        action = self.env["ir.actions.act_window"]._for_xml_id(
+            "diamond.action_sudi_diamond_receipts"
+        )
+        action.update({
             "name": name,
-            "res_model": "stock.picking",
-            "view_mode": "list,form",
             "domain": domain,
-            "context": {"create": False},
+            "context": {"create": False, "restricted_picking_type_code": "incoming"},
             "target": "current",
-        }
+        })
+        return action

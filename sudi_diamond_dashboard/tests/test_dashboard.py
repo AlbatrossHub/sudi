@@ -202,6 +202,9 @@ class TestSudiDiamondDashboard(TestStockCommon):
             "customer", self.customer_a.id, period="month"
         )
         self.assertEqual(action["res_model"], "stock.picking")
+        # The web client calls action.views.map() unguarded; without a resolved
+        # views list every drilldown click raises a TypeError.
+        self.assertTrue(action.get("views"), "drilldown action needs a views list")
 
         pickings = self.env["stock.picking"].with_user(self.manager).search(action["domain"])
         self.assertEqual(pickings.mapped("partner_id"), self.customer_a)
@@ -213,5 +216,6 @@ class TestSudiDiamondDashboard(TestStockCommon):
         action = self.dashboard.with_user(self.manager).get_drilldown_action(
             "job_type", self.job_natts.id, period="month"
         )
+        self.assertTrue(action.get("views"), "drilldown action needs a views list")
         pickings = self.env["stock.picking"].with_user(self.manager).search(action["domain"])
         self.assertEqual(pickings.move_ids.sudi_job_type_id, self.job_natts)

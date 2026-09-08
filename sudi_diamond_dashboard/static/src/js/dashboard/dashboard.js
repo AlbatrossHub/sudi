@@ -2,6 +2,30 @@ import { Component, onWillStart, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
+import { useSetupAction } from "@web/search/action_hook";
+import { browser } from "@web/core/browser/browser";
+
+// Filters survive a drilldown two ways: useSetupAction() hands them back as
+// props.state when returning through the breadcrumb, and sessionStorage keeps
+// them if that state is missing (a hard reload, or a fresh action instance).
+const FILTER_KEY = "sudi_diamond_dashboard.filters";
+
+function readStoredFilters() {
+    try {
+        return JSON.parse(browser.sessionStorage.getItem(FILTER_KEY)) || {};
+    } catch {
+        return {};
+    }
+}
+
+function writeStoredFilters(filters) {
+    try {
+        browser.sessionStorage.setItem(FILTER_KEY, JSON.stringify(filters));
+    } catch {
+        // Storage can be unavailable (private windows, blocked site data);
+        // the dashboard then simply opens on its defaults.
+    }
+}
 import { _t } from "@web/core/l10n/translation";
 import { formatFloat, formatInteger } from "@web/views/fields/formatters";
 import { SudiTrendChart } from "./trend_chart";
@@ -27,13 +51,30 @@ export class SudiDiamondDashboard extends Component {
             { key: "carats", label: _t("Carats") },
         ];
 
+        // Restored from props.state when the user comes back through the
+        // breadcrumb after a drilldown, so returning does not silently reset the
+        // period, measure or custom range they had chosen. Figures are
+        // deliberately not persisted -- they are refetched so the numbers are
+        // never stale.
+        // props.state wins when present -- it is the state of the exact view the
+        // user navigated away from; storage is the fallback.
+        const restored = { ...readStoredFilters(), ...(this.props.state || {}) };
         this.state = useState({
-            period: "month",
-            measure: "pcs",
-            dateFrom: "",
-            dateTo: "",
+            period: restored.period || "month",
+            measure: restored.measure || "pcs",
+            dateFrom: restored.dateFrom || "",
+            dateTo: restored.dateTo || "",
             loading: true,
             data: null,
+        });
+
+        useSetupAction({
+            getLocalState: () => ({
+                period: this.state.period,
+                measure: this.state.measure,
+                dateFrom: this.state.dateFrom,
+                dateTo: this.state.dateTo,
+            }),
         });
 
         // Passed to the chart, which formats tooltips with the active measure.
@@ -63,6 +104,12 @@ export class SudiDiamondDashboard extends Component {
             this.state.data = data;
             this.state.dateFrom = data.date_from;
             this.state.dateTo = data.date_to;
+            writeStoredFilters({
+                period: this.state.period,
+                measure: this.state.measure,
+                dateFrom: this.state.dateFrom,
+                dateTo: this.state.dateTo,
+            });
         } finally {
             this.state.loading = false;
         }
@@ -114,6 +161,13 @@ export class SudiDiamondDashboard extends Component {
                 date_to: this.state.dateTo,
             }
         );
+        // Odoo navigates with router.pushState(..., { replace: true }), which
+        // overwrites this dashboard's history entry -- the browser Back button
+        // would then skip it and land on the apps home. Duplicating the current
+        // entry first gives Odoo a copy to overwrite, so the original survives and
+        // Back returns here. Filters come back from sessionStorage, since a
+        // history navigation remounts the action without props.state.
+        browser.history.pushState({}, "", browser.location.href);
         this.actionService.doAction(action);
     }
 
