@@ -1,0 +1,575 @@
+// Sudi Diamond — analytical dashboard (neumorphic).
+//
+// Committed single light world: the look depends on a top-left light source on
+// a light ground, so there is no dark variant. No black is used anywhere — not
+// in ink, not in shadows, not in chart furniture. Everything is scoped under
+// .o_sudi_dashboard so none of it leaks into the rest of the web client.
+//
+// Typefaces load from Google Fonts as progressive enhancement; every stack has
+// a real system fallback so an offline server still renders correctly.
+// NB: the Google Fonts *v1* API (commas) is required here, not v2. Odoo's asset
+// bundler hoists @import rules and splits them on ";", so the semicolons in a v2
+// "wght@400;500" URL tear the statement in half and invalidate the whole bundle.
+@import url("https://fonts.googleapis.com/css?family=Sora:400,500,600,700|Manrope:400,500,600,700|IBM+Plex+Mono:400,500&display=swap");
+
+.o_sudi_dashboard {
+    --sudi-ground: #e9edf4;
+    --sudi-shade-light: #ffffff;
+    --sudi-shade-dark: #c4cddd;
+
+    --sudi-ink: #37415a;
+    --sudi-ink-soft: #5f6b85;
+    --sudi-ink-muted: #8e99b0;
+    --sudi-rule: #d7dfec;
+
+    --sudi-accent: #e2560f;
+    --sudi-accent-bright: #f2601a;
+    --sudi-accent-deep: #c2410c;
+
+    --sudi-good: #0ca30c;
+    --sudi-critical: #d03b3b;
+
+    --sudi-raise-sm: -3px -3px 7px var(--sudi-shade-light), 3px 3px 7px var(--sudi-shade-dark);
+    --sudi-raise-md: -6px -6px 14px var(--sudi-shade-light), 6px 6px 14px var(--sudi-shade-dark);
+    --sudi-sink-sm: inset -2px -2px 5px var(--sudi-shade-light), inset 2px 2px 5px var(--sudi-shade-dark);
+    --sudi-sink-md: inset -4px -4px 9px var(--sudi-shade-light), inset 4px 4px 9px var(--sudi-shade-dark);
+
+    --sudi-font-display: "Sora", "Trebuchet MS", system-ui, sans-serif;
+    --sudi-font-ui: "Manrope", "Segoe UI", system-ui, sans-serif;
+    --sudi-font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+
+    height: 100%;
+    overflow: auto;
+    background: var(--sudi-ground);
+    color: var(--sudi-ink);
+    font-family: var(--sudi-font-ui);
+    font-size: 14px;
+    line-height: 1.5;
+
+    .o_sudi_shell {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 26px 24px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    // ── Control bar ──────────────────────────────────────────────────────
+    .o_sudi_topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .o_sudi_brand {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        margin-right: auto;
+
+        h1 {
+            font-family: var(--sudi-font-display);
+            font-weight: 700;
+            font-size: 25px;
+            letter-spacing: -0.02em;
+            margin: 0;
+            color: var(--sudi-ink);
+
+            em {
+                font-style: normal;
+                color: var(--sudi-accent);
+            }
+        }
+    }
+
+    .o_sudi_scope {
+        font-size: 12.5px;
+        color: var(--sudi-ink-soft);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 19px;
+    }
+
+    .o_sudi_loading {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--sudi-accent-deep);
+    }
+
+    .o_sudi_seg {
+        display: flex;
+        gap: 4px;
+        padding: 5px;
+        border-radius: 999px;
+        box-shadow: var(--sudi-sink-md);
+        background: var(--sudi-ground);
+
+        button {
+            font-family: var(--sudi-font-ui);
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--sudi-ink-soft);
+            background: transparent;
+            border: 0;
+            border-radius: 999px;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: color 0.18s ease, box-shadow 0.18s ease;
+
+            &:hover {
+                color: var(--sudi-ink);
+            }
+
+            &[aria-pressed="true"] {
+                color: var(--sudi-accent-deep);
+                background: var(--sudi-ground);
+                box-shadow: var(--sudi-raise-sm);
+            }
+
+            &:focus-visible {
+                outline: 2px solid var(--sudi-accent);
+                outline-offset: 2px;
+            }
+        }
+    }
+
+    .o_sudi_seg_label {
+        align-self: center;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--sudi-ink-muted);
+        padding-left: 4px;
+    }
+
+    // ── Custom date range ────────────────────────────────────────────────
+    .o_sudi_range {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 18px;
+        border-radius: 18px;
+        box-shadow: var(--sudi-sink-md);
+
+        label {
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--sudi-ink-muted);
+            margin: 0;
+        }
+
+        input[type="date"] {
+            font-family: var(--sudi-font-ui);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--sudi-ink);
+            background: var(--sudi-ground);
+            border: 0;
+            border-radius: 12px;
+            padding: 8px 12px;
+            box-shadow: var(--sudi-raise-sm);
+
+            &:focus-visible {
+                outline: 2px solid var(--sudi-accent);
+                outline-offset: 2px;
+            }
+        }
+    }
+
+    .o_sudi_range_note {
+        font-size: 11.5px;
+        color: var(--sudi-ink-muted);
+        margin-left: auto;
+    }
+
+    // ── Cards ────────────────────────────────────────────────────────────
+    .o_sudi_card {
+        background: var(--sudi-ground);
+        border-radius: 26px;
+        box-shadow: var(--sudi-raise-md);
+        padding: 22px 24px;
+    }
+
+    .o_sudi_card_head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+
+        h2 {
+            font-family: var(--sudi-font-display);
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            margin: 0;
+            color: var(--sudi-ink);
+        }
+    }
+
+    .o_sudi_note {
+        font-size: 11.5px;
+        color: var(--sudi-ink-muted);
+    }
+
+    // ── KPI tiles ────────────────────────────────────────────────────────
+    .o_sudi_kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+    }
+
+    .o_sudi_kpi {
+        background: var(--sudi-ground);
+        border-radius: 26px;
+        box-shadow: var(--sudi-raise-md);
+        padding: 20px 22px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .o_sudi_kpi_label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--sudi-ink-muted);
+    }
+
+    .o_sudi_kpi_value {
+        font-family: var(--sudi-font-display);
+        font-size: 33px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        line-height: 1.05;
+        font-variant-numeric: tabular-nums;
+        color: var(--sudi-ink);
+    }
+
+    .o_sudi_unit {
+        font-family: var(--sudi-font-mono);
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--sudi-ink-muted);
+        letter-spacing: 0;
+        margin-left: 5px;
+    }
+
+    .o_sudi_kpi_foot {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--sudi-ink-muted);
+    }
+
+    .o_sudi_delta {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 700;
+        font-size: 11.5px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        box-shadow: var(--sudi-sink-sm);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .o_sudi_delta_up {
+        color: var(--sudi-good);
+    }
+
+    .o_sudi_delta_down {
+        color: var(--sudi-critical);
+    }
+
+    // ── Rows ─────────────────────────────────────────────────────────────
+    .o_sudi_row_trend {
+        display: grid;
+        grid-template-columns: 1.62fr 1fr;
+        gap: 20px;
+    }
+
+    .o_sudi_row_rank {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    // ── Trend chart ──────────────────────────────────────────────────────
+    .o_sudi_chart_well {
+        border-radius: 18px;
+        box-shadow: var(--sudi-sink-md);
+        padding: 16px 14px 10px;
+        height: 268px;
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+    }
+
+    .o_sudi_table_view {
+        margin-top: 14px;
+
+        summary {
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--sudi-ink-soft);
+            list-style: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 13px;
+            border-radius: 999px;
+            box-shadow: var(--sudi-raise-sm);
+
+            &::-webkit-details-marker {
+                display: none;
+            }
+
+            &:focus-visible {
+                outline: 2px solid var(--sudi-accent);
+                outline-offset: 2px;
+            }
+        }
+    }
+
+    .o_sudi_table_scroll {
+        overflow-x: auto;
+        margin-top: 12px;
+        border-radius: 12px;
+        box-shadow: var(--sudi-sink-sm);
+        padding: 10px 12px;
+    }
+
+    table.o_sudi_data {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 12.5px;
+
+        th,
+        td {
+            text-align: right;
+            padding: 6px 10px;
+            white-space: nowrap;
+        }
+
+        th:first-child,
+        td:first-child {
+            text-align: left;
+        }
+
+        thead th {
+            font-size: 10.5px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--sudi-ink-muted);
+            border-bottom: 1px solid var(--sudi-rule);
+        }
+
+        td {
+            font-family: var(--sudi-font-mono);
+            font-variant-numeric: tabular-nums;
+            color: var(--sudi-ink-soft);
+
+            &:first-child {
+                font-family: var(--sudi-font-ui);
+                color: var(--sudi-ink);
+            }
+        }
+    }
+
+    // ── Pipeline ─────────────────────────────────────────────────────────
+    .o_sudi_stages {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .o_sudi_stage_row,
+    .o_sudi_rank {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        cursor: pointer;
+        border-radius: 10px;
+
+        &:focus-visible {
+            outline: 2px solid var(--sudi-accent);
+            outline-offset: 3px;
+        }
+
+        &:hover .o_sudi_fill {
+            filter: saturate(1.15) brightness(1.04);
+        }
+    }
+
+    .o_sudi_stage_top {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 13px;
+    }
+
+    .o_sudi_stage_dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex: none;
+    }
+
+    .o_sudi_stage_name {
+        font-weight: 600;
+    }
+
+    .o_sudi_stage_count {
+        margin-left: auto;
+        font-family: var(--sudi-font-mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--sudi-ink-soft);
+    }
+
+    .o_sudi_stage_share {
+        font-size: 11.5px;
+        color: var(--sudi-ink-muted);
+        width: 42px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .o_sudi_track {
+        height: 13px;
+        border-radius: 999px;
+        box-shadow: var(--sudi-sink-sm);
+        overflow: hidden;
+    }
+
+    .o_sudi_fill {
+        height: 100%;
+        border-radius: 999px;
+        box-shadow: 1px 1px 3px rgba(146, 64, 14, 0.32);
+        transition: width 0.45s cubic-bezier(0.22, 0.7, 0.31, 1);
+    }
+
+    .o_sudi_fill_accent {
+        background: linear-gradient(90deg, var(--sudi-accent-bright), var(--sudi-accent));
+    }
+
+    .o_sudi_pipeline_foot {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid var(--sudi-rule);
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-size: 12.5px;
+        color: var(--sudi-ink-soft);
+
+        b {
+            font-family: var(--sudi-font-display);
+            font-size: 19px;
+            color: var(--sudi-ink);
+            font-variant-numeric: tabular-nums;
+        }
+    }
+
+    // ── Ranked lists ─────────────────────────────────────────────────────
+    .o_sudi_ranks {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .o_sudi_rank .o_sudi_track {
+        height: 15px;
+    }
+
+    .o_sudi_rank_top {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        font-size: 13px;
+    }
+
+    .o_sudi_rank_name {
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .o_sudi_rank_sub {
+        font-size: 11.5px;
+        color: var(--sudi-ink-muted);
+        white-space: nowrap;
+    }
+
+    .o_sudi_rank_val {
+        margin-left: auto;
+        font-family: var(--sudi-font-mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--sudi-ink);
+        white-space: nowrap;
+    }
+
+    .o_sudi_empty {
+        font-size: 13px;
+        color: var(--sudi-ink-muted);
+        padding: 18px 0;
+        text-align: center;
+    }
+
+    // ── Responsive ───────────────────────────────────────────────────────
+    @media (max-width: 1040px) {
+        .o_sudi_kpis {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .o_sudi_row_trend,
+        .o_sudi_row_rank {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .o_sudi_shell {
+            padding: 18px 12px 32px;
+            gap: 16px;
+        }
+
+        .o_sudi_kpis {
+            grid-template-columns: 1fr;
+        }
+
+        .o_sudi_kpi_value {
+            font-size: 29px;
+        }
+
+        .o_sudi_brand h1 {
+            font-size: 21px;
+        }
+
+        .o_sudi_seg button {
+            padding: 7px 12px;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        * {
+            transition: none !important;
+            animation: none !important;
+        }
+    }
+}

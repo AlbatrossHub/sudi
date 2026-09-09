@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_sudi_diamond_dashboard" model="ir.actions.client">
+        <field name="name">Job Work Analytics</field>
+        <field name="tag">sudi_diamond_dashboard</field>
+        <!-- Gives the app a stable, readable URL (/odoo/job-work-analytics) instead
+             of /odoo/action-<id>. The navbar app title links to
+             actionPath || "action-" + actionID, so this makes that link
+             deterministic and independent of the action's database id. -->
+        <field name="path">job-work-analytics</field>
+    </record>
+
+    <!-- Top-level app entry. Visibility is enforced twice: this groups= hides the
+         tile, and get_dashboard_data() re-checks the group, because hiding a menu
+         does not stop a crafted JSON-RPC call. -->
+    <menuitem id="menu_sudi_diamond_dashboard_root"
+              name="Job Work Analytics"
+              sequence="134"
+              groups="stock.group_stock_manager"
+              web_icon="sudi_diamond_dashboard,static/description/icon.svg"/>
+
+    <!-- The action hangs off a child, not the app root. Odoo's load_web_menus()
+         resolves an app's action by walking down to "the first (sub)child having
+         one defined", and the navbar's app-brand link is built from that. An app
+         root that carries the action itself and has no children is an unusual
+         shape for that code path, and the brand link did not come back here. -->
+    <menuitem id="menu_sudi_diamond_dashboard"
+              name="Dashboard"
+              parent="menu_sudi_diamond_dashboard_root"
+              action="action_sudi_diamond_dashboard"
+              sequence="10"
+              groups="stock.group_stock_manager"/>
+</odoo>

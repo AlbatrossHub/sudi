@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="sudi_diamond_dashboard.SudiTrendChart">
+        <div class="o_sudi_chart_well">
+            <canvas t-ref="canvas" role="img" aria-label="Quantity trend"/>
+        </div>
+    </t>
+
+    <t t-name="sudi_diamond_dashboard.SudiDashboard">
+        <div class="o_sudi_dashboard">
+            <div class="o_sudi_shell">
+
+                <header class="o_sudi_topbar">
+                    <div class="o_sudi_brand">
+                        <h1>Sudi <em>Job Work</em> Analytics</h1>
+                        <div class="o_sudi_scope">
+                            <span t-if="state.data" t-esc="state.data.scope_label"/>
+                            <span t-if="state.loading" class="o_sudi_loading">Loading…</span>
+                        </div>
+                    </div>
+
+                    <div class="o_sudi_seg" role="group" aria-label="Measure">
+                        <span class="o_sudi_seg_label">Measure</span>
+                        <button t-foreach="measures" t-as="item" t-key="item.key"
+                                type="button"
+                                t-att-aria-pressed="state.measure === item.key ? 'true' : 'false'"
+                                t-on-click="() => this.onSelectMeasure(item.key)">
+                            <t t-esc="item.label"/>
+                        </button>
+                    </div>
+
+                    <div class="o_sudi_seg" role="group" aria-label="Period">
+                        <button t-foreach="periods" t-as="item" t-key="item.key"
+                                type="button"
+                                t-att-aria-pressed="state.period === item.key ? 'true' : 'false'"
+                                t-on-click="() => this.onSelectPeriod(item.key)">
+                            <t t-esc="item.label"/>
+                        </button>
+                    </div>
+                </header>
+
+                <div t-if="state.period === 'custom'" class="o_sudi_range">
+                    <label for="sudi_date_from">From</label>
+                    <input id="sudi_date_from" type="date" t-att-value="state.dateFrom"
+                           t-on-change="(ev) => this.onDateChange('dateFrom', ev)"/>
+                    <label for="sudi_date_to">To</label>
+                    <input id="sudi_date_to" type="date" t-att-value="state.dateTo"
+                           t-on-change="(ev) => this.onDateChange('dateTo', ev)"/>
+                    <span t-if="state.data" class="o_sudi_range_note">
+                        bucketed by <t t-esc="state.data.trend.granularity"/>
+                    </span>
+                </div>
+
+                <t t-if="state.data">
+                    <section class="o_sudi_kpis">
+                        <article class="o_sudi_kpi">
+                            <span class="o_sudi_kpi_label">Job Receipts</span>
+                            <span class="o_sudi_kpi_value" t-esc="formatCount(state.data.kpis.jobs)"/>
+                            <span class="o_sudi_kpi_foot">
+                                <t t-if="state.data.deltas.jobs !== null">
+                                    <span t-att-class="deltaClass(state.data.deltas.jobs)"
+                                          t-esc="deltaText(state.data.deltas.jobs)"/>
+                                    vs previous
+                                </t>
+                                <t t-else="">no comparable period</t>
+                            </span>
+                        </article>
+
+                        <article class="o_sudi_kpi">
+                            <span class="o_sudi_kpi_label" t-esc="qtyLabel"/>
+                            <span class="o_sudi_kpi_value">
+                                <t t-esc="formatValue(state.data.kpis.qty)"/>
+                                <span class="o_sudi_unit" t-esc="state.data.unit"/>
+                            </span>
+                            <span class="o_sudi_kpi_foot">
+                                <t t-if="state.data.deltas.qty !== null">
+                                    <span t-att-class="deltaClass(state.data.deltas.qty)"
+                                          t-esc="deltaText(state.data.deltas.qty)"/>
+                                    vs previous
+                                </t>
+                                <t t-else="">no comparable period</t>
+                            </span>
+                        </article>
+
+                        <article class="o_sudi_kpi">
+                            <span class="o_sudi_kpi_label" t-esc="avgLabel"/>
+                            <span class="o_sudi_kpi_value">
+                                <t t-esc="formatValue(state.data.kpis.avg)"/>
+                                <span class="o_sudi_unit" t-esc="state.data.unit"/>
+                            </span>
+                            <span class="o_sudi_kpi_foot">across all job types</span>
+                        </article>
+
+                        <article class="o_sudi_kpi">
+                            <span class="o_sudi_kpi_label">Active Customers</span>
+                            <span class="o_sudi_kpi_value" t-esc="formatCount(state.data.kpis.customers)"/>
+                            <span class="o_sudi_kpi_foot">sent work in this period</span>
+                        </article>
+                    </section>
+
+                    <section class="o_sudi_row_trend">
+                        <article class="o_sudi_card">
+                            <div class="o_sudi_card_head">
+                                <h2 t-esc="trendTitle"/>
+                                <span class="o_sudi_note">
+                                    by <t t-esc="state.data.trend.granularity"/>
+                                </span>
+                            </div>
+
+                            <SudiTrendChart labels="state.data.trend.labels"
+                                            values="state.data.trend.values"
+                                            unit="state.data.unit"
+                                            formatValue="formatValue"/>
+
+                            <details class="o_sudi_table_view">
+                                <summary>View as table</summary>
+                                <div class="o_sudi_table_scroll">
+                                    <table class="o_sudi_data">
+                                        <thead>
+                                            <tr>
+                                                <th>Period</th>
+                                                <th t-esc="state.data.measure_label"/>
+                                                <th>Receipts</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr t-foreach="state.data.trend.labels" t-as="label" t-key="label_index">
+                                                <td t-esc="label"/>
+                                                <td t-esc="formatValue(state.data.trend.values[label_index])"/>
+                                                <td t-esc="formatCount(state.data.trend.receipts[label_index])"/>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </details>
+                        </article>
+
+                        <article class="o_sudi_card">
+                            <div class="o_sudi_card_head">
+                                <h2>Job pipeline</h2>
+                                <span class="o_sudi_note">receipts by stage</span>
+                            </div>
+                            <div class="o_sudi_stages">
+                                <div t-foreach="state.data.stages" t-as="stage" t-key="stage.key"
+                                     class="o_sudi_stage_row" role="button" tabindex="0"
+                                     t-on-click="() => this.openDrilldown('stage', stage.key)"
+                                     t-on-keydown="(ev) => this.onRowKeydown(ev, 'stage', stage.key)">
+                                    <div class="o_sudi_stage_top">
+                                        <span class="o_sudi_stage_dot"
+                                              t-att-style="'background:' + stage.color"/>
+                                        <span class="o_sudi_stage_name" t-esc="stage.name"/>
+                                        <span class="o_sudi_stage_count" t-esc="formatCount(stage.count)"/>
+                                        <span class="o_sudi_stage_share" t-esc="percent(stage.share)"/>
+                                    </div>
+                                    <div class="o_sudi_track">
+                                        <div class="o_sudi_fill"
+                                             t-att-style="'width:' + stageWidth(stage) + ';background:' + stage.color"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="o_sudi_pipeline_foot">
+                                <span>Still open</span>
+                                <b t-esc="formatCount(state.data.open_jobs)"/>
+                            </div>
+                        </article>
+                    </section>
+
+                    <section class="o_sudi_row_rank">
+                        <article class="o_sudi_card">
+                            <div class="o_sudi_card_head">
+                                <h2>Top job types</h2>
+                                <span class="o_sudi_note" t-esc="rankNote"/>
+                            </div>
+                            <div class="o_sudi_ranks">
+                                <div t-if="!state.data.job_types.length" class="o_sudi_empty">
+                                    No job work recorded in this period.
+                                </div>
+                                <div t-foreach="state.data.job_types" t-as="row" t-key="row.id or 'none'"
+                                     class="o_sudi_rank" role="button" tabindex="0"
+                                     t-on-click="() => this.openDrilldown('job_type', row.id)"
+                                     t-on-keydown="(ev) => this.onRowKeydown(ev, 'job_type', row.id)">
+                                    <div class="o_sudi_rank_top">
+                                        <span class="o_sudi_rank_name" t-esc="row.name"/>
+                                        <span class="o_sudi_rank_sub" t-esc="percent(row.share)"/>
+                                        <span class="o_sudi_rank_val">
+                                            <t t-esc="formatValue(row.value)"/>
+                                            <t t-esc="state.data.unit"/>
+                                        </span>
+                                    </div>
+                                    <div class="o_sudi_track">
+                                        <div class="o_sudi_fill o_sudi_fill_accent"
+                                             t-att-style="'width:' + barWidth(row, state.data.job_types)"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="o_sudi_card">
+                            <div class="o_sudi_card_head">
+                                <h2>Top customers</h2>
+                                <span class="o_sudi_note" t-esc="rankNote"/>
+                            </div>
+                            <div class="o_sudi_ranks">
+                                <div t-if="!state.data.customers.length" class="o_sudi_empty">
+                                    No customer activity in this period.
+                                </div>
+                                <div t-foreach="state.data.customers" t-as="row" t-key="row.id or 'none'"
+                                     class="o_sudi_rank" role="button" tabindex="0"
+                                     t-on-click="() => this.openDrilldown('customer', row.id)"
+                                     t-on-keydown="(ev) => this.onRowKeydown(ev, 'customer', row.id)">
+                                    <div class="o_sudi_rank_top">
+                                        <span class="o_sudi_rank_name" t-esc="row.name"/>
+                                        <span class="o_sudi_rank_sub">
+                                            <t t-esc="formatCount(row.receipts)"/> receipts
+                                        </span>
+                                        <span class="o_sudi_rank_val">
+                                            <t t-esc="formatValue(row.value)"/>
+                                            <t t-esc="state.data.unit"/>
+                                        </span>
+                                    </div>
+                                    <div class="o_sudi_track">
+                                        <div class="o_sudi_fill o_sudi_fill_accent"
+                                             t-att-style="'width:' + barWidth(row, state.data.customers)"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </section>
+                </t>
+            </div>
+        </div>
+    </t>
+
+</templates>
