@@ -54,3 +54,73 @@
         }
     }
 }
+
+// ── Floating Jangad viewer ───────────────────────────────────────────────────
+// Shown once the inline viewer scrolls off the top of the form, so the Jangad
+// stays readable while the job table is being filled in. Positioned in JS over
+// the chatter column; z-index sits above the chatter but below Odoo dialogs
+// (1055) so modals still win.
+.o_jangad_float {
+    position: fixed;
+    z-index: 1000;
+    background: var(--o-white, #fff);
+    display: flex;
+    flex-direction: column;
+    max-height: 62vh;
+    overflow: hidden;
+
+    .o_jangad_float_head {
+        font-size: 12px;
+        border-bottom: 1px solid var(--o-gray-300, #dee2e6);
+        background: var(--o-gray-100, #f8f9fa);
+        color: var(--o-gray-700, #495057);
+        cursor: default;
+
+        .btn {
+            color: var(--o-gray-600, #6c757d);
+            border: 0;
+
+            &:hover {
+                color: var(--o-gray-900, #212529);
+            }
+        }
+    }
+
+    .o_jangad_float_body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--o-gray-200, #e9ecef);
+
+        img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transform-origin: center center;
+        }
+    }
+
+    .o_jangad_float_toolbar {
+        border-top: 1px solid var(--o-gray-300, #dee2e6);
+        background: var(--o-gray-100, #f8f9fa);
+
+        .btn {
+            width: 26px;
+            height: 26px;
+            line-height: 1;
+            padding: 0;
+            font-size: 11px;
+        }
+    }
+}
+
+@media (max-width: 991.98px) {
+    // Narrow layouts put the chatter under the form; a fixed panel would cover
+    // the very table the user is filling in, so the JS also disables it there.
+    .o_jangad_float {
+        display: none;
+    }
+}
