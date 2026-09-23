@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sudi_billing_log_list" model="ir.ui.view">
+        <field name="name">sudi.diamond.billing.log.list</field>
+        <field name="model">sudi.diamond.billing.log</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" delete="0" default_order="date desc, id desc"
+                  decoration-success="event == 'billed'"
+                  decoration-muted="event == 'reference'"
+                  decoration-danger="event in ('released', 'reopened')">
+                <field name="date"/>
+                <field name="event" widget="badge"/>
+                <field name="document_name" string="Document"/>
+                <field name="partner_id"/>
+                <field name="delivery_id"/>
+                <field name="receipt_id"/>
+                <field name="job_type_id"/>
+                <field name="pcs" sum="Pcs"/>
+                <field name="carats" sum="Carats"/>
+                <field name="price_unit" optional="show"/>
+                <field name="amount" sum="Amount"/>
+                <field name="returned_without_work" optional="hide"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="note" optional="hide"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="invoice_id" column_invisible="True"/>
+                <field name="reference_statement_id" column_invisible="True" groups="diamond.group_sudi_reference_ledger"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sudi_billing_log_search" model="ir.ui.view">
+        <field name="name">sudi.diamond.billing.log.search</field>
+        <field name="model">sudi.diamond.billing.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="partner_id"/>
+                <field name="delivery_id"/>
+                <field name="receipt_id"/>
+                <field name="invoice_id"/>
+                <field name="job_type_id"/>
+                <filter name="billed" string="Billed" domain="[('event', '=', 'billed')]"/>
+                <filter name="closed" string="Closed" domain="[('event', '=', 'reference')]"/>
+                <filter name="released" string="Released / Reopened" domain="[('event', 'in', ('released', 'reopened'))]"/>
+                <separator/>
+                <filter name="this_month" string="This Month" date="date" default_period="month"/>
+                <group>
+                    <filter name="group_partner" string="Customer" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_document" string="Invoice" context="{'group_by': 'invoice_id'}"/>
+                    <filter name="group_job_type" string="Job Type" context="{'group_by': 'job_type_id'}"/>
+                    <filter name="group_event" string="Event" context="{'group_by': 'event'}"/>
+                    <filter name="group_month" string="Month" context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_sudi_billing_log" model="ir.actions.act_window">
+        <field name="name">Billing Log</field>
+        <field name="res_model">sudi.diamond.billing.log</field>
+        <field name="view_mode">list,pivot</field>
+        <field name="search_view_id" ref="view_sudi_billing_log_search"/>
+        <field name="context">{'search_default_group_partner': 1}</field>
+    </record>
+
+    <menuitem id="menu_sudi_diamond_billing_log"
+              name="Billing Log"
+              parent="menu_sudi_diamond_root"
+              action="action_sudi_billing_log"
+              sequence="40"
+              groups="diamond.group_sudi_billing_reviewer"/>
+</odoo>

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Job-work statement appended to the customer invoice PDF: one section per
+         delivery in date order, every delivered line (including no-charge returns),
+         job-type sub-totals and a grand total that ties to the invoice.
+         Lives in the same report as the invoice so the WhatsApp/email PDF carries it. -->
+    <template id="report_invoice_document_sudi_annexure" inherit_id="account.report_invoice_document">
+        <xpath expr="//div[hasclass('invoice_main')]/div[hasclass('page')]" position="inside">
+            <t t-if="o.sudi_is_diamond_job_work_invoice and o.sudi_delivery_ids">
+                <t t-set="annexure_groups" t-value="o._sudi_get_annexure_groups()"/>
+                <t t-set="job_totals" t-value="o._sudi_get_annexure_job_type_totals()"/>
+                <div class="sudi_annexure" style="page-break-before: always;">
+                    <h3 class="mt-0">Annexure — Job Work Statement</h3>
+                    <div class="row mb-3 small">
+                        <div class="col-6">
+                            <strong>Invoice:</strong> <span t-field="o.name"/>
+                            <span t-if="o.invoice_date"> dated <span t-field="o.invoice_date"/></span><br/>
+                            <strong>Customer:</strong> <span t-field="o.partner_id.name"/>
+                        </div>
+                        <div class="col-6 text-end">
+                            <t t-if="o.sudi_billing_period_from or o.sudi_billing_period_to">
+                                <strong>Period:</strong>
+                                <span t-field="o.sudi_billing_period_from"/> – <span t-field="o.sudi_billing_period_to"/><br/>
+                            </t>
+                            <strong>Receipts:</strong> <span t-esc="', '.join(o.sudi_receipt_ids.sorted('name').mapped('name'))"/>
+                        </div>
+                    </div>
+
+                    <table class="table table-sm o_main_table sudi_annexure_table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Receipt</th>
+                                <th>Delivery</th>
+                                <th class="text-center">Sr</th>
+                                <th>Size</th>
+                                <th>Job Work</th>
+                                <th class="text-end">Pcs</th>
+                                <th class="text-end">Carats</th>
+                                <th class="text-end">Rate</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="annexure_groups" t-as="group">
+                                <t t-foreach="group['lines']" t-as="line">
+                                    <tr>
+                                        <td><span t-if="line_first and group['date']" t-esc="group['date']" t-options="{'widget': 'date'}"/></td>
+                                        <td><span t-if="line_first" t-esc="group['receipt'].name"/></td>
+                                        <td><span t-if="line_first" t-esc="group['delivery'].name"/></td>
+                                        <td class="text-center"><span t-esc="line.sudi_sr or ''"/></td>
+                                        <td><span t-esc="line.sudi_size or ''"/></td>
+                                        <td>
+                                            <span t-esc="line.sudi_job_type_id.name"/>
+                                            <span t-if="line.sudi_returned_without_work" class="fst-italic"> — returned without job work</span>
+                                        </td>
+                                        <td class="text-end"><span t-esc="line.sudi_pcs_qty" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="text-end"><span t-esc="line.sudi_carats" t-options="{'widget': 'float', 'precision': 3}"/></td>
+                                        <td class="text-end">
+                                            <span t-if="not line.sudi_returned_without_work" t-esc="line.sudi_price_unit" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                                            <span t-else="">—</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <span t-if="not line.sudi_returned_without_work" t-esc="line.sudi_billable_amount" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                                            <span t-else="">—</span>
+                                        </td>
+                                    </tr>
+                                </t>
+                                <tr class="sudi_annexure_subtotal">
+                                    <td colspan="6" class="text-end fst-italic">Delivery <t t-esc="group['delivery'].name"/> total</td>
+                                    <td class="text-end"><span t-esc="group['pcs']" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                    <td class="text-end"><span t-esc="group['carats']" t-options="{'widget': 'float', 'precision': 3}"/></td>
+                                    <td/>
+                                    <td class="text-end"><span t-esc="group['amount']" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+
+                    <div class="row">
+                        <div class="col-7"/>
+                        <div class="col-5">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Job Work</th>
+                                        <th class="text-end">Pcs</th>
+                                        <th class="text-end">Carats</th>
+                                        <th class="text-end">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="job_totals" t-as="job">
+                                        <td><span t-esc="job['name']"/></td>
+                                        <td class="text-end"><span t-esc="job['pcs']" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="text-end"><span t-esc="job['carats']" t-options="{'widget': 'float', 'precision': 3}"/></td>
+                                        <td class="text-end"><span t-esc="job['amount']" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                                    </tr>
+                                    <tr class="fw-bold">
+                                        <td>Total (before tax)</td>
+                                        <td class="text-end"><span t-esc="sum(j['pcs'] for j in job_totals)" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="text-end"><span t-esc="sum(j['carats'] for j in job_totals)" t-options="{'widget': 'float', 'precision': 3}"/></td>
+                                        <td class="text-end"><span t-esc="sum(j['amount'] for j in job_totals)" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </xpath>
+    </template>
+</odoo>

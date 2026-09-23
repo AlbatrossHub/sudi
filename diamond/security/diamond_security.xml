@@ -19,9 +19,51 @@
             <field name="privilege_id" ref="res_groups_privilege_sudi_diamond_operations"/>
             <field name="implied_ids" eval="[Command.link(ref('base.group_user')), Command.link(ref('group_sudi_pickup_app'))]"/>
         </record>
+
+        <!-- Job work is done by different people from pickup and delivery, so
+             it is a role of its own rather than a second menu on the Onfield
+             group. Deliberately implies neither: an operator who also does job
+             work holds both groups. The 19.0.1.4.0 migration grants this to
+             everyone who currently has Onfield User, so nobody loses the menu
+             they had yesterday. -->
+        <record id="group_sudi_job_work_user" model="res.groups">
+            <field name="name">Job Work User</field>
+            <field name="sequence">15</field>
+            <field name="privilege_id" ref="res_groups_privilege_sudi_diamond_operations"/>
+            <field name="implied_ids" eval="[Command.link(ref('base.group_user'))]"/>
+        </record>
     </data>
 
     <data noupdate="1">
+        <record model="res.groups.privilege" id="res_groups_privilege_sudi_diamond_billing">
+            <field name="name">Job Work Billing</field>
+            <field name="category_id" ref="base.module_category_supply_chain"/>
+        </record>
+
+        <!-- Reviews delivered job work and settles it. Implies Invoicing so the
+             draft invoices can be created under the reviewer's own rights. -->
+        <record id="group_sudi_billing_reviewer" model="res.groups">
+            <field name="name">Billing Reviewer</field>
+            <field name="privilege_id" ref="res_groups_privilege_sudi_diamond_billing"/>
+            <field name="implied_ids" eval="[Command.link(ref('stock.group_stock_user')), Command.link(ref('account.group_account_invoice'))]"/>
+        </record>
+
+        <!-- Sees and reopens reference statements. Kept separate from the
+             reviewer on purpose: settling as reference needs no ledger access. -->
+        <record id="group_sudi_reference_ledger" model="res.groups">
+            <field name="name">Reference Ledger</field>
+            <field name="privilege_id" ref="res_groups_privilege_sudi_diamond_billing"/>
+            <field name="implied_ids" eval="[Command.link(ref('group_sudi_billing_reviewer'))]"/>
+        </record>
+
+        <record id="stock.group_stock_manager" model="res.groups">
+            <field name="implied_ids" eval="[Command.link(ref('group_sudi_billing_reviewer'))]"/>
+        </record>
+
+        <record id="base.group_system" model="res.groups">
+            <field name="implied_ids" eval="[Command.link(ref('group_sudi_reference_ledger'))]"/>
+        </record>
+
         <record id="rule_sudi_operator_pickup_pending_receipts" model="ir.rule">
             <field name="name">Sudi operator: pending pickup receipts</field>
             <field name="model_id" ref="stock.model_stock_picking"/>
@@ -30,7 +72,7 @@
                 ('picking_type_id.code', '=', 'incoming'),
                 ('state', '=', 'sudi_pickup_pending'),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_app'))]"/>
         </record>
 
         <record id="rule_sudi_operator_active_deliveries" model="ir.rule">
@@ -42,7 +84,7 @@
                 ('sudi_origin_receipt_id', '!=', False),
                 ('state', '!=', 'done'),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_delivery_operator'))]"/>
         </record>
 
         <record id="rule_sudi_operator_assigned_receipts" model="ir.rule">
@@ -53,7 +95,7 @@
                 ('picking_type_id.code', '=', 'incoming'),
                 ('state', '=', 'assigned'),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_job_work_user'))]"/>
         </record>
 
         <record id="rule_sudi_operator_today_done_deliveries" model="ir.rule">
@@ -70,7 +112,7 @@
                         ('date_done', '&gt;=', user._sudi_operator_today_start_utc()),
                         ('date_done', '&lt;', user._sudi_operator_tomorrow_start_utc()),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_delivery_operator'))]"/>
         </record>
 
         <record id="rule_sudi_operator_pending_receipt_moves" model="ir.rule">
@@ -81,7 +123,7 @@
                 ('picking_id.picking_type_id.code', '=', 'incoming'),
                 ('picking_id.state', '=', 'sudi_pickup_pending'),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_app'))]"/>
         </record>
 
         <record id="rule_sudi_operator_active_delivery_moves" model="ir.rule">
@@ -93,7 +135,7 @@
                 ('picking_id.sudi_origin_receipt_id', '!=', False),
                 ('picking_id.state', '!=', 'done'),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_delivery_operator'))]"/>
         </record>
 
         <record id="rule_sudi_operator_assigned_receipt_moves" model="ir.rule">
@@ -104,7 +146,7 @@
                 ('picking_id.picking_type_id.code', '=', 'incoming'),
                 ('picking_id.state', '=', 'assigned'),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_job_work_user'))]"/>
         </record>
 
         <record id="rule_sudi_operator_today_done_delivery_moves" model="ir.rule">
@@ -121,7 +163,7 @@
                         ('picking_id.date_done', '&gt;=', user._sudi_operator_today_start_utc()),
                         ('picking_id.date_done', '&lt;', user._sudi_operator_tomorrow_start_utc()),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_delivery_operator'))]"/>
         </record>
 
         <record id="rule_sudi_operator_pending_receipt_move_lines" model="ir.rule">
@@ -132,7 +174,7 @@
                 ('picking_id.picking_type_id.code', '=', 'incoming'),
                 ('picking_id.state', '=', 'sudi_pickup_pending'),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_app'))]"/>
         </record>
 
         <record id="rule_sudi_operator_active_delivery_move_lines" model="ir.rule">
@@ -144,7 +186,7 @@
                 ('picking_id.sudi_origin_receipt_id', '!=', False),
                 ('picking_id.state', '!=', 'done'),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_delivery_operator'))]"/>
         </record>
 
         <record id="rule_sudi_operator_assigned_receipt_move_lines" model="ir.rule">
@@ -155,7 +197,7 @@
                 ('picking_id.picking_type_id.code', '=', 'incoming'),
                 ('picking_id.state', '=', 'assigned'),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_job_work_user'))]"/>
         </record>
 
         <record id="rule_sudi_operator_today_done_delivery_move_lines" model="ir.rule">
@@ -172,7 +214,7 @@
                         ('picking_id.date_done', '&gt;=', user._sudi_operator_today_start_utc()),
                         ('picking_id.date_done', '&lt;', user._sudi_operator_tomorrow_start_utc()),
             ]</field>
-            <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_delivery_operator'))]"/>
         </record>
 
         <record id="rule_sudi_stock_user_all_pickings" model="ir.rule">

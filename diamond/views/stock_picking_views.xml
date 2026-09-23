@@ -32,14 +32,14 @@
                         string="Confirm Pickup"
                         type="object"
                         icon="fa-check-square-o"
-                        groups="base.group_user"
+                        groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
                         invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state != 'sudi_pickup_pending'"/>
                 <button name="action_sudi_open_cancel_pickup_wizard"
                         string="Cancel Pickup"
                         type="object"
                         class="btn-secondary btn-dark"
                         icon="fa-times"
-                        groups="base.group_user"
+                        groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
                         invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state != 'sudi_pickup_pending'"/>
                 <field name="sudi_display_timesheet_timer" invisible="1"/>
                 <field name="sudi_total_hours_spent" invisible="1"/>
@@ -75,7 +75,7 @@
                         string="Transfer Department"
                         type="object"
                         class="btn-secondary"
-                        groups="base.group_user"
+                        groups="diamond.group_sudi_job_work_user,stock.group_stock_user"
                         invisible="state != 'assigned' or not sudi_is_diamond_job_work or picking_type_code != 'incoming'"/>
             </xpath>
 
@@ -85,21 +85,33 @@
                         type="object"
                         class="btn-primary"
                         icon="fa-truck"
-                        groups="base.group_user"
+                        groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
                         invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state != 'done' or sudi_delivery_count &gt; 0"/>
+                <button name="action_sudi_take_for_delivery"
+                        string="Take for Delivery"
+                        type="object"
+                        class="btn-primary"
+                        icon="fa-truck"
+                        groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
+                        invisible="sudi_delivery_stage != 'awaiting'"/>
                 <button name="action_sudi_mark_delivered"
                         string="Mark Delivered"
                         type="object"
                         class="btn-primary"
                         icon="fa-check"
-                        groups="base.group_user"
+                        groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
                         invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing' or not sudi_origin_receipt_id or state in ['done', 'cancel']"/>
-                <button name="action_sudi_create_invoice"
-                        string="Create Diamond Invoice"
+                <button name="action_sudi_release_delivery"
+                        string="Release Delivery"
                         type="object"
-                        class="btn-primary"
-                        groups="account.group_account_invoice"
-                        invisible="not sudi_is_diamond_job_work or state != 'done' or picking_type_code not in ['incoming', 'outgoing']"/>
+                        groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
+                        invisible="sudi_delivery_stage != 'out'"/>
+                <button name="action_sudi_return_all_without_work"
+                        string="Return Without Job Work"
+                        type="object"
+                        groups="diamond.group_sudi_billing_reviewer"
+                        confirm="Flag every unsettled line of this delivery as returned without job work? Nothing will be charged for them."
+                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing' or not sudi_origin_receipt_id or state != 'done' or sudi_billing_status not in ['to_bill', 'partial']"/>
                 <button name="action_sudi_recompute_billing_details"
                         string="Recompute Billing Details"
                         type="object"
@@ -131,6 +143,14 @@
                         invisible="not sudi_is_diamond_job_work or sudi_invoice_count == 0">
                     <field name="sudi_invoice_count" widget="statinfo" string="Invoices"/>
                 </button>
+                <button name="action_sudi_view_billing_log"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-history"
+                        groups="diamond.group_sudi_billing_reviewer"
+                        invisible="not sudi_is_diamond_job_work or sudi_billing_log_count == 0">
+                    <field name="sudi_billing_log_count" widget="statinfo" string="Billing Log"/>
+                </button>
             </xpath>
 
             <xpath expr="//field[@name='partner_id'][@nolabel='1']" position="after">
@@ -140,6 +160,12 @@
                        readonly="1"/>
                 <field name="sudi_jangad_image"
                        widget="jangad_image_viewer"
+                       invisible="not sudi_is_diamond_job_work"
+                       readonly="state in ['cancel', 'done']"/>
+                <field name="sudi_jangad_page_count" invisible="1"/>
+                <field name="sudi_jangad_attachment_ids"
+                       widget="many2many_binary"
+                       string="Jangad Pages 2+"
                        invisible="not sudi_is_diamond_job_work"
                        readonly="state in ['cancel', 'done']"/>
             </xpath>
@@ -166,6 +192,21 @@
                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
                        readonly="state in ['cancel', 'done']"
                        placeholder="Pickup address submitted from Jangad upload..."/>
+                <!-- Proof of delivery, read-only for the office: it is captured
+                     in the field and is evidence, not data entry. -->
+                <field name="sudi_pod_receiver_name"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing'"
+                       readonly="state in ['cancel', 'done']"/>
+                <field name="sudi_pod_signature"
+                       widget="image"
+                       options="{'size': [0, 90]}"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing' or not sudi_pod_signature"
+                       readonly="1"/>
+                <field name="sudi_pod_attachment_ids"
+                       widget="many2many_binary"
+                       string="Delivery Photos"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing' or not sudi_pod_attachment_ids"
+                       readonly="1"/>
                 <field name="sudi_timesheet_job_type_id"
                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"
                        readonly="state in ['cancel', 'done']"
@@ -217,7 +258,8 @@
                             <field name="price_source" readonly="1"/>
                             <field name="manual_quantity" optional="hide"/>
                             <field name="manual_price" optional="hide"/>
-                            <field name="invoice_line_id" readonly="1" optional="show"/>
+                            <field name="settlement_names" readonly="1" optional="show"/>
+                            <field name="is_settled" readonly="1" optional="hide"/>
                         </list>
                         <kanban class="o_kanban_mobile">
                             <templates>
@@ -283,6 +325,26 @@
             </xpath>
 
             <xpath expr="//field[@name='move_ids']" position="before">
+                <group invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing' or not sudi_origin_receipt_id" name="sudi_billing">
+                    <group>
+                        <field name="sudi_delivery_stage" widget="badge"
+                               decoration-warning="sudi_delivery_stage == 'awaiting'"
+                               decoration-info="sudi_delivery_stage == 'out'"
+                               decoration-success="sudi_delivery_stage == 'delivered'"/>
+                        <field name="sudi_out_for_delivery_datetime" invisible="not sudi_out_for_delivery_datetime"/>
+                        <field name="sudi_billing_status" widget="badge"
+                               decoration-warning="sudi_billing_status in ('to_bill', 'partial')"
+                               decoration-success="sudi_billing_status == 'billed'"
+                               decoration-muted="sudi_billing_status in ('closed', 'no_charge', 'none')"/>
+                        <field name="sudi_settlement_mode" groups="diamond.group_sudi_billing_reviewer"
+                               readonly="sudi_billing_status not in ('to_bill', 'partial')"/>
+                    </group>
+                    <group>
+                        <field name="sudi_billable_amount"/>
+                        <field name="sudi_settled_amount"/>
+                        <field name="sudi_currency_id" invisible="1"/>
+                    </group>
+                </group>
                 <div class="alert alert-warning text-center fw-bold mb-3 p-2 rounded"
                      role="alert"
                      invisible="state != 'sudi_pickup_pending' or not sudi_is_diamond_job_work or picking_type_code != 'incoming'">
@@ -306,6 +368,16 @@
                 <field name="sudi_remarks" optional="show"/>
                 <field name="sudi_origin_receipt_move_id" column_invisible="True"/>
                 <field name="sudi_invoice_line_id" column_invisible="True"/>
+                <field name="sudi_returned_without_work" optional="show"
+                       column_invisible="parent.picking_type_code != 'outgoing'"
+                       readonly="sudi_billing_state in ('billed', 'closed')"/>
+                <field name="sudi_billing_state" optional="show" widget="badge"
+                       column_invisible="parent.picking_type_code != 'outgoing'"
+                       decoration-warning="sudi_billing_state == 'to_bill'"
+                       decoration-success="sudi_billing_state == 'billed'"
+                       decoration-muted="sudi_billing_state in ('closed', 'no_charge', 'none')"/>
+                <field name="sudi_price_unit" optional="hide" column_invisible="parent.picking_type_code != 'outgoing'"/>
+                <field name="sudi_billable_amount" optional="hide" column_invisible="parent.picking_type_code != 'outgoing'"/>
             </xpath>
             <xpath expr="//field[@name='move_ids']/list/field[@name='product_uom_qty']" position="attributes">
                 <attribute name="optional">show</attribute>
@@ -330,6 +402,16 @@
             </xpath>
             <field name="partner_id" position="after">
                 <field name="sudi_is_diamond_job_work" optional="hide"/>
+                <field name="sudi_delivery_stage" optional="show" widget="badge"
+                       decoration-warning="sudi_delivery_stage == 'awaiting'"
+                       decoration-info="sudi_delivery_stage == 'out'"
+                       decoration-success="sudi_delivery_stage == 'delivered'"
+                       decoration-muted="sudi_delivery_stage == 'cancelled'"/>
+                <field name="sudi_billing_status" optional="show" widget="badge"
+                       decoration-warning="sudi_billing_status in ('to_bill', 'partial')"
+                       decoration-success="sudi_billing_status == 'billed'"
+                       decoration-muted="sudi_billing_status in ('closed', 'no_charge')"
+                       invisible="sudi_billing_status == 'none'"/>
             </field>
         </field>
     </record>
@@ -362,14 +444,14 @@
                             string="Confirm Pickup"
                             type="object"
                             class="btn-primary"
-                            groups="base.group_user"
+                            groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
                             invisible="state != 'sudi_pickup_pending'"/>
                     <button name="action_sudi_open_cancel_pickup_wizard"
                             string="Cancel Pickup"
                             type="object"
                             class="btn-secondary btn-dark"
                             icon="fa-times"
-                            groups="base.group_user"
+                            groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
                             invisible="state != 'sudi_pickup_pending'"/>
                     <field name="state" widget="statusbar" statusbar_visible="sudi_pickup_pending,draft,assigned,done"/>
                 </header>
@@ -398,6 +480,12 @@
                     </group>
                     <group string="Jangad">
                         <field name="sudi_jangad_image" widget="jangad_image_viewer" readonly="1" nolabel="1"/>
+                        <field name="sudi_jangad_page_count" invisible="1"/>
+                        <field name="sudi_jangad_attachment_ids"
+                               widget="many2many_binary"
+                               string="More Pages"
+                               readonly="1"
+                               invisible="sudi_jangad_page_count &lt; 2"/>
                     </group>
                 </sheet>
             </form>
@@ -408,17 +496,25 @@
         <field name="name">stock.picking.list.sudi.operator.delivery</field>
         <field name="model">stock.picking</field>
         <field name="arch" type="xml">
-            <list string="Deliveries" class="o_sudi_list_wrap_text" create="0" delete="0" edit="0" default_order="state, scheduled_date, id">
+            <list string="Deliveries" class="o_sudi_list_wrap_text" create="0" delete="0" edit="0" default_order="sudi_delivery_stage, scheduled_date, id">
+                <header>
+                    <button name="action_sudi_take_for_delivery" type="object" string="Take for Delivery" class="btn-primary" display="always"/>
+                    <button name="action_sudi_release_delivery" type="object" string="Release"/>
+                </header>
                 <field name="name"/>
                 <field name="partner_id" string="Customer" options="{'no_open': True, 'no_create': True}"/>
+                <field name="sudi_partner_address" optional="hide"/>
                 <field name="sudi_origin_receipt_name"/>
+                <field name="sudi_total_pcs" string="Pcs" optional="show"/>
+                <field name="sudi_total_carats" string="Carats" optional="show"/>
                 <field name="scheduled_date"/>
-                <field name="date_done"/>
-                <field name="state" widget="badge"
-                       decoration-info="state == 'assigned'"
-                       decoration-warning="state not in ['assigned', 'done', 'cancel']"
-                       decoration-success="state == 'done'"
-                       decoration-muted="state == 'cancel'"/>
+                <field name="sudi_pickup_user_id" string="Delivery Person" widget="many2one_avatar_user" optional="show"/>
+                <field name="date_done" optional="hide"/>
+                <field name="sudi_delivery_stage" widget="badge"
+                       decoration-warning="sudi_delivery_stage == 'awaiting'"
+                       decoration-info="sudi_delivery_stage == 'out'"
+                       decoration-success="sudi_delivery_stage == 'delivered'"
+                       decoration-muted="sudi_delivery_stage == 'cancelled'"/>
             </list>
         </field>
     </record>
@@ -429,13 +525,25 @@
         <field name="arch" type="xml">
             <form string="Deliveries" create="0" delete="0">
                 <header>
+                    <button name="action_sudi_take_for_delivery"
+                            string="Take for Delivery"
+                            type="object"
+                            class="btn-primary"
+                            groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
+                            invisible="sudi_delivery_stage != 'awaiting'"/>
                     <button name="action_sudi_mark_delivered"
                             string="Mark Delivered"
                             type="object"
                             class="btn-primary"
-                            groups="base.group_user"
-                            invisible="state in ['done', 'cancel']"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,assigned,done"/>
+                            groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
+                            invisible="sudi_delivery_stage != 'out'"/>
+                    <button name="action_sudi_release_delivery"
+                            string="Release"
+                            type="object"
+                            groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
+                            invisible="sudi_delivery_stage != 'out'"/>
+                    <field name="state" invisible="1"/>
+                    <field name="sudi_delivery_stage" widget="statusbar" statusbar_visible="awaiting,out,delivered"/>
                 </header>
                 <sheet>
                     <group>
@@ -454,6 +562,20 @@
                             <field name="sudi_pickup_user_id" readonly="1"/>
                             <field name="sudi_pickup_datetime" readonly="1"/>
                         </group>
+                    </group>
+                    <group string="Proof of Delivery"
+                           invisible="sudi_delivery_stage not in ('out', 'delivered')">
+                        <field name="sudi_pod_receiver_name"
+                               readonly="state == 'done'"
+                               placeholder="Who received the parcel"/>
+                        <field name="sudi_pod_signature"
+                               widget="signature"
+                               readonly="state == 'done'"
+                               options="{'full_name': 'sudi_pod_receiver_name'}"/>
+                        <field name="sudi_pod_attachment_ids"
+                               widget="many2many_binary"
+                               string="Delivery Photos"
+                               readonly="state == 'done'"/>
                     </group>
                     <notebook>
                         <page string="Items" name="items">
@@ -529,7 +651,7 @@
                             string="Finish Job Work"
                             type="object"
                             class="oe_highlight"
-                            groups="base.group_user"
+                            groups="diamond.group_sudi_job_work_user,stock.group_stock_user"
                             invisible="state in ('draft', 'confirmed', 'done', 'cancel', 'sudi_pickup_pending')"
                             data-hotkey="v"/>
                     <field name="sudi_display_timesheet_timer" invisible="1"/>
@@ -566,7 +688,7 @@
                             string="Transfer Department"
                             type="object"
                             class="btn-secondary"
-                            groups="base.group_user"
+                            groups="diamond.group_sudi_job_work_user,stock.group_stock_user"
                             invisible="state != 'assigned'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,assigned,done"/>
                 </header>
@@ -606,6 +728,12 @@
                     </group>
                     <group string="Jangad">
                         <field name="sudi_jangad_image" widget="jangad_image_viewer" readonly="1" nolabel="1"/>
+                        <field name="sudi_jangad_page_count" invisible="1"/>
+                        <field name="sudi_jangad_attachment_ids"
+                               widget="many2many_binary"
+                               string="More Pages"
+                               readonly="1"
+                               invisible="sudi_jangad_page_count &lt; 2"/>
                     </group>
                     <notebook>
                         <page string="Items" name="items">
@@ -707,6 +835,28 @@
         <field name="context">{'create': False, 'delete': False}</field>
     </record>
 
+    <record id="view_sudi_operator_delivery_search" model="ir.ui.view">
+        <field name="name">stock.picking.search.sudi.operator.delivery</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="partner_id" string="Customer"/>
+                <field name="sudi_origin_receipt_name"/>
+                <filter name="awaiting" string="Awaiting" domain="[('sudi_delivery_stage', '=', 'awaiting')]"/>
+                <filter name="mine" string="Out with me" domain="[('sudi_delivery_stage', '=', 'out'), ('sudi_pickup_user_id', '=', uid)]"/>
+                <filter name="out" string="Out for delivery" domain="[('sudi_delivery_stage', '=', 'out')]"/>
+                <filter name="delivered_today" string="Delivered today"
+                        domain="[('sudi_delivery_stage', '=', 'delivered'), ('date_done', '&gt;=', datetime.datetime.combine(context_today(), datetime.time(0, 0, 0)))]"/>
+                <group>
+                    <filter name="group_stage" string="Stage" context="{'group_by': 'sudi_delivery_stage'}"/>
+                    <filter name="group_customer" string="Customer" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_person" string="Delivery Person" context="{'group_by': 'sudi_pickup_user_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_sudi_operator_deliveries" model="ir.actions.act_window">
         <field name="name">Deliveries</field>
         <field name="res_model">stock.picking</field>
@@ -714,12 +864,13 @@
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('view_sudi_operator_delivery_list')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('view_sudi_operator_delivery_form')})]"/>
+        <field name="search_view_id" ref="view_sudi_operator_delivery_search"/>
         <field name="domain">[
             ('sudi_is_diamond_job_work', '=', True),
             ('picking_type_id.code', '=', 'outgoing'),
             ('sudi_origin_receipt_id', '!=', False),
         ]</field>
-        <field name="context">{'create': False, 'delete': False}</field>
+        <field name="context">{'create': False, 'delete': False, 'search_default_awaiting': 1, 'search_default_mine': 1}</field>
     </record>
 
     <record id="action_sudi_operator_job_work" model="ir.actions.act_window">

@@ -10,10 +10,8 @@
                         type="object"
                         class="oe_stat_button"
                         icon="fa-sign-in"
-                        invisible="not sudi_receipt_id">
-                    <div class="o_form_field o_stat_info">
-                        <span class="o_stat_text">Receipt</span>
-                    </div>
+                        invisible="sudi_receipt_count == 0">
+                    <field name="sudi_receipt_count" widget="statinfo" string="Receipts"/>
                 </button>
                 <button name="action_sudi_view_deliveries"
                         type="object"
@@ -26,12 +24,18 @@
 
             <xpath expr="//field[@name='invoice_origin']" position="after">
                 <field name="sudi_is_diamond_job_work_invoice" invisible="1"/>
-                <field name="sudi_receipt_id" readonly="1" invisible="not sudi_is_diamond_job_work_invoice"/>
+                <field name="sudi_receipt_ids" widget="many2many_tags" readonly="1" invisible="not sudi_is_diamond_job_work_invoice"/>
                 <field name="sudi_delivery_ids" widget="many2many_tags" readonly="1" invisible="not sudi_is_diamond_job_work_invoice"/>
+                <label for="sudi_billing_period_from" string="Job Work Period" invisible="not sudi_is_diamond_job_work_invoice"/>
+                <div class="o_row" invisible="not sudi_is_diamond_job_work_invoice">
+                    <field name="sudi_billing_period_from" readonly="1"/>
+                    <span>→</span>
+                    <field name="sudi_billing_period_to" readonly="1"/>
+                </div>
             </xpath>
 
             <xpath expr="//field[@name='invoice_line_ids']//list//field[@name='name']" position="after">
-                <field name="sudi_stock_move_id" optional="show"/>
+                <field name="sudi_delivery_names" optional="show"/>
             </xpath>
         </field>
     </record>

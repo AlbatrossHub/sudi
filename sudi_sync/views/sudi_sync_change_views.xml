@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sudi_sync_change_list" model="ir.ui.view">
+        <field name="name">sudi.sync.change.list</field>
+        <field name="model">sudi.sync.change</field>
+        <field name="arch" type="xml">
+            <list string="Sync Change Log" create="0" edit="0">
+                <field name="id" string="Cursor"/>
+                <field name="logged_at"/>
+                <field name="model"/>
+                <field name="res_id"/>
+                <field name="op"/>
+                <field name="company_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_sudi_sync_change" model="ir.actions.act_window">
+        <field name="name">Sync Change Log</field>
+        <field name="res_model">sudi.sync.change</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Nothing has changed yet</p>
+            <p>Each row is one picking touched in one transaction. A device's cursor is the id of the last row it accepted.</p>
+        </field>
+    </record>
+</odoo>

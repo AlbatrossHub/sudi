@@ -6,6 +6,13 @@ class ResPartner(models.Model):
     _inherit = "res.partner"
 
     x_skip_gst = fields.Boolean(string="Skip GST Prompt", default=False)
+    sudi_invoice_policy = fields.Selection(
+        [("on_demand", "On Demand"), ("monthly", "Monthly")],
+        string="Job Work Invoicing",
+        default="on_demand",
+        help="Monthly: the billing review lists this customer as due once the month is "
+             "over, so the reviewer can bill everything delivered in one go.",
+    )
     sudi_diamond_service_price_ids = fields.One2many(
         "sudi.diamond.partner.service.price",
         "partner_id",
@@ -81,13 +88,10 @@ class SudiDiamondPartnerServicePrice(models.Model):
     )
     price = fields.Monetary(currency_field="currency_id", required=True, default=0.0)
 
-    _sql_constraints = [
-        (
-            "price_non_negative",
-            "CHECK(price >= 0)",
-            "The special service price must be zero or positive.",
-        ),
-    ]
+    _price_non_negative = models.Constraint(
+        "CHECK(price >= 0)",
+        "The special service price must be zero or positive.",
+    )
 
     @api.constrains("partner_id", "job_type_id", "company_id", "active")
     def _check_unique_active_price(self):

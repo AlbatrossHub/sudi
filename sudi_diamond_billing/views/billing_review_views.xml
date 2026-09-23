@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_sudi_billing_review" model="ir.actions.client">
+        <field name="name">Billing Review</field>
+        <field name="tag">sudi_diamond_billing_review</field>
+        <field name="path">billing-review</field>
+    </record>
+
+    <!-- App tile plus an entry under Inventory › Diamond Job Work. The RPCs
+         re-check the group; the menu only hides the entry point. -->
+    <menuitem id="menu_sudi_billing_review_root"
+              name="Billing Review"
+              sequence="138"
+              groups="diamond.group_sudi_billing_reviewer"
+              web_icon="sudi_diamond_billing,static/description/icon.svg"/>
+    <menuitem id="menu_sudi_billing_review"
+              name="Review"
+              parent="menu_sudi_billing_review_root"
+              action="action_sudi_billing_review"
+              sequence="10"
+              groups="diamond.group_sudi_billing_reviewer"/>
+    <menuitem id="menu_sudi_billing_review_inventory"
+              name="Billing Review"
+              parent="diamond.menu_sudi_diamond_root"
+              action="action_sudi_billing_review"
+              sequence="35"
+              groups="diamond.group_sudi_billing_reviewer"/>
+</odoo>

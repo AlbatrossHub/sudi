@@ -72,27 +72,68 @@ class SudiDiamondBillingLine(models.Model):
     )
     manual_price = fields.Boolean(string="Manual Price")
     manual_quantity = fields.Boolean(string="Manual Quantity")
-    invoice_line_id = fields.Many2one(
+    invoice_line_ids = fields.Many2many(
         "account.move.line",
-        string="Invoice Line",
+        "sudi_billing_line_account_move_line_rel",
+        "billing_line_id",
+        "invoice_line_id",
+        string="Invoice Lines",
         copy=False,
         readonly=True,
-        ondelete="set null",
-        index=True,
+    )
+    reference_line_ids = fields.One2many(
+        "sudi.diamond.reference.line",
+        "billing_line_id",
+        string="Reference Statement Lines",
+        readonly=True,
+    )
+    delivery_move_ids = fields.One2many(
+        "stock.move",
+        "sudi_billing_line_id",
+        string="Delivery Lines",
+        readonly=True,
+    )
+    is_settled = fields.Boolean(
+        string="Settled",
+        compute="_compute_is_settled",
+        help="Every delivered quantity of this receipt line has been invoiced or closed by a reference statement.",
+    )
+    settlement_names = fields.Char(
+        string="Settled On",
+        compute="_compute_is_settled",
     )
 
-    _sql_constraints = [
-        (
-            "quantity_non_negative",
-            "CHECK(quantity >= 0)",
-            "The billing quantity must be zero or positive.",
-        ),
-        (
-            "price_unit_non_negative",
-            "CHECK(price_unit >= 0)",
-            "The billing unit price must be zero or positive.",
-        ),
-    ]
+    _quantity_non_negative = models.Constraint(
+        "CHECK(quantity >= 0)",
+        "The billing quantity must be zero or positive.",
+    )
+    _price_unit_non_negative = models.Constraint(
+        "CHECK(price_unit >= 0)",
+        "The billing unit price must be zero or positive.",
+    )
+
+    @api.depends(
+        "invoice_line_ids.move_id.state",
+        "invoice_line_ids.move_id.name",
+        "reference_line_ids.statement_id.state",
+        "reference_line_ids.statement_id.name",
+        "delivery_move_ids.sudi_billing_state",
+    )
+    def _compute_is_settled(self):
+        for line in self:
+            invoices = line.invoice_line_ids.move_id.filtered(lambda move: move.state != "cancel")
+            statements = line.reference_line_ids.statement_id.filtered(lambda statement: statement.state == "settled")
+            names = [move.name for move in invoices if move.name and move.name != "/"]
+            names += statements.mapped("name")
+            line.settlement_names = ", ".join(names)
+            has_settlement = bool(invoices or statements)
+            pending = line.delivery_move_ids.filtered(lambda move: move.sudi_billing_state == "to_bill")
+            line.is_settled = has_settlement and not pending
+
+    def _sudi_is_locked(self):
+        """A billing line is frozen once nothing delivered against it is left to bill."""
+        self.ensure_one()
+        return self.is_settled
 
     @api.depends("quantity", "price_unit")
     def _compute_price_subtotal(self):
@@ -130,7 +171,7 @@ class SudiDiamondBillingLine(models.Model):
                 line.price_source = source
                 line.manual_price = False
 
-    @api.constrains("picking_id", "receipt_move_id", "active", "invoice_line_id")
+    @api.constrains("picking_id", "receipt_move_id", "active")
     def _check_unique_active_receipt_move(self):
         for line in self.filtered(lambda record: record.active and record.receipt_move_id):
             duplicate = self.search(
@@ -145,11 +186,11 @@ class SudiDiamondBillingLine(models.Model):
             if duplicate:
                 raise ValidationError(_("Only one active billing line is allowed per receipt line."))
 
-    @api.constrains("receipt_move_id", "active", "invoice_line_id", "picking_id")
+    @api.constrains("receipt_move_id", "active", "picking_id")
     def _check_receipt_move_required(self):
         for line in self.filtered(
             lambda record: record.active
-            and not record.invoice_line_id
+            and not record.invoice_line_ids
             and record.picking_id.state == "done"
         ):
             if not line.receipt_move_id:
@@ -177,13 +218,33 @@ class SudiDiamondBillingLine(models.Model):
     def write(self, vals):
         self._check_pickup_pending_lock()
         protected_fields = {"job_type_id", "receipt_move_id", "quantity", "price_unit", "name", "active"}
-        if protected_fields.intersection(vals) and any(self.mapped("invoice_line_id")):
-            raise ValidationError(_("You cannot modify a billing line that has already been invoiced."))
+        if protected_fields.intersection(vals) and any(line._sudi_is_locked() for line in self):
+            raise ValidationError(_("You cannot modify a billing line whose deliveries have all been settled."))
         return super().write(vals)
 
     def unlink(self):
         self._check_pickup_pending_lock()
-        if any(self.mapped("invoice_line_id")):
-            raise ValidationError(_("You cannot delete a billing line that has already been invoiced."))
+        if any(self.mapped("invoice_line_ids")) or any(self.mapped("reference_line_ids")):
+            raise ValidationError(_("You cannot delete a billing line that has already been settled."))
         return super().unlink()
+
+    def sudi_set_manual_price(self, price_unit):
+        """Reviewer override of the rate; kept on the receipt so a re-sync respects it."""
+        for line in self:
+            if line._sudi_is_locked():
+                raise ValidationError(_("This rate is frozen: everything delivered against it is already settled."))
+            line.write({"price_unit": price_unit, "manual_price": True, "price_source": "manual"})
+        return True
+
+    def sudi_reset_manual_price(self):
+        """Drop the manual override and fall back to the customer / job type price."""
+        for line in self:
+            if line._sudi_is_locked():
+                continue
+            price, source = line.job_type_id._sudi_get_price_for_partner_with_source(
+                line.picking_id.partner_id.commercial_partner_id,
+                line.picking_id.company_id,
+            )
+            line.write({"price_unit": price, "price_source": source, "manual_price": False})
+        return True
 

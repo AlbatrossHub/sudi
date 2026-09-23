@@ -29,7 +29,152 @@ class StockMove(models.Model):
         copy=False,
         readonly=True,
         index=True,
+        ondelete="set null",
     )
+    sudi_reference_line_id = fields.Many2one(
+        "sudi.diamond.reference.line",
+        string="Reference Statement Line",
+        copy=False,
+        readonly=True,
+        index=True,
+        ondelete="set null",
+    )
+    sudi_returned_without_work = fields.Boolean(
+        string="Returned Without Job Work",
+        copy=False,
+        help="The goods went back to the customer as received: nothing is charged, "
+             "but the line is still listed on the invoice annexure.",
+    )
+    sudi_billing_line_ids = fields.One2many(
+        "sudi.diamond.billing.line",
+        "receipt_move_id",
+        string="Billing Lines",
+    )
+    # Billing values are resolved from the origin receipt's billing line and
+    # stored on the delivery move, so the review screen can filter, group and
+    # total without touching the receipt.
+    sudi_currency_id = fields.Many2one(related="company_id.currency_id", readonly=True)
+    sudi_billing_line_id = fields.Many2one(
+        "sudi.diamond.billing.line",
+        string="Billing Line",
+        compute="_compute_sudi_billing_values",
+        store=True,
+        index=True,
+    )
+    sudi_price_unit = fields.Monetary(
+        string="Rate",
+        currency_field="sudi_currency_id",
+        compute="_compute_sudi_billing_values",
+        store=True,
+    )
+    sudi_billable_qty = fields.Float(
+        string="Billable Qty",
+        digits="Product Unit",
+        compute="_compute_sudi_billing_values",
+        store=True,
+    )
+    sudi_billable_amount = fields.Monetary(
+        string="Billable Amount",
+        currency_field="sudi_currency_id",
+        compute="_compute_sudi_billing_values",
+        store=True,
+    )
+    sudi_billing_state = fields.Selection(
+        [
+            ("none", "Not Billable"),
+            ("to_bill", "To Bill"),
+            ("no_charge", "No Charge"),
+            ("billed", "Billed"),
+            ("closed", "Closed"),
+        ],
+        string="Billing State",
+        compute="_compute_sudi_billing_state",
+        store=True,
+        index=True,
+    )
+
+    @api.depends(
+        "state",
+        "quantity",
+        "product_uom_qty",
+        "sudi_pcs_qty",
+        "sudi_carats",
+        "sudi_job_type_id.invoice_basis",
+        "sudi_returned_without_work",
+        "sudi_origin_receipt_move_id.sudi_billing_line_ids.active",
+        "sudi_origin_receipt_move_id.sudi_billing_line_ids.price_unit",
+        "picking_id.picking_type_code",
+        "picking_id.sudi_is_diamond_job_work",
+    )
+    def _compute_sudi_billing_values(self):
+        for move in self:
+            billing_line = self.env["sudi.diamond.billing.line"]
+            if move._sudi_is_delivery_move():
+                billing_line = move.sudi_origin_receipt_move_id.sudi_billing_line_ids.filtered("active")[:1]
+            move.sudi_billing_line_id = billing_line
+            if not billing_line or move.sudi_returned_without_work:
+                move.sudi_price_unit = 0.0
+                move.sudi_billable_qty = 0.0 if move.sudi_returned_without_work else (
+                    move._sudi_get_invoice_quantity() if move._sudi_is_delivery_move() else 0.0
+                )
+                move.sudi_billable_amount = 0.0
+                continue
+            quantity = move._sudi_get_invoice_quantity()
+            move.sudi_price_unit = billing_line.price_unit
+            move.sudi_billable_qty = quantity
+            move.sudi_billable_amount = quantity * billing_line.price_unit
+
+    @api.depends(
+        "state",
+        "sudi_job_type_id",
+        "sudi_returned_without_work",
+        "sudi_invoice_line_id.move_id.state",
+        "sudi_reference_line_id.statement_id.state",
+        "picking_id.state",
+        "picking_id.picking_type_code",
+        "picking_id.sudi_is_diamond_job_work",
+        "picking_id.sudi_origin_receipt_id",
+    )
+    def _compute_sudi_billing_state(self):
+        for move in self:
+            if not move._sudi_is_delivery_move() or move.state != "done" or not move.sudi_job_type_id:
+                move.sudi_billing_state = "none"
+            elif move.sudi_invoice_line_id and move.sudi_invoice_line_id.move_id.state != "cancel":
+                move.sudi_billing_state = "billed"
+            elif move.sudi_reference_line_id and move.sudi_reference_line_id.statement_id.state == "settled":
+                move.sudi_billing_state = "closed"
+            elif move.sudi_returned_without_work:
+                move.sudi_billing_state = "no_charge"
+            else:
+                move.sudi_billing_state = "to_bill"
+
+    def _sudi_is_delivery_move(self):
+        self.ensure_one()
+        picking = self.picking_id
+        return bool(
+            picking
+            and picking.sudi_is_diamond_job_work
+            and picking.picking_type_code == "outgoing"
+            and picking.sudi_origin_receipt_id
+        )
+
+    def _sudi_is_settled(self):
+        self.ensure_one()
+        if self.sudi_billing_state in ("billed", "closed"):
+            return True
+        # A no-charge return has no invoice line of its own, but it is listed
+        # on the annexure of whatever settled its delivery.
+        if self.sudi_billing_state == "no_charge":
+            return self.picking_id.sudi_billing_status in ("billed", "closed")
+        return False
+
+    def action_sudi_toggle_returned_without_work(self):
+        settled = self.filtered(lambda move: move._sudi_is_settled())
+        if settled:
+            raise UserError(_("Settled delivery lines cannot be flagged as returned without job work."))
+        for move in self:
+            move.sudi_returned_without_work = not move.sudi_returned_without_work
+        return True
 
     @api.model_create_multi
     def create(self, vals_list):

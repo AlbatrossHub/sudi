@@ -1,6 +1,7 @@
 import base64
 import logging
 import re
+from datetime import datetime, timedelta, timezone
 
 from markupsafe import Markup, escape
 
@@ -10,9 +11,26 @@ from odoo.tools.float_utils import float_is_zero
 
 _logger = logging.getLogger(__name__)
 
+# Field events are captured on a phone that may be offline and flushed hours
+# later, so the caller supplies when the event happened rather than letting the
+# server stamp its own clock. These bound how far the supplied time may sit from
+# the server's: see docs/MOBILE_API_PLAN.md section 7.3.
+SUDI_MAX_CLOCK_SKEW_SECONDS = 60
+SUDI_MAX_BACKDATE_HOURS = 72
+
+# Which parts of the proof of delivery are mandatory is configuration, not code:
+# the app captures all three and the business tightens the requirement without
+# needing an app release.
+SUDI_POD_PARAMS = {
+    "receiver_name": "sudi_diamond.pod_require_receiver_name",
+    "signature": "sudi_diamond.pod_require_signature",
+    "photo": "sudi_diamond.pod_require_photo",
+}
+
 
 class StockPicking(models.Model):
-    _inherit = ["stock.picking", "timer.parent.mixin"]
+    _name = "stock.picking"
+    _inherit = ["stock.picking", "timer.parent.mixin", "sudi.diamond.whatsapp.mixin"]
 
     active = fields.Boolean(
         string="Active",
@@ -46,18 +64,130 @@ class StockPicking(models.Model):
         compute_sudo=True,
     )
     sudi_delivery_count = fields.Integer(compute="_compute_sudi_counts")
+    # Stored inverse of account.move.sudi_delivery_ids: the invoices that
+    # settle this delivery. sudi_invoice_ids adds the receipt-side view.
+    sudi_billed_invoice_ids = fields.Many2many(
+        "account.move",
+        "sudi_account_move_stock_picking_rel",
+        "picking_id",
+        "move_id",
+        string="Settling Invoices",
+        copy=False,
+        readonly=True,
+    )
+    sudi_reference_statement_ids = fields.Many2many(
+        "sudi.diamond.reference.statement",
+        "sudi_reference_statement_stock_picking_rel",
+        "picking_id",
+        "statement_id",
+        string="Reference Statements",
+        copy=False,
+        readonly=True,
+    )
     sudi_invoice_ids = fields.Many2many(
         "account.move",
         compute="_compute_sudi_invoice_ids",
         string="Diamond Invoices",
     )
     sudi_invoice_count = fields.Integer(compute="_compute_sudi_invoice_ids")
+    sudi_billing_log_count = fields.Integer(compute="_compute_sudi_billing_log_count")
+    sudi_billing_status = fields.Selection(
+        [
+            ("none", "Not Billable"),
+            ("to_bill", "To Bill"),
+            ("partial", "Partially Billed"),
+            ("no_charge", "No Charge"),
+            ("billed", "Billed"),
+            ("closed", "Closed"),
+        ],
+        string="Billing Status",
+        compute="_compute_sudi_billing_status",
+        store=True,
+        index=True,
+        copy=False,
+    )
+    sudi_settlement_mode = fields.Selection(
+        [("invoice", "Invoice"), ("reference", "Reference")],
+        string="Settle As",
+        default="invoice",
+        required=True,
+        copy=False,
+        help="Chosen by the billing reviewer per delivery: an official invoice, or an "
+             "off-book reference statement.",
+    )
+    sudi_total_pcs = fields.Float(
+        string="Total Pcs",
+        digits="Product Unit",
+        compute="_compute_sudi_billing_totals",
+        store=True,
+    )
+    sudi_total_carats = fields.Float(
+        string="Total Carats",
+        digits="Product Unit",
+        compute="_compute_sudi_billing_totals",
+        store=True,
+    )
+    sudi_billable_amount = fields.Monetary(
+        string="Amount To Bill",
+        currency_field="sudi_currency_id",
+        compute="_compute_sudi_billing_totals",
+        store=True,
+    )
+    sudi_settled_amount = fields.Monetary(
+        string="Settled Amount",
+        currency_field="sudi_currency_id",
+        compute="_compute_sudi_billing_totals",
+        store=True,
+    )
+    sudi_currency_id = fields.Many2one(related="company_id.currency_id", readonly=True)
+    sudi_job_type_summary = fields.Char(
+        string="Job Work",
+        compute="_compute_sudi_billing_totals",
+        store=True,
+    )
     sudi_pickup_user_id = fields.Many2one(
         "res.users",
         string="Pickup Person",
         tracking=True,
     )
     sudi_pickup_datetime = fields.Datetime(string="Pickup Date/Time", tracking=True)
+    # Delivery orders share `state` with receipts, whose "assigned" reads "Job Work
+    # in Progress". Deliveries get their own stage so the label fits the flow:
+    # confirmation awaited -> out for delivery (taken by an operator) -> delivered.
+    sudi_delivery_stage = fields.Selection(
+        [
+            ("awaiting", "Delivery Confirmation Awaited"),
+            ("out", "Out for Delivery"),
+            ("delivered", "Delivered"),
+            ("cancelled", "Cancelled"),
+        ],
+        string="Delivery Stage",
+        compute="_compute_sudi_delivery_stage",
+        store=True,
+        index=True,
+        copy=False,
+    )
+    sudi_out_for_delivery_datetime = fields.Datetime(string="Out for Delivery Since", copy=False, tracking=True)
+    sudi_pod_receiver_name = fields.Char(
+        string="Received By",
+        copy=False,
+        tracking=True,
+        help="Who took delivery of the parcel.",
+    )
+    sudi_pod_signature = fields.Image(
+        string="Receiver Signature",
+        max_width=1024,
+        max_height=256,
+        copy=False,
+    )
+    sudi_pod_attachment_ids = fields.Many2many(
+        "ir.attachment",
+        "sudi_picking_pod_attachment_rel",
+        "picking_id",
+        "attachment_id",
+        string="Delivery Photos",
+        copy=False,
+    )
     sudi_customer_contact = fields.Char(string="Customer Contact", tracking=True)
     sudi_pickup_address_id = fields.Many2one(
         "res.partner",
@@ -72,6 +202,18 @@ class StockPicking(models.Model):
     )
     sudi_internal_notes = fields.Text(string="Job Work Notes", tracking=True)
     sudi_jangad_image = fields.Image(string="Jangad")
+    sudi_jangad_attachment_ids = fields.Many2many(
+        "ir.attachment",
+        "sudi_picking_jangad_attachment_rel",
+        "picking_id",
+        "attachment_id",
+        string="Jangad Pages",
+        copy=False,
+        help="Every page of the jangad. The first page is mirrored into "
+             "sudi_jangad_image, which the receipt report and the WhatsApp "
+             "templates read.",
+    )
+    sudi_jangad_page_count = fields.Integer(compute="_compute_sudi_jangad_page_count")
     sudi_partner_address = fields.Text(
         string="Customer Address",
         compute="_compute_sudi_partner_address",
@@ -138,7 +280,9 @@ class StockPicking(models.Model):
                     raise UserError(_("This pickup is still pending you can not input the data please confirm the pick up"))
         res = super().write(vals)
         if not self.env.context.get("sudi_skip_pickup_scheduled_notify") and (
-            "sudi_jangad_image" in vals or "sudi_pickup_user_id" in vals
+            "sudi_jangad_image" in vals
+            or "sudi_jangad_attachment_ids" in vals
+            or "sudi_pickup_user_id" in vals
         ):
             self._sudi_notify_pickup_scheduled()
         if not self.env.context.get("sudi_skip_billing_sync"):
@@ -204,7 +348,7 @@ class StockPicking(models.Model):
         body_lines.append(_("\nPlease update data entry for these orders at the earliest.\n\n\nThank you,\n\n*Team SDPPL*"))
         body_text = "\n".join(body_lines)
         for user in notify_users:
-            user_phone = user.partner_id.phone or user.partner_id.mobile
+            user_phone = user.partner_id.phone
             if user_phone:
                 pending_receipts[:1]._sudi_send_whatsapp_message(
                     recipient_phone=user_phone,
@@ -245,58 +389,150 @@ class StockPicking(models.Model):
                     },
                 )
 
-    def _sudi_send_whatsapp_message(self, recipient_phone, body_text, attachment=None, partner=None):
-        """Send a WhatsApp message via open_whatsapp_connector engine."""
-        if not recipient_phone:
-            _logger.warning("No recipient phone number provided for WhatsApp notification on %s", self.display_name)
-            return False
-        
-        wa_account = (
-            self.env['owa.account'].sudo().search([('session_state', '=', 'connected')], limit=1)
-            or self.env['owa.account'].sudo().search([], limit=1)
-        )
-        if not wa_account:
-            _logger.warning("No WhatsApp account found in open_whatsapp_connector for %s", self.display_name)
-            return False
+    @api.model
+    def _sudi_parse_event_datetime(self, occurred_at):
+        """Resolve a caller-supplied event time to naive UTC.
 
-        mail_vals = {
-            'model': self._name,
-            'res_id': self.id,
-            'body': body_text,
-            'message_type': 'whatsapp_message',
-        }
-        if attachment:
-            mail_vals['attachment_ids'] = [(6, 0, attachment.ids)]
-        
-        mail_message = self.env['mail.message'].sudo().create(mail_vals)
+        Returns ``(value, error_code)``; exactly one of the two is set. The
+        codes are the ones the mobile API answers with -- ``VALIDATION``,
+        ``CLOCK_SKEW``, ``STALE_INTENT`` -- so a router can classify the failure
+        without catching and re-reading an exception message.
 
-        msg_vals = {
-            'mobile_number': recipient_phone,
-            'message_type': 'outbound',
-            'state': 'outgoing',
-            'wa_account_id': wa_account.id,
-            'mail_message_id': mail_message.id,
-        }
-        if partner:
-            msg_vals['whatsapp_partner_id'] = partner.id
+        A falsy ``occurred_at`` means now, which is what every web-client caller
+        passes.
+        """
+        now = fields.Datetime.now()
+        if not occurred_at:
+            return now, None
 
-        owa_msg = self.env['owa.message'].sudo().create(msg_vals)
-        try:
-            owa_msg._send_message()
-        except Exception:
-            _logger.exception("Failed to send WhatsApp message for %s to %s", self.display_name, recipient_phone)
-        return owa_msg
+        value = occurred_at
+        if isinstance(value, str):
+            try:
+                value = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+            except ValueError:
+                return None, "VALIDATION"
+        if not isinstance(value, datetime):
+            return None, "VALIDATION"
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+
+        if value > now + timedelta(seconds=SUDI_MAX_CLOCK_SKEW_SECONDS):
+            return None, "CLOCK_SKEW"
+        if value < now - timedelta(hours=SUDI_MAX_BACKDATE_HOURS):
+            return None, "STALE_INTENT"
+        # A device a few seconds fast must not be allowed to record the future.
+        return min(value, now), None
+
+    @api.model
+    def _sudi_event_datetime(self, occurred_at=None):
+        """``_sudi_parse_event_datetime`` for callers that want an exception."""
+        value, error = self._sudi_parse_event_datetime(occurred_at)
+        if error == "CLOCK_SKEW":
+            raise UserError(_(
+                "This device's clock is more than %s seconds ahead of the server, "
+                "so the event time was refused.", SUDI_MAX_CLOCK_SKEW_SECONDS,
+            ))
+        if error == "STALE_INTENT":
+            raise UserError(_(
+                "This event is more than %s hours old and can no longer be "
+                "recorded automatically.", SUDI_MAX_BACKDATE_HOURS,
+            ))
+        if error:
+            raise UserError(_("%r is not a valid event date and time.", occurred_at))
+        return value
+
+    def _sudi_post_event_provenance(self, event, occurred_at_value):
+        """Record that an event happened earlier, and on which device.
+
+        Skipped for an ordinary online action with no device behind it: a note
+        on every delivery saying it happened just now would drown the chatter.
+        """
+        device_uid = self.env.context.get("sudi_device_uid")
+        received_at = fields.Datetime.now()
+        delay = abs((received_at - occurred_at_value).total_seconds())
+        if not device_uid and delay < 120:
+            return
+        device_note = _(" from device %s", device_uid) if device_uid else ""
+        for picking in self:
+            # sudo: confirming a pickup moves the receipt out of the operator's
+            # own scope (it becomes job work), so by the time this note is
+            # written they can no longer read the record they just acted on.
+            # The action's access check has already run; this is the audit
+            # trail of it, written the same way _sudi_post_user_notification
+            # writes its own.
+            picking.sudo().message_post(
+                body=_(
+                    "%(event)s recorded by %(user)s. Happened at %(occurred)s UTC, "
+                    "received at %(received)s UTC%(device)s.",
+                    event=event,
+                    user=self.env.user.name,
+                    occurred=occurred_at_value,
+                    received=received_at,
+                    device=device_note,
+                ),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
 
     def _sudi_get_form_view_url(self):
         self.ensure_one()
         base_url = self.get_base_url().rstrip("/")
         return f"{base_url}/web#id={self.id}&model={self._name}&view_type=form"
 
+    @api.depends("sudi_jangad_attachment_ids", "sudi_jangad_image")
+    def _compute_sudi_jangad_page_count(self):
+        for picking in self:
+            picking.sudi_jangad_page_count = (
+                (1 if picking.sudi_jangad_image else 0)
+                + len(picking.sudi_jangad_attachment_ids)
+            )
+
+    def _sudi_add_jangad_pages(self, datas_list):
+        """Attach jangad pages, keeping page 1 mirrored into ``sudi_jangad_image``.
+
+        A jangad can run to several handwritten sheets. The report and the
+        WhatsApp templates read ``sudi_jangad_image``, so the first page stays
+        there and the remainder live as attachments; nothing that reads the old
+        field has to change.
+        """
+        self.ensure_one()
+        pages = [datas for datas in (datas_list or []) if datas]
+        if not pages:
+            return self.env["ir.attachment"]
+        vals = {}
+        if not self.sudi_jangad_image:
+            vals["sudi_jangad_image"] = pages.pop(0)
+            if not pages:
+                self.write(vals)
+                return self.env["ir.attachment"]
+        offset = len(self.sudi_jangad_attachment_ids) + 1
+        attachments = self.env["ir.attachment"].sudo().create([
+            {
+                "name": f"jangad_{self.name or self.id}_{offset + index + 1}.jpg",
+                "type": "binary",
+                "datas": datas,
+                "res_model": self._name,
+                "res_id": self.id,
+                "mimetype": "image/jpeg",
+            }
+            for index, datas in enumerate(pages)
+        ])
+        vals["sudi_jangad_attachment_ids"] = [
+            Command.link(record.id) for record in attachments
+        ]
+        self.write(vals)
+        return attachments
+
     def _sudi_get_jangad_image_attachment(self):
+        """Every jangad page as attachments, for the WhatsApp notifications.
+
+        Page 1 lives in ``sudi_jangad_image`` and pages 2+ are already
+        attachments, so the first is materialised here and the rest appended.
+        """
         self.ensure_one()
         if not self.sudi_jangad_image:
-            return self.env["ir.attachment"]
-        return self.env["ir.attachment"].sudo().create({
+            return self.sudi_jangad_attachment_ids
+        first_page = self.env["ir.attachment"].sudo().create({
             "name": f"jangad_{self.name}.jpg",
             "type": "binary",
             "datas": self.sudi_jangad_image,
@@ -304,6 +540,7 @@ class StockPicking(models.Model):
             "res_id": self.id,
             "mimetype": "image/jpeg",
         })
+        return first_page | self.sudi_jangad_attachment_ids
 
     def _sudi_get_delivery_pdf_attachment(self):
         """Render and return the PDF attachment of Diamond Job Work Receipt / Delivery report."""
@@ -358,7 +595,7 @@ class StockPicking(models.Model):
         )
         phone_no = (
             self.sudi_customer_contact
-            or (customer_partner.phone or customer_partner.mobile if customer_partner else "")
+            or (customer_partner.phone if customer_partner else "")
             or ""
         )
         url = self._sudi_get_form_view_url()
@@ -373,72 +610,6 @@ class StockPicking(models.Model):
             "pickup_reference": self.name,
             "delivery_reference": self.name,
         }
-
-    def _sudi_render_event_whatsapp_message(self, event):
-        """Render body text from configured sudi.whatsapp.template mapping for event."""
-        self.ensure_one()
-        mapping = self.env["sudi.whatsapp.template"].sudo().search(
-            [
-                ("event", "=", event),
-                ("active", "=", True),
-                "|",
-                ("company_id", "=", False),
-                ("company_id", "=", self.company_id.id or self.env.company.id),
-            ],
-            order="company_id desc, sequence asc, id asc",
-            limit=1,
-        )
-        if not mapping or not mapping.body:
-            _logger.warning(
-                "No active sudi.whatsapp.template found for event '%s' on %s",
-                event,
-                self.display_name,
-            )
-            return False
-
-        body = mapping.body
-        ctx = self._sudi_get_whatsapp_template_context(event)
-
-        # 1. Unescape XML-escaped % strings if present (%%(key)s -> %(key)s)
-        if "%%(" in body:
-            body = body.replace("%%(", "%(")
-
-        # 2. Map positional index variables {{1}}, {{2}}, etc. to event context keys
-        positional_map = {
-            "pickup_scheduled": ["customer_name", "address", "phone", "url"],
-            "pickup_request_confirmation": ["customer_name", "pickup_reference"],
-            "pickup_confirmed": ["customer_name", "pickup_reference"],
-            "pickup_admin_intimation": ["customer_name", "pickup_reference", "pickup_person", "url"],
-            "pickup_cancelled": ["customer_name", "pickup_reference"],
-            "delivery_assigned": ["customer_name", "delivery_reference"],
-            "delivery_dispatch": ["customer_name", "address", "phone", "delivery_reference", "url"],
-            "delivery_completed": ["customer_name", "delivery_reference"],
-            "delivery_admin_intimation": ["customer_name", "delivery_reference", "delivery_person", "url"],
-        }
-        keys = positional_map.get(event, [])
-        for idx, key in enumerate(keys, 1):
-            val = str(ctx.get(key, "") or "")
-            body = body.replace(f"{{{{{idx}}}}}", val)
-            body = body.replace(f"{{{idx}}}", val)
-
-        # 3. Map named placeholder syntaxes: %(key)s, {{key}}, {key}
-        for key, val in ctx.items():
-            val_str = str(val or "")
-            body = body.replace(f"{{{{{key}}}}}", val_str)
-            body = body.replace(f"{{{key}}}", val_str)
-            body = body.replace(f"%({key})s", val_str)
-            body = body.replace(f"%({key})d", val_str)
-
-        # 4. Safe Python dict interpolation fallback
-        try:
-            if "%(" in body:
-                body = body % ctx
-        except Exception:
-            pass
-
-        return body
-
-
 
     def _sudi_notify_pickup_scheduled(self):
         """Trigger 1: Notify pickup person(s) and customer on Jangad upload / schedule creation."""
@@ -465,7 +636,7 @@ class StockPicking(models.Model):
             body_pickup = receipt._sudi_render_event_whatsapp_message("pickup_scheduled")
             if body_pickup:
                 for user in wa_recipients:
-                    pickup_phone = user.partner_id.phone or user.partner_id.mobile
+                    pickup_phone = user.partner_id.phone
                     if pickup_phone:
                         receipt._sudi_send_whatsapp_message(
                             recipient_phone=pickup_phone,
@@ -475,7 +646,7 @@ class StockPicking(models.Model):
                         )
 
             # Message 1B: Send To Customer
-            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
+            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone if customer_partner else False)
             if customer_phone:
                 body_cust = receipt._sudi_render_event_whatsapp_message("pickup_request_confirmation")
                 if body_cust:
@@ -505,7 +676,7 @@ class StockPicking(models.Model):
             attachment = receipt._sudi_get_jangad_image_attachment()
 
             # Message 2A: Send To Customer
-            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
+            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone if customer_partner else False)
             if customer_phone:
                 cust_body = receipt._sudi_render_event_whatsapp_message("pickup_confirmed")
                 if cust_body:
@@ -521,7 +692,7 @@ class StockPicking(models.Model):
             if admin_body:
                 for notify_user in notify_users:
                     admin_partner = notify_user.partner_id
-                    admin_phone = admin_partner.phone or admin_partner.mobile
+                    admin_phone = admin_partner.phone
                     if admin_phone:
                         receipt._sudi_send_whatsapp_message(
                             recipient_phone=admin_phone,
@@ -534,7 +705,7 @@ class StockPicking(models.Model):
         """Send WhatsApp cancellation intimation to customer with Jangad attachment."""
         for receipt in self:
             customer_partner = receipt.partner_id
-            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone if customer_partner else False) or (customer_partner.mobile if customer_partner else False)
+            customer_phone = receipt.sudi_customer_contact or (customer_partner.phone if customer_partner else False)
 
             if customer_phone:
                 attachment = receipt._sudi_get_jangad_image_attachment()
@@ -556,7 +727,7 @@ class StockPicking(models.Model):
         )
         for delivery in deliveries:
             customer_partner = delivery.partner_id
-            customer_phone = delivery.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
+            customer_phone = delivery.sudi_customer_contact or (customer_partner.phone if customer_partner else False)
 
             # 1. Send To Customer
             # if customer_phone:
@@ -574,7 +745,7 @@ class StockPicking(models.Model):
             deliv_body = delivery._sudi_render_event_whatsapp_message("delivery_dispatch")
             if deliv_body:
                 for user in delivery_recipients:
-                    user_phone = user.partner_id.phone or user.partner_id.mobile
+                    user_phone = user.partner_id.phone
                     if user_phone:
                         delivery._sudi_send_whatsapp_message(
                             recipient_phone=user_phone,
@@ -591,7 +762,7 @@ class StockPicking(models.Model):
         )
         for delivery in deliveries:
             customer_partner = delivery.partner_id
-            customer_phone = delivery.sudi_customer_contact or (customer_partner.phone or customer_partner.mobile if customer_partner else False)
+            customer_phone = delivery.sudi_customer_contact or (customer_partner.phone if customer_partner else False)
 
             # Generate PDF attachment for delivery report
             pdf_attachment = delivery._sudi_get_delivery_pdf_attachment()
@@ -612,7 +783,7 @@ class StockPicking(models.Model):
             admin_body = delivery._sudi_render_event_whatsapp_message("delivery_admin_intimation")
             if admin_body:
                 for user in notify_users:
-                    user_phone = user.partner_id.phone or user.partner_id.mobile
+                    user_phone = user.partner_id.phone
                     if user_phone:
                         delivery._sudi_send_whatsapp_message(
                             recipient_phone=user_phone,
@@ -634,15 +805,155 @@ class StockPicking(models.Model):
         for picking in self:
             picking.sudi_origin_receipt_name = picking.sudi_origin_receipt_id.name or ""
 
+    def _compute_sudi_billing_log_count(self):
+        Log = self.env["sudi.diamond.billing.log"]
+        for picking in self:
+            field = "receipt_id" if picking.picking_type_code == "incoming" else "delivery_id"
+            picking.sudi_billing_log_count = Log.search_count([(field, "=", picking.id)]) if picking.id else 0
+
+    @api.depends("sudi_billed_invoice_ids", "sudi_delivery_ids.sudi_billed_invoice_ids")
     def _compute_sudi_invoice_ids(self):
-        AccountMove = self.env["account.move"]
         for picking in self:
             if picking.picking_type_code == "incoming":
-                invoices = AccountMove.search([("sudi_receipt_id", "=", picking.id)])
+                invoices = picking.sudi_delivery_ids.sudi_billed_invoice_ids
             else:
-                invoices = AccountMove.search([("sudi_delivery_ids", "in", picking.ids)])
+                invoices = picking.sudi_billed_invoice_ids
             picking.sudi_invoice_ids = invoices
             picking.sudi_invoice_count = len(invoices)
+
+    @api.depends(
+        "state",
+        "picking_type_code",
+        "sudi_is_diamond_job_work",
+        "sudi_origin_receipt_id",
+        "move_ids.sudi_billing_state",
+        "sudi_billed_invoice_ids.state",
+        "sudi_reference_statement_ids.state",
+    )
+    def _compute_sudi_billing_status(self):
+        for picking in self:
+            if not picking._sudi_is_job_work_delivery() or picking.state != "done":
+                picking.sudi_billing_status = "none"
+                continue
+            states = set(picking.move_ids.filtered(lambda move: move.state == "done").mapped("sudi_billing_state")) - {"none"}
+            settled = states & {"billed", "closed"}
+            if not states:
+                picking.sudi_billing_status = "none"
+            elif "to_bill" in states:
+                picking.sudi_billing_status = "partial" if settled else "to_bill"
+            elif settled:
+                picking.sudi_billing_status = "billed" if "billed" in settled else "closed"
+            elif picking.sudi_billed_invoice_ids.filtered(lambda move: move.state != "cancel"):
+                # Only no-charge returns, attached to an invoice's annexure.
+                picking.sudi_billing_status = "billed"
+            elif picking.sudi_reference_statement_ids.filtered(lambda statement: statement.state == "settled"):
+                picking.sudi_billing_status = "closed"
+            else:
+                picking.sudi_billing_status = "no_charge"
+
+    @api.depends(
+        "move_ids.state",
+        "move_ids.sudi_pcs_qty",
+        "move_ids.sudi_carats",
+        "move_ids.sudi_job_type_id",
+        "move_ids.sudi_billing_state",
+        "move_ids.sudi_billable_amount",
+    )
+    def _compute_sudi_billing_totals(self):
+        for picking in self:
+            moves = picking.move_ids.filtered(lambda move: move.state != "cancel")
+            picking.sudi_total_pcs = sum(moves.mapped("sudi_pcs_qty"))
+            picking.sudi_total_carats = sum(moves.mapped("sudi_carats"))
+            picking.sudi_billable_amount = sum(
+                moves.filtered(lambda move: move.sudi_billing_state == "to_bill").mapped("sudi_billable_amount")
+            )
+            picking.sudi_settled_amount = sum(
+                moves.filtered(lambda move: move.sudi_billing_state in ("billed", "closed")).mapped("sudi_billable_amount")
+            )
+            names = []
+            for move in moves.sorted(key=lambda move: (move.sudi_sr or 0, move.id)):
+                name = move.sudi_job_type_id.name
+                if name and name not in names:
+                    names.append(name)
+            picking.sudi_job_type_summary = ", ".join(names)
+
+    @api.depends(
+        "state",
+        "picking_type_code",
+        "sudi_is_diamond_job_work",
+        "sudi_origin_receipt_id",
+        "sudi_pickup_user_id",
+        "sudi_out_for_delivery_datetime",
+    )
+    def _compute_sudi_delivery_stage(self):
+        for picking in self:
+            if not picking._sudi_is_job_work_delivery():
+                picking.sudi_delivery_stage = False
+            elif picking.state == "done":
+                picking.sudi_delivery_stage = "delivered"
+            elif picking.state == "cancel":
+                picking.sudi_delivery_stage = "cancelled"
+            elif picking.sudi_pickup_user_id and picking.sudi_out_for_delivery_datetime:
+                picking.sudi_delivery_stage = "out"
+            else:
+                picking.sudi_delivery_stage = "awaiting"
+
+    def action_sudi_take_for_delivery(self, occurred_at=None):
+        """An operator picks the deliveries they are going out with.
+
+        Multi-record: called from the operator's list selection. The dispatch
+        WhatsApp goes out here, to the person who actually took the parcels.
+        ``occurred_at`` carries the capture time when the tap happened offline.
+        """
+        self._sudi_check_pickup_delivery_operator_access()
+        deliveries = self.filtered(lambda picking: picking.sudi_delivery_stage == "awaiting")
+        if not deliveries:
+            raise UserError(_("Select deliveries that are still awaiting confirmation."))
+        taken_at = self._sudi_event_datetime(occurred_at)
+        deliveries.with_context(sudi_skip_pickup_scheduled_notify=True).write({
+            "sudi_pickup_user_id": self.env.user.id,
+            "sudi_out_for_delivery_datetime": taken_at,
+        })
+        for delivery in deliveries:
+            delivery.message_post(
+                body=_("Taken for delivery by %s.", self.env.user.name),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
+        deliveries._sudi_post_event_provenance(_("Taken for delivery"), taken_at)
+        deliveries._sudi_notify_delivery_assigned()
+        return True
+
+    def action_sudi_release_delivery(self):
+        """Hand a taken delivery back to the awaiting pool."""
+        self._sudi_check_pickup_delivery_operator_access()
+        deliveries = self.filtered(lambda picking: picking.sudi_delivery_stage == "out")
+        deliveries.with_context(sudi_skip_pickup_scheduled_notify=True).write({
+            "sudi_pickup_user_id": False,
+            "sudi_out_for_delivery_datetime": False,
+        })
+        for delivery in deliveries:
+            delivery.message_post(
+                body=_("Released back to awaiting deliveries by %s.", self.env.user.name),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
+        return True
+
+    def _sudi_is_job_work_delivery(self):
+        self.ensure_one()
+        return bool(
+            self.sudi_is_diamond_job_work
+            and self.picking_type_code == "outgoing"
+            and self.sudi_origin_receipt_id
+        )
+
+    def _sudi_post_billing_chatter(self, body):
+        """Post ``body`` on each delivery and on its origin receipt."""
+        for delivery in self:
+            targets = delivery | delivery.sudi_origin_receipt_id
+            for picking in targets:
+                picking.message_post(body=body, message_type="comment", subtype_xmlid="mail.mt_note")
 
     @api.depends("partner_id")
     def _compute_sudi_partner_address(self):
@@ -743,7 +1054,7 @@ class StockPicking(models.Model):
             },
         }
 
-    def action_sudi_confirm_pickup(self):
+    def action_sudi_confirm_pickup(self, occurred_at=None):
         self._sudi_check_pickup_delivery_operator_access()
         invalid_pickings = self.filtered(
             lambda picking: not picking.sudi_is_diamond_job_work
@@ -753,14 +1064,16 @@ class StockPicking(models.Model):
         if invalid_pickings:
             raise UserError(_("Pickup can only be confirmed on diamond job-work receipts waiting for pickup."))
 
+        picked_at = self._sudi_event_datetime(occurred_at)
         self.with_context(sudi_skip_pickup_scheduled_notify=True).write({
             "sudi_pickup_user_id": self.env.user.id,
-            "sudi_pickup_datetime": fields.Datetime.now(),
+            "sudi_pickup_datetime": picked_at,
         })
+        self._sudi_post_event_provenance(_("Pickup"), picked_at)
         self._sudi_notify_pickup_confirmed()
         return True
 
-    def action_sudi_cancel_pickup(self):
+    def action_sudi_cancel_pickup(self, occurred_at=None, reason=None):
         self._sudi_check_pickup_delivery_operator_access()
         invalid_pickings = self.filtered(
             lambda picking: not picking.sudi_is_diamond_job_work
@@ -770,6 +1083,15 @@ class StockPicking(models.Model):
         if invalid_pickings:
             raise UserError(_("Pickup can only be cancelled on diamond job-work receipts waiting for pickup."))
 
+        cancelled_at = self._sudi_event_datetime(occurred_at)
+        if reason:
+            for picking in self:
+                picking.message_post(
+                    body=_("Pickup cancelled: %s", reason),
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_note",
+                )
+        self._sudi_post_event_provenance(_("Pickup cancellation"), cancelled_at)
         self._sudi_notify_pickup_cancelled()
         self.write({
             "active": False,
@@ -778,14 +1100,55 @@ class StockPicking(models.Model):
         return True
 
     def _sudi_check_pickup_delivery_operator_access(self):
+        """Gate the pickup and delivery field actions.
+
+        This used to accept any ``base.group_user``, which the web client hid
+        behind menu visibility. Once these methods are callable over the mobile
+        API there are no menus, so the role group is checked properly. Stock
+        users keep access because the office still drives the same actions from
+        the web client.
+        """
         if self.env.su:
             return
-        if not self.env.user.has_group("base.group_user"):
+        if not (
+            self.env.user.has_group("diamond.group_sudi_pickup_delivery_operator")
+            or self.env.user.has_group("stock.group_stock_user")
+        ):
             raise AccessError(_("You are not allowed to operate diamond pickup and delivery records."))
+
+    def _sudi_check_job_work_access(self):
+        """Gate the job-work actions, which are a different role from the field."""
+        if self.env.su:
+            return
+        if not (
+            self.env.user.has_group("diamond.group_sudi_job_work_user")
+            or self.env.user.has_group("stock.group_stock_user")
+        ):
+            raise AccessError(_("You are not allowed to operate diamond job-work records."))
+
+    def _sudi_transfer_department(self, job_type):
+        """Move a job-work receipt to another department.
+
+        The wizard and the mobile API both call this; the wizard used to hold
+        the write itself, which an API cannot reach because
+        ``action_sudi_transfer_department`` returns a window action.
+        """
+        self.ensure_one()
+        self._sudi_check_job_work_access()
+        if (
+            not self.sudi_is_diamond_job_work
+            or self.picking_type_code != "incoming"
+            or self.state != "assigned"
+        ):
+            raise UserError(_("Department transfer is only available on diamond job-work receipts in progress."))
+        if not job_type:
+            raise UserError(_("Select the department to transfer to."))
+        self.write({"sudi_current_department_id": job_type.id})
+        return True
 
     def action_sudi_transfer_department(self):
         self.ensure_one()
-        self._sudi_check_pickup_delivery_operator_access()
+        self._sudi_check_job_work_access()
         if (
             not self.sudi_is_diamond_job_work
             or self.picking_type_code != "incoming"
@@ -1019,7 +1382,14 @@ class StockPicking(models.Model):
         jangad_image,
         pickup_address_id=False,
         manual_pickup_address=False,
+        extra_pages=None,
     ):
+        """Create a receipt from a customer upload.
+
+        ``jangad_image`` is page 1 and keeps its original meaning; ``extra_pages``
+        are the remaining sheets of a multi-page jangad, attached after creation
+        so the notification that ``create`` fires still carries page 1.
+        """
         picking_type, source_location, destination_location = self._sudi_get_public_receipt_defaults()
         partner, pickup_address, pickup_address_text = self._sudi_resolve_public_pickup_address(
             phone,
@@ -1040,7 +1410,12 @@ class StockPicking(models.Model):
             vals["partner_id"] = partner.id
         if pickup_address:
             vals["sudi_pickup_address_id"] = pickup_address.id
-        return self.sudo().create(vals)
+        receipt = self.sudo().create(vals)
+        if extra_pages:
+            receipt.with_context(
+                sudi_skip_pickup_scheduled_notify=True
+            )._sudi_add_jangad_pages(extra_pages)
+        return receipt
 
     @api.onchange(
         "partner_id",
@@ -1092,7 +1467,7 @@ class StockPicking(models.Model):
         ):
             prepared_values = receipt._sudi_prepare_billing_detail_values()
             prepared_receipt_move_ids = {vals["receipt_move_id"] for vals in prepared_values}
-            existing_lines = receipt.sudi_billing_line_ids.sudo().filtered(lambda line: line.active and not line.invoice_line_id)
+            existing_lines = receipt.sudi_billing_line_ids.sudo().filtered(lambda line: line.active and not line._sudi_is_locked())
             existing_by_receipt_move = {
                 line.receipt_move_id.id: line
                 for line in existing_lines
@@ -1148,15 +1523,9 @@ class StockPicking(models.Model):
         return True
 
     def action_assign(self):
-        res = super().action_assign()
-        assigned_deliveries = self.filtered(
-            lambda picking: picking.sudi_is_diamond_job_work
-            and picking.picking_type_code == "outgoing"
-            and picking.state == "assigned"
-        )
-        if assigned_deliveries:
-            assigned_deliveries._sudi_notify_delivery_assigned()
-        return res
+        # The dispatch WhatsApp used to go out here, before anyone had taken the
+        # delivery; it now fires from action_sudi_take_for_delivery.
+        return super().action_assign()
 
     def _action_done(self):
         res = super()._action_done()
@@ -1302,7 +1671,76 @@ class StockPicking(models.Model):
             delivery.action_confirm()
             delivery.action_assign()
 
-    def action_sudi_mark_delivered(self):
+    def _sudi_pod_is_required(self, requirement):
+        """Whether this part of the proof of delivery is mandatory."""
+        value = self.env["ir.config_parameter"].sudo().get_param(
+            SUDI_POD_PARAMS[requirement], "0"
+        )
+        return str(value).strip().lower() in ("1", "true", "yes")
+
+    def _sudi_apply_proof_of_delivery(self, receiver_name=None, signature=None, photo_datas=None):
+        """Validate and record the proof of delivery.
+
+        Validation runs before the write so a refused delivery leaves no partial
+        record behind, and it reads the *incoming* values as well as what is
+        already stored -- an operator who captured the signature earlier in the
+        form should not have to draw it again.
+        """
+        Attachment = self.env["ir.attachment"].sudo()
+        for delivery in self:
+            name = (receiver_name or delivery.sudi_pod_receiver_name or "").strip()
+            has_signature = bool(signature or delivery.sudi_pod_signature)
+            has_photo = bool(photo_datas or delivery.sudi_pod_attachment_ids)
+
+            if delivery._sudi_pod_is_required("receiver_name") and not name:
+                raise UserError(_(
+                    "Enter who received %s before marking it delivered.", delivery.name
+                ))
+            if delivery._sudi_pod_is_required("signature") and not has_signature:
+                raise UserError(_(
+                    "Capture the receiver's signature for %s before marking it delivered.",
+                    delivery.name,
+                ))
+            if delivery._sudi_pod_is_required("photo") and not has_photo:
+                raise UserError(_(
+                    "Attach a delivery photo for %s before marking it delivered.",
+                    delivery.name,
+                ))
+
+            vals = {}
+            if name and name != delivery.sudi_pod_receiver_name:
+                vals["sudi_pod_receiver_name"] = name
+            if signature:
+                vals["sudi_pod_signature"] = signature
+            if photo_datas:
+                offset = len(delivery.sudi_pod_attachment_ids)
+                attachments = Attachment.create([
+                    {
+                        "name": f"delivery_{delivery.name or delivery.id}_{offset + index + 1}.jpg",
+                        "type": "binary",
+                        "datas": datas,
+                        "res_model": delivery._name,
+                        "res_id": delivery.id,
+                        "mimetype": "image/jpeg",
+                    }
+                    for index, datas in enumerate(photo_datas)
+                    if datas
+                ])
+                if attachments:
+                    vals["sudi_pod_attachment_ids"] = [
+                        Command.link(record.id) for record in attachments
+                    ]
+            if vals:
+                delivery.write(vals)
+        return True
+
+    def action_sudi_mark_delivered(
+        self,
+        occurred_at=None,
+        receiver_name=None,
+        signature=None,
+        photo_datas=None,
+    ):
         self._sudi_check_pickup_delivery_operator_access()
         invalid_pickings = self.filtered(
             lambda picking: not picking.sudi_is_diamond_job_work
@@ -1313,15 +1751,29 @@ class StockPicking(models.Model):
         if invalid_pickings:
             raise UserError(_("Only active diamond job-work deliveries can be marked delivered."))
 
-        self.write({
-            "sudi_pickup_user_id": self.env.user.id,
-            "sudi_pickup_datetime": fields.Datetime.now(),
-        })
+        delivered_at = self._sudi_event_datetime(occurred_at)
+        self._sudi_apply_proof_of_delivery(
+            receiver_name=receiver_name,
+            signature=signature,
+            photo_datas=photo_datas,
+        )
+        for delivery in self:
+            delivery.with_context(sudi_skip_pickup_scheduled_notify=True).write({
+                "sudi_pickup_user_id": delivery.sudi_pickup_user_id.id or self.env.user.id,
+                "sudi_pickup_datetime": delivered_at,
+            })
         for move in self.move_ids.filtered(lambda stock_move: stock_move.state not in ("done", "cancel")):
             if float_is_zero(move.quantity, precision_rounding=move.product_uom.rounding):
                 move.quantity = move.product_uom_qty
             move.picked = True
-        return self.button_validate()
+        result = self.button_validate()
+        # button_validate stamps date_done with the server clock; for an event
+        # captured offline the delivery happened when the operator said it did.
+        delivered = self.filtered(lambda picking: picking.state == "done")
+        if delivered:
+            delivered.write({"date_done": delivered_at})
+            delivered._sudi_post_event_provenance(_("Delivery"), delivered_at)
+        return result
 
     def _sudi_get_delivery_picking_type(self):
         self.ensure_one()
@@ -1347,6 +1799,14 @@ class StockPicking(models.Model):
         self.ensure_one()
         return self._sudi_action_view_pickings(self.sudi_origin_receipt_id, _("Origin Receipt"))
 
+    def action_sudi_view_billing_log(self):
+        self.ensure_one()
+        action = self.env["ir.actions.actions"]._for_xml_id("diamond.action_sudi_billing_log")
+        field = "receipt_id" if self.picking_type_code == "incoming" else "delivery_id"
+        action["domain"] = [(field, "=", self.id)]
+        action["context"] = {}
+        return action
+
     def action_sudi_view_invoices(self):
         self.ensure_one()
         action = self.env["ir.actions.actions"]._for_xml_id("account.action_move_out_invoice")
@@ -1357,78 +1817,132 @@ class StockPicking(models.Model):
             action["res_id"] = invoices.id
         return action
 
+    def action_sudi_return_all_without_work(self):
+        """Flag every unsettled line of these deliveries as returned without job work."""
+        for delivery in self:
+            if not delivery._sudi_is_job_work_delivery():
+                raise UserError(_("Only diamond job-work deliveries can be returned without job work."))
+            moves = delivery.move_ids.filtered(lambda move: move.state != "cancel" and not move._sudi_is_settled())
+            if not moves:
+                raise UserError(_("Every line of %s is already settled.", delivery.name))
+            moves.write({"sudi_returned_without_work": True})
+        return True
+
     def action_sudi_create_invoice(self):
+        """Settle every delivered, unbilled line of this receipt (or this delivery) by invoice."""
         self.ensure_one()
-        receipt = self if self.picking_type_code == "incoming" else self.sudi_origin_receipt_id
-        delivery_pickings = self.sudi_delivery_ids if self.picking_type_code == "incoming" else self
-        delivery_pickings = delivery_pickings.filtered(
-            lambda picking: picking.sudi_is_diamond_job_work
-            and picking.picking_type_code == "outgoing"
-            and picking.state == "done"
-        )
-        delivered_moves = delivery_pickings.move_ids.filtered(
-            lambda move: move.state == "done"
-            and move.sudi_job_type_id
-            and not move.sudi_invoice_line_id
-        )
-        if not delivered_moves:
+        deliveries = self.sudi_delivery_ids if self.picking_type_code == "incoming" else self
+        invoices, _statements = deliveries._sudi_settle_deliveries(mode="invoice")
+        if not invoices:
             raise UserError(_("There are no delivered uninvoiced diamond job-work lines."))
+        action = self.env["ir.actions.actions"]._for_xml_id("account.action_move_out_invoice")
+        action["domain"] = [("id", "in", invoices.ids)]
+        if len(invoices) == 1:
+            action["views"] = [(False, "form")]
+            action["res_id"] = invoices.id
+        return action
 
-        partner = (receipt or self).partner_id.commercial_partner_id
-        self._sudi_validate_invoice_partner(partner, (receipt or self).partner_id)
-        receipt._sudi_sync_billing_details()
-        billing_lines = receipt.sudi_billing_line_ids.filtered(
-            lambda line: line.active
-            and line.receipt_move_id
-            and not line.invoice_line_id
-        )
-        eligible_billing_lines = billing_lines.filtered(
-            lambda line: delivered_moves.filtered(
-                lambda move: move.sudi_origin_receipt_move_id == line.receipt_move_id
+    # ------------------------------------------------------------------
+    # Settlement engine
+    # ------------------------------------------------------------------
+    def _sudi_settle_deliveries(self, mode=None, date=None, period=None):
+        """Settle the unbilled lines of these deliveries.
+
+        One draft invoice (``mode='invoice'``) or one reference statement
+        (``mode='reference'``) is created per customer. ``mode=None`` uses each
+        delivery's own ``sudi_settlement_mode``, so a mixed selection produces
+        both kinds of document. Returns ``(invoices, statements)``.
+        """
+        date = date or fields.Date.context_today(self)
+        deliveries = self.filtered(lambda picking: picking._sudi_is_job_work_delivery() and picking.state == "done")
+        if not deliveries:
+            return self.env["account.move"], self.env["sudi.diamond.reference.statement"]
+        if len(deliveries.company_id) > 1:
+            raise UserError(_("Deliveries from different companies cannot be settled together."))
+
+        # Pick up any price-list change since the receipt was done; manual
+        # overrides survive this (see _sudi_sync_billing_details).
+        deliveries.sudi_origin_receipt_id.with_context(sudi_skip_billing_sync=True)._sudi_sync_billing_details()
+
+        invoices = self.env["account.move"]
+        statements = self.env["sudi.diamond.reference.statement"]
+        batches = {}
+        for delivery in deliveries:
+            delivery_mode = mode or delivery.sudi_settlement_mode or "invoice"
+            key = (delivery.partner_id.commercial_partner_id.id, delivery_mode)
+            batches.setdefault(key, self.env["stock.picking"])
+            batches[key] |= delivery
+
+        for (_partner_id, delivery_mode), batch in batches.items():
+            moves = batch.move_ids.filtered(
+                lambda move: move.state == "done"
+                and move.sudi_job_type_id
+                and move.sudi_billing_state in ("to_bill", "no_charge")
             )
-        )
-        if not eligible_billing_lines:
-            raise UserError(_("There are no uninvoiced diamond billing lines."))
+            if not moves.filtered(lambda move: move.sudi_billing_state == "to_bill"):
+                continue
+            if delivery_mode == "reference":
+                statements |= batch._sudi_create_reference_statement(moves, date, period)
+            else:
+                invoices |= batch._sudi_create_invoice(moves, date, period)
+        return invoices, statements
 
+    def _sudi_create_invoice(self, moves, date, period=None):
+        partner = self[:1].partner_id.commercial_partner_id
+        shipping_partner = self[:1].partner_id
+        self[:1]._sudi_validate_invoice_partner(partner, shipping_partner)
+
+        receipts = self.sudi_origin_receipt_id
         invoice = self.env["account.move"].create({
             "move_type": "out_invoice",
             "partner_id": partner.id,
-            "partner_shipping_id": (receipt or self).partner_id.id,
-            "invoice_origin": receipt.name if receipt else ", ".join(delivery_pickings.mapped("name")),
-            "ref": ", ".join(delivery_pickings.mapped("name")),
-            "company_id": (receipt or self).company_id.id,
+            "partner_shipping_id": shipping_partner.id,
+            "invoice_date": date,
+            "invoice_origin": ", ".join(receipts.sorted("name").mapped("name")),
+            "ref": ", ".join(self.sorted("name").mapped("name")),
+            "company_id": self[:1].company_id.id,
             "sudi_is_diamond_job_work_invoice": True,
-            "sudi_receipt_id": receipt.id if receipt else False,
-            "sudi_delivery_ids": [Command.set(delivery_pickings.ids)],
+            "sudi_delivery_ids": [Command.set(self.ids)],
+            "sudi_billing_period_from": period[0] if period else False,
+            "sudi_billing_period_to": period[1] if period else False,
         })
 
-        line_commands = []
-        custom_tax_by_billing_line = {}
-        for billing_line in eligible_billing_lines.sorted(key=lambda line: (line.sequence, line.id)):
-            related_delivered_moves = delivered_moves.filtered(
-                lambda move: move.sudi_origin_receipt_move_id == billing_line.receipt_move_id
-            )
-            job_type = billing_line.job_type_id
-            product = billing_line.service_product_id
-            if not product:
-                raise UserError(_("Please configure a service product on job type %s.") % job_type.display_name)
-            invoice_quantity = sum(
-                move._sudi_get_invoice_quantity() for move in related_delivered_moves
-            )
-            rounding = product.uom_id.rounding
-            if float_is_zero(invoice_quantity, precision_rounding=rounding):
+        # One invoice line per (job type, rate): five inscription receipts at
+        # the same rate collapse into one line, a receipt at another rate gets
+        # its own. The annexure carries the delivery-wise detail.
+        chargeable = moves.filtered(lambda move: move.sudi_billing_state == "to_bill")
+        groups = {}
+        order = []
+        for move in chargeable.sorted(key=lambda move: (move.sudi_job_type_id.sequence, move.sudi_job_type_id.id, move.sudi_price_unit)):
+            rounding = move.product_uom.rounding if move.product_uom else 0.01
+            if float_is_zero(move.sudi_billable_qty, precision_rounding=rounding):
                 continue
+            key = (move.sudi_job_type_id.id, move.sudi_price_unit)
+            if key not in groups:
+                groups[key] = self.env["stock.move"]
+                order.append(key)
+            groups[key] |= move
+
+        line_commands = []
+        taxes_by_key = {}
+        for key in order:
+            group_moves = groups[key]
+            job_type = group_moves[:1].sudi_job_type_id
+            product = job_type.service_product_id
+            if not product:
+                raise UserError(_("Please configure a service product on job type %s.", job_type.display_name))
             line_vals = {
                 "product_id": product.id,
-                "name": billing_line.name,
-                "quantity": invoice_quantity,
+                "name": job_type._sudi_get_invoice_line_name(),
+                "quantity": sum(group_moves.mapped("sudi_billable_qty")),
                 "product_uom_id": product.uom_id.id,
-                "price_unit": billing_line.price_unit,
-                "sudi_billing_line_id": billing_line.id,
-                "sudi_stock_move_id": related_delivered_moves[:1].id,
+                "price_unit": key[1],
+                "sudi_job_type_id": job_type.id,
+                "sudi_billing_line_ids": [Command.set(group_moves.sudi_billing_line_id.ids)],
+                "sudi_stock_move_ids": [Command.set(group_moves.ids)],
             }
             if job_type.tax_ids:
-                custom_tax_by_billing_line[billing_line.id] = invoice.fiscal_position_id.map_tax(
+                taxes_by_key[key] = invoice.fiscal_position_id.map_tax(
                     job_type.tax_ids._filter_taxes_by_company(invoice.company_id)
                 )
             line_commands.append(Command.create(line_vals))
@@ -1439,22 +1953,56 @@ class StockPicking(models.Model):
 
         invoice.write({"invoice_line_ids": line_commands})
         invoice.action_update_fpos_values()
-        for line in invoice.invoice_line_ids.filtered(lambda invoice_line: invoice_line.sudi_billing_line_id.id in custom_tax_by_billing_line):
-            line.tax_ids = custom_tax_by_billing_line[line.sudi_billing_line_id.id]
-        for line in invoice.invoice_line_ids.filtered("sudi_billing_line_id"):
-            billing_line = line.sudi_billing_line_id.sudo()
-            billing_line.invoice_line_id = line
-            delivered_moves.filtered(
-                lambda move: move.sudi_origin_receipt_move_id == billing_line.receipt_move_id
-            ).sudi_invoice_line_id = line
-        return {
-            "type": "ir.actions.act_window",
-            "name": _("Diamond Job Work Invoice"),
-            "res_model": "account.move",
-            "res_id": invoice.id,
-            "view_mode": "form",
-            "target": "current",
-        }
+        for line in invoice.invoice_line_ids.filtered("sudi_job_type_id"):
+            key = (line.sudi_job_type_id.id, line.price_unit)
+            if key in taxes_by_key:
+                line.tax_ids = taxes_by_key[key]
+
+        settled_moves = invoice.line_ids.sudi_stock_move_ids
+        self.env["sudi.diamond.billing.log"]._sudi_log_moves("billed", settled_moves, invoice=invoice)
+        no_charge = moves.filtered(lambda move: move.sudi_billing_state == "no_charge")
+        if no_charge:
+            self.env["sudi.diamond.billing.log"]._sudi_log_moves(
+                "billed", no_charge, invoice=invoice, note=_("Returned without job work — listed on annexure, no charge")
+            )
+        self._sudi_post_billing_chatter(
+            _("Draft invoice %s created for this job work.", invoice._get_html_link())
+        )
+        return invoice
+
+    def _sudi_create_reference_statement(self, moves, date, period=None):
+        partner = self[:1].partner_id.commercial_partner_id
+        statement = self.env["sudi.diamond.reference.statement"].sudo().create({
+            "date": date,
+            "partner_id": partner.id,
+            "company_id": self[:1].company_id.id,
+            "user_id": self.env.user.id,
+            "delivery_ids": [Command.set(self.ids)],
+            "line_ids": [
+                Command.create({
+                    "date": fields.Date.to_date(move.picking_id.date_done) if move.picking_id.date_done else date,
+                    "delivery_id": move.picking_id.id,
+                    "receipt_id": move.picking_id.sudi_origin_receipt_id.id,
+                    "stock_move_id": move.id,
+                    "billing_line_id": move.sudi_billing_line_id.id,
+                    "job_type_id": move.sudi_job_type_id.id,
+                    "size": move.sudi_size,
+                    "pcs": move.sudi_pcs_qty,
+                    "carats": move.sudi_carats,
+                    "quantity": move.sudi_billable_qty,
+                    "price_unit": move.sudi_price_unit,
+                    "amount": move.sudi_billable_amount,
+                    "returned_without_work": move.sudi_returned_without_work,
+                })
+                for move in moves.sorted(key=lambda move: (move.picking_id.date_done or fields.Datetime.now(), move.picking_id.id, move.sudi_sr or 0, move.id))
+            ],
+        })
+        for line in statement.line_ids:
+            line.stock_move_id.sudo().sudi_reference_line_id = line
+        self.env["sudi.diamond.billing.log"]._sudi_log_moves("reference", statement.line_ids.stock_move_id, statement=statement)
+        # Ordinary users must not learn how this was settled: the chatter stays neutral.
+        self._sudi_post_billing_chatter(_("Closed for billing."))
+        return statement
 
     def _sudi_validate_invoice_partner(self, partner, shipping_partner):
         self.ensure_one()
