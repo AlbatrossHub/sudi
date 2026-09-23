@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- One-time passwords. The web flow in web_auth_otp_login kept the
+             plaintext code in the HTTP session with a five minute window and no
+             attempt limit; these are the bounds that replace it. -->
+        <record id="param_sudi_auth_otp_length" model="ir.config_parameter">
+            <field name="key">sudi_auth.otp_length</field>
+            <field name="value">6</field>
+        </record>
+        <record id="param_sudi_auth_otp_ttl" model="ir.config_parameter">
+            <field name="key">sudi_auth.otp_ttl_minutes</field>
+            <field name="value">5</field>
+        </record>
+        <record id="param_sudi_auth_otp_max_attempts" model="ir.config_parameter">
+            <field name="key">sudi_auth.otp_max_attempts</field>
+            <field name="value">5</field>
+        </record>
+        <record id="param_sudi_auth_otp_cooldown" model="ir.config_parameter">
+            <field name="key">sudi_auth.otp_resend_cooldown_seconds</field>
+            <field name="value">60</field>
+        </record>
+        <record id="param_sudi_auth_otp_max_per_hour" model="ir.config_parameter">
+            <field name="key">sudi_auth.otp_max_per_hour</field>
+            <field name="value">5</field>
+        </record>
+        <record id="param_sudi_auth_otp_retention" model="ir.config_parameter">
+            <field name="key">sudi_auth.otp_retention_days</field>
+            <field name="value">30</field>
+        </record>
+    </data>
+</odoo>

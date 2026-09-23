@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="sudi_wa_template_invoice_posted" model="sudi.whatsapp.template">
+            <field name="name">Job Work Invoice (To Customer)</field>
+            <field name="event">invoice_posted</field>
+            <field name="sequence">100</field>
+            <field name="body">*SDPPL*
+*_Job Work Invoice_*
+
+Dear *{{customer_name}}*,
+
+📄  *INVOICE ISSUED*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Please find attached the invoice for the job work delivered to you.
+
+📌  *SUMMARY*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ▪ *Invoice No :*  {{invoice_number}}
+    ▪ *Date       :*  {{invoice_date}}
+    ▪ *Amount     :*  {{amount}}
+    ▪ *Due Date   :*  {{due_date}}
+    ▪ *Deliveries :*  {{deliveries}}
+
+The delivery-wise statement is on the annexure page of the attached PDF.
+
+Thank you for your business!
+
+Warm Regards,
+
+*Team SDPPL*</field>
+        </record>
+    </data>
+</odoo>

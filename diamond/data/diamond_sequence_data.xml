@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_sudi_diamond_reference_statement" model="ir.sequence">
+            <field name="name">Diamond Reference Statement</field>
+            <field name="code">sudi.diamond.reference.statement</field>
+            <field name="prefix">REF/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

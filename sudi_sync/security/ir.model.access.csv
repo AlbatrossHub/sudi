@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sudi_sync_change_system,sudi.sync.change.system,model_sudi_sync_change,base.group_system,1,0,0,1
+access_sudi_api_device_system,sudi.api.device.system,model_sudi_api_device,base.group_system,1,1,1,1
+access_sudi_api_device_stock_manager,sudi.api.device.stock.manager,model_sudi_api_device,stock.group_stock_manager,1,1,0,0
+access_sudi_idempotency_key_system,sudi.idempotency.key.system,model_sudi_idempotency_key,base.group_system,1,0,0,1
+access_sudi_upload_system,sudi.upload.system,model_sudi_upload,base.group_system,1,0,0,1

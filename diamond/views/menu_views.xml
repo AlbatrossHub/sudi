@@ -14,11 +14,13 @@
               groups="diamond.group_sudi_pickup_delivery_operator"
               web_icon="diamond,static/description/icon.svg"/>
 
+    <!-- Job work is its own role: the people who do it are not the people who
+         collect and deliver. -->
     <menuitem id="menu_sudi_operator_job_work_root"
               name="Job Work"
               action="action_sudi_operator_job_work"
               sequence="137"
-              groups="diamond.group_sudi_pickup_delivery_operator"
+              groups="diamond.group_sudi_job_work_user"
               web_icon="diamond,static/description/icon.svg"/>
 
     <menuitem id="menu_sudi_diamond_root"

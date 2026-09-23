@@ -58,18 +58,14 @@ class SudiDiamondJobType(models.Model):
         help="Optional override. Leave empty to use the service product taxes.",
     )
 
-    _sql_constraints = [
-        (
-            "name_company_uniq",
-            "unique(name, company_id)",
-            "A diamond job type with this name already exists for this company.",
-        ),
-        (
-            "base_price_non_negative",
-            "CHECK(base_price >= 0)",
-            "The base price must be zero or positive.",
-        ),
-    ]
+    _name_company_uniq = models.Constraint(
+        "unique(name, company_id)",
+        "A diamond job type with this name already exists for this company.",
+    )
+    _base_price_non_negative = models.Constraint(
+        "CHECK(base_price >= 0)",
+        "The base price must be zero or positive.",
+    )
 
     @api.constrains("service_product_id")
     def _check_service_product_id(self):
@@ -105,4 +101,8 @@ class SudiDiamondJobType(models.Model):
         self.ensure_one()
         price, _source = self._sudi_get_price_for_partner_with_source(partner, company)
         return price
-        return special_price.price if special_price else self.base_price
+
+    def _sudi_get_invoice_line_name(self):
+        """Description of the consolidated invoice line for this job type."""
+        self.ensure_one()
+        return self.invoice_description or self.name

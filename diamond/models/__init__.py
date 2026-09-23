@@ -1,3 +1,4 @@
+from . import whatsapp_mixin
 from . import job_type
 from . import department_transfer_wizard
 from . import pickup_confirmation_wizard
@@ -8,3 +9,7 @@ from . import stock_move
 from . import account_analytic_line
 from . import stock_picking
 from . import account_move
+from . import billing_log
+from . import reference_statement
+from . import sudi_whatsapp_template
+from . import sudi_auth_otp

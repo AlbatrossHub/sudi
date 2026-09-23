@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_sudi_sync_root"
+              name="Sudi Mobile"
+              parent="base.menu_administration"
+              sequence="90"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_sudi_api_device"
+              name="Mobile Devices"
+              parent="menu_sudi_sync_root"
+              action="action_sudi_api_device"
+              sequence="10"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_sudi_sync_change"
+              name="Sync Change Log"
+              parent="menu_sudi_sync_root"
+              action="action_sudi_sync_change"
+              sequence="20"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_sudi_upload"
+              name="Staged Uploads"
+              parent="menu_sudi_sync_root"
+              action="action_sudi_upload"
+              sequence="30"
+              groups="base.group_system"/>
+</odoo>

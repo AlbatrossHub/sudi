@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="sudi_diamond_billing.BillingReview">
+        <div class="o_sudi_billing">
+            <div class="o_sb_shell">
+
+                <header class="o_sb_topbar">
+                    <div class="o_sb_brand">
+                        <h1>Billing <em>Review</em></h1>
+                        <div class="o_sb_scope">
+                            <span>Diamond job work · what was delivered is what we charge · rates re-synced from customer price lists when settling</span>
+                            <span t-if="state.loading" class="o_sb_loading">Loading…</span>
+                        </div>
+                    </div>
+                    <div class="o_sb_tabs" role="tablist">
+                        <button type="button" t-att-aria-pressed="state.tab === 'ready' ? 'true' : 'false'" t-on-click="() => this.setTab('ready')">
+                            Ready to bill <span t-if="state.data" class="o_sb_cnt" t-esc="state.data.kpis.due_count"/>
+                        </button>
+                        <button type="button" t-att-aria-pressed="state.tab === 'awaiting' ? 'true' : 'false'" t-on-click="() => this.setTab('awaiting')">
+                            Awaiting delivery <span t-if="state.data" class="o_sb_cnt" t-esc="state.data.awaiting.length"/>
+                        </button>
+                        <button type="button" t-att-aria-pressed="state.tab === 'history' ? 'true' : 'false'" t-on-click="() => this.setTab('history')">
+                            Billing history
+                        </button>
+                    </div>
+                </header>
+
+                <t t-if="state.data">
+                    <section class="o_sb_kpis">
+                        <article class="o_sb_kpi">
+                            <span class="o_sb_lbl">Deliveries to bill</span>
+                            <span class="o_sb_kv" t-esc="state.data.kpis.due_count"/>
+                            <span class="o_sb_sub"><t t-esc="state.data.kpis.partial_count"/> partially billed</span>
+                        </article>
+                        <article class="o_sb_kpi">
+                            <span class="o_sb_lbl">Unbilled pieces</span>
+                            <span class="o_sb_kv"><t t-esc="pcs(state.data.kpis.pcs)"/><span class="o_sb_unit">pcs</span></span>
+                            <span class="o_sb_sub">across <t t-esc="state.data.kpis.customers"/> customers</span>
+                        </article>
+                        <article class="o_sb_kpi">
+                            <span class="o_sb_lbl">Unbilled carats</span>
+                            <span class="o_sb_kv"><t t-esc="carats(state.data.kpis.carats)"/><span class="o_sb_unit">ct</span></span>
+                            <span class="o_sb_sub">delivered, not yet settled</span>
+                        </article>
+                        <article class="o_sb_kpi">
+                            <span class="o_sb_lbl">Unbilled amount</span>
+                            <span class="o_sb_kv" t-esc="money(state.data.kpis.amount)"/>
+                            <span class="o_sb_sub">at current receipt-wise rates</span>
+                        </article>
+                        <article class="o_sb_kpi o_sb_kpi_due">
+                            <span class="o_sb_lbl">Monthly customers due</span>
+                            <span class="o_sb_kv" t-esc="state.data.kpis.monthly_customers"/>
+                            <div class="o_sb_kpi_row">
+                                <span class="o_sb_sub">
+                                    <t t-if="state.data.kpis.monthly_customers">
+                                        <t t-esc="state.data.kpis.monthly_names"/> · <t t-esc="state.data.kpis.monthly_deliveries"/> deliveries before <t t-esc="date(state.data.kpis.month_start)"/>
+                                    </t>
+                                    <t t-else="">nothing due</t>
+                                </span>
+                                <button type="button" class="o_sb_btn o_sb_btn_sm" t-att-disabled="!state.data.kpis.monthly_customers" t-on-click="billAllDue">Bill all due</button>
+                            </div>
+                        </article>
+                    </section>
+
+                    <!-- ═══════ Ready to bill ═══════ -->
+                    <t t-if="state.tab === 'ready'">
+                        <section class="o_sb_card o_sb_filters">
+                            <label class="o_sb_lbl" for="o_sb_partner">Customer</label>
+                            <div class="o_sb_select">
+                                <select id="o_sb_partner" class="o_sb_in" t-att-value="state.partnerId" t-on-change="onPartnerChange">
+                                    <option value="">All customers</option>
+                                    <option t-foreach="state.data.customers" t-as="customer" t-key="customer.id"
+                                            t-att-value="customer.id" t-att-selected="customer.id == state.partnerId">
+                                        <t t-esc="customer.name"/><t t-if="customer.monthly"> · monthly</t>
+                                    </option>
+                                </select>
+                            </div>
+                            <label class="o_sb_lbl" for="o_sb_search">Search</label>
+                            <input id="o_sb_search" class="o_sb_in" type="search" placeholder="Delivery or receipt no." t-att-value="state.search" t-on-change="onSearch"/>
+                            <label class="o_sb_lbl" for="o_sb_from">Delivered</label>
+                            <input id="o_sb_from" class="o_sb_in" type="date" t-att-value="state.dateFrom" t-on-change="(ev) => this.onDateChange('dateFrom', ev)"/>
+                            <span class="o_sb_sub">to</span>
+                            <input class="o_sb_in" type="date" aria-label="Delivered to" t-att-value="state.dateTo" t-on-change="(ev) => this.onDateChange('dateTo', ev)"/>
+                            <div class="o_sb_filters_right">
+                                <span class="o_sb_lbl">Show</span>
+                                <div class="o_sb_seg" role="group" aria-label="Status">
+                                    <button t-foreach="statusChips" t-as="chip" t-key="chip.key" type="button"
+                                            t-att-aria-pressed="state.status === chip.key ? 'true' : 'false'"
+                                            t-on-click="() => this.setStatus(chip.key)"><t t-esc="chip.label"/></button>
+                                </div>
+                                <span class="o_sb_lbl">Group</span>
+                                <div class="o_sb_seg" role="group" aria-label="Group by">
+                                    <button t-foreach="groupChips" t-as="chip" t-key="chip.key" type="button"
+                                            t-att-aria-pressed="state.groupBy === chip.key ? 'true' : 'false'"
+                                            t-on-click="() => this.setGroupBy(chip.key)"><t t-esc="chip.label"/></button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="o_sb_groups">
+                            <div t-if="!state.data.groups.length" class="o_sb_card o_sb_empty">Nothing matches these filters.</div>
+                            <section t-foreach="state.data.groups" t-as="group" t-key="group.key" class="o_sb_grp">
+                                <div class="o_sb_grph">
+                                    <div class="o_sb_cbw">
+                                        <input class="o_sb_cb" type="checkbox" aria-label="Select all in group"
+                                               t-att-checked="isGroupAllSelected(group)" t-att-disabled="!group.due_count"
+                                               t-on-change="() => this.toggleGroup(group)"/>
+                                    </div>
+                                    <h3 t-esc="group.title"/>
+                                    <span t-if="group.monthly" class="o_sb_pill o_sb_p_part"><i/>Monthly · invoice without asking</span>
+                                    <span class="o_sb_grpm">
+                                        <b t-esc="group.count"/> deliveries · <b t-esc="pcs(group.pcs)"/> pcs · <b t-esc="carats(group.carats)"/> ct · due <b t-esc="money(group.amount)"/>
+                                    </span>
+                                    <div class="o_sb_grp_actions">
+                                        <button type="button" class="o_sb_btn o_sb_btn_sm o_sb_btn_ghost" t-on-click="() => this.resetPrices(group.rows.filter((row) => row.open))" t-att-disabled="!group.due_count">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+                                            Refresh prices
+                                        </button>
+                                        <button type="button" class="o_sb_btn o_sb_btn_sm" t-on-click="() => this.settleGroup(group)" t-att-disabled="!group.due_count">Settle all due</button>
+                                    </div>
+                                </div>
+                                <div class="o_sb_hd">
+                                    <span/><span>Delivery · Receipt</span><span>Delivered</span><span>Job work contained</span>
+                                    <span class="o_sb_num">Pcs</span><span class="o_sb_num">Carats</span><span class="o_sb_num">Amount</span>
+                                    <span>Status</span><span>Settle as</span><span/>
+                                </div>
+                                <t t-foreach="group.rows" t-as="row" t-key="row.id">
+                                    <div t-attf-class="o_sb_row {{ state.selected[row.id] ? 'o_sb_sel' : '' }} {{ row.open ? '' : 'o_sb_closed' }}">
+                                        <div class="o_sb_cbw">
+                                            <input class="o_sb_cb" type="checkbox" aria-label="Select delivery"
+                                                   t-att-checked="!!state.selected[row.id]" t-att-disabled="!row.open"
+                                                   t-on-change="() => this.toggleRow(row)"/>
+                                        </div>
+                                        <div>
+                                            <button type="button" class="o_sb_link o_sb_docn" t-on-click="() => this.openRecord('stock.picking', row.id)" t-esc="row.name"/>
+                                            <div class="o_sb_sub">from <t t-esc="row.receipt"/> · <t t-esc="row.customer"/></div>
+                                        </div>
+                                        <div class="o_sb_date" t-esc="date(row.date)"/>
+                                        <div class="o_sb_chips">
+                                            <span t-foreach="row.jobs" t-as="job" t-key="job_index" t-attf-class="o_sb_chip {{ job.no_charge ? 'o_sb_chip_nc' : '' }}">
+                                                <t t-esc="job.name"/><t t-if="job.no_charge"> · returned</t>
+                                            </span>
+                                        </div>
+                                        <div class="o_sb_num" t-esc="pcs(row.pcs)"/>
+                                        <div class="o_sb_num" t-esc="carats(row.carats)"/>
+                                        <div class="o_sb_num o_sb_amt" t-esc="money(row.amount)"/>
+                                        <div><span t-att-class="pillClass(row.status)"><i/><t t-esc="row.status_label"/></span></div>
+                                        <div>
+                                            <div t-if="row.open" class="o_sb_seg o_sb_seg_sm" role="group" aria-label="Settlement mode">
+                                                <button type="button" t-att-aria-pressed="row.mode === 'invoice' ? 'true' : 'false'" t-on-click="() => this.setMode(row, 'invoice')">Invoice</button>
+                                                <button type="button" t-att-aria-pressed="row.mode === 'reference' ? 'true' : 'false'" t-on-click="() => this.setMode(row, 'reference')">Reference</button>
+                                            </div>
+                                            <div t-else="" class="o_sb_docs">
+                                                <button t-foreach="row.docs" t-as="doc" t-key="doc.model + doc.id" type="button" class="o_sb_link o_sb_docn"
+                                                        t-on-click="() => this.openRecord(doc.model, doc.id)" t-esc="doc.name"/>
+                                                <span t-if="!row.docs.length" class="o_sb_docn o_sb_muted">Closed</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <button type="button" class="o_sb_ib" aria-label="Show lines"
+                                                    t-att-aria-expanded="state.expanded[row.id] ? 'true' : 'false'"
+                                                    t-on-click="() => this.toggleExpand(row)">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div t-if="state.expanded[row.id] and state.lines[row.id]" class="o_sb_det">
+                                        <div class="o_sb_lh">
+                                            <span>Sr</span><span>Size</span><span>Job type</span>
+                                            <span class="o_sb_num">Pcs</span><span class="o_sb_num">Carats</span><span class="o_sb_num">Billed qty</span>
+                                            <span class="o_sb_num">Rate</span><span class="o_sb_num">Subtotal</span><span>Price source · status</span>
+                                        </div>
+                                        <div t-foreach="state.lines[row.id].lines" t-as="line" t-key="line.move_id"
+                                             t-attf-class="o_sb_ln {{ line.no_charge ? 'o_sb_ln_nc' : '' }}">
+                                            <span class="o_sb_docn" t-esc="line.sr"/>
+                                            <span t-esc="line.size"/>
+                                            <span class="o_sb_job" t-esc="line.job"/>
+                                            <span class="o_sb_num" t-esc="pcs(line.pcs)"/>
+                                            <span class="o_sb_num" t-esc="carats(line.carats)"/>
+                                            <span class="o_sb_num"><t t-if="!line.no_charge" t-esc="line.qty"/><t t-else="">—</t></span>
+                                            <div class="o_sb_rate">
+                                                <input type="number" step="0.01" min="0" aria-label="Unit rate"
+                                                       t-att-value="line.rate" t-att-disabled="line.locked"
+                                                       t-on-change="(ev) => this.onRateChange(row, line, ev)"/>
+                                            </div>
+                                            <span class="o_sb_num o_sb_amt"><t t-if="!line.no_charge" t-esc="money(line.amount)"/><t t-else="">—</t></span>
+                                            <div class="o_sb_src_cell">
+                                                <span t-attf-class="o_sb_src o_sb_src_{{ line.source_key }}" t-esc="line.source"/>
+                                                <span t-if="line.doc" class="o_sb_sub">Settled on <t t-esc="line.doc"/></span>
+                                                <span t-elif="line.no_charge" class="o_sb_sub">Returned without job work · no charge</span>
+                                                <button t-if="row.open and !line.locked" type="button" class="o_sb_link o_sb_sub"
+                                                        t-on-click="() => this.toggleNoCharge(row, line)">
+                                                    <t t-if="line.no_charge">charge it</t><t t-else="">returned without job work</t>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="o_sb_lf">
+                                            <span class="o_sb_sub">Rates come from <b t-esc="state.lines[row.id].receipt"/>'s billing lines: customer price list → job type price → manual edit. Edits are saved on the receipt and survive a refresh.</span>
+                                            <button t-if="row.open" type="button" class="o_sb_btn o_sb_btn_sm o_sb_btn_ghost" t-on-click="() => this.resetPrices([row])">Refresh from price list</button>
+                                        </div>
+                                    </div>
+                                </t>
+                            </section>
+                        </div>
+
+                        <div t-if="selection.count" class="o_sb_bar" role="region" aria-label="Selection">
+                            <div class="o_sb_bar_stats">
+                                <div><b t-esc="selection.count"/> <span>deliveries</span></div>
+                                <div><b t-esc="pcs(selection.pcs)"/> <span>pcs</span></div>
+                                <div><b t-esc="carats(selection.carats)"/> <span>ct</span></div>
+                                <div><b t-esc="money(selection.amount)"/></div>
+                                <div><span>→ <t t-esc="selection.split"/></span></div>
+                            </div>
+                            <div class="o_sb_bar_actions">
+                                <button type="button" class="o_sb_btn o_sb_btn_ghost" t-on-click="clearSelection">Clear</button>
+                                <button type="button" class="o_sb_btn o_sb_btn_pri" t-on-click="openDialog">
+                                    Settle selection
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- ═══════ Awaiting delivery ═══════ -->
+                    <section t-if="state.tab === 'awaiting'" class="o_sb_card">
+                        <div class="o_sb_card_head">
+                            <h2>Receipts in the pipeline</h2>
+                            <span class="o_sb_sub">Read-only · these become billable once their delivery order is marked delivered</span>
+                        </div>
+                        <div t-if="!state.data.awaiting.length" class="o_sb_empty">No receipt is waiting for delivery.</div>
+                        <table t-else="" class="o_sb_table">
+                            <thead><tr><th>Receipt</th><th>Customer</th><th>Received</th><th>Stage</th><th>Job work</th><th class="o_sb_num">Pcs</th><th class="o_sb_num">Carats</th><th class="o_sb_num">Est. amount</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.data.awaiting" t-as="receipt" t-key="receipt.id">
+                                    <td><button type="button" class="o_sb_link o_sb_docn" t-on-click="() => this.openRecord('stock.picking', receipt.id)" t-esc="receipt.name"/></td>
+                                    <td t-esc="receipt.customer"/>
+                                    <td t-esc="date(receipt.date)"/>
+                                    <td><span t-attf-class="o_sb_stg o_sb_stg_{{ receipt.stage_key }}" t-esc="receipt.stage"/></td>
+                                    <td t-esc="receipt.jobs.join(', ')"/>
+                                    <td class="o_sb_num" t-esc="pcs(receipt.pcs)"/>
+                                    <td class="o_sb_num" t-esc="carats(receipt.carats)"/>
+                                    <td class="o_sb_num" t-esc="money(receipt.amount)"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </section>
+
+                    <!-- ═══════ History ═══════ -->
+                    <section t-if="state.tab === 'history'" class="o_sb_card">
+                        <div class="o_sb_card_head">
+                            <h2>Billing log</h2>
+                            <span class="o_sb_sub">Every settlement and release, newest first<t t-if="state.data.ledger_access"> · reference numbers shown to Reference Ledger admins</t></span>
+                        </div>
+                        <div t-if="!state.history" class="o_sb_empty">Loading…</div>
+                        <div t-elif="!state.history.length" class="o_sb_empty">Nothing has been settled yet.</div>
+                        <table t-else="" class="o_sb_table">
+                            <thead><tr><th>When</th><th>Event</th><th>Document</th><th>Customer</th><th>Delivery · Receipt</th><th>Job work</th><th class="o_sb_num">Pcs</th><th class="o_sb_num">Carats</th><th class="o_sb_num">Amount</th><th>By</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.history" t-as="entry" t-key="entry.id">
+                                    <td class="o_sb_nowrap" t-esc="entry.date"/>
+                                    <td><span t-attf-class="o_sb_ev o_sb_ev_{{ entry.event }}">
+                                        <t t-if="entry.event === 'billed'">Billed</t>
+                                        <t t-elif="entry.event === 'reference'">Closed · reference</t>
+                                        <t t-elif="entry.event === 'released'">Released</t>
+                                        <t t-else="">Reopened</t>
+                                    </span></td>
+                                    <td>
+                                        <button t-if="entry.doc_model and entry.doc_id" type="button" class="o_sb_link o_sb_docn" t-on-click="() => this.openRecord(entry.doc_model, entry.doc_id)" t-esc="entry.doc"/>
+                                        <span t-else="" class="o_sb_docn" t-esc="entry.doc"/>
+                                        <span t-if="entry.admin_only and state.data.ledger_access" class="o_sb_adm">admin</span>
+                                    </td>
+                                    <td t-esc="entry.customer"/>
+                                    <td class="o_sb_docn"><t t-esc="entry.delivery"/> · <t t-esc="entry.receipt"/></td>
+                                    <td t-esc="entry.job"/>
+                                    <td class="o_sb_num" t-esc="pcs(entry.pcs)"/>
+                                    <td class="o_sb_num" t-esc="carats(entry.carats)"/>
+                                    <td class="o_sb_num" t-esc="money(entry.amount)"/>
+                                    <td t-esc="entry.user"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </section>
+                </t>
+
+                <!-- ═══════ Confirm dialog ═══════ -->
+                <div t-if="state.dialog" class="o_sb_ovl" t-on-click.self="closeDialog">
+                    <div class="o_sb_dlg" role="dialog" aria-modal="true" aria-labelledby="o_sb_dlg_title">
+                        <div>
+                            <h2 id="o_sb_dlg_title">Confirm settlement</h2>
+                            <div class="o_sb_sub o_sb_mt4">Drafts are created per customer. Invoices go to Accounting as drafts; reference statements go to the Reference Ledger and create no accounting entry.</div>
+                        </div>
+                        <div class="o_sb_dlg_date">
+                            <label class="o_sb_lbl" for="o_sb_dlg_date">Document date</label>
+                            <input id="o_sb_dlg_date" class="o_sb_in" type="date" t-att-value="state.dialog.date" t-on-change="onDialogDate"/>
+                            <span class="o_sb_sub">defaults to today · editable</span>
+                        </div>
+                        <div class="o_sb_dlg_list">
+                            <div t-foreach="state.dialog.preview" t-as="entry" t-key="entry.customer" class="o_sb_cust">
+                                <h4 t-esc="entry.customer"/>
+                                <div t-if="entry.invoice_count" class="o_sb_dl">
+                                    <span class="o_sb_tag o_sb_tag_inv">Draft invoice</span>
+                                    <span><t t-esc="entry.invoice_count"/> <t t-if="entry.invoice_count === 1">delivery</t><t t-else="">deliveries</t> · one invoice line per job type &amp; rate · annexure attached</span>
+                                    <span class="o_sb_dl_amt" t-esc="money(entry.invoice_amount)"/>
+                                </div>
+                                <div t-if="entry.reference_count" class="o_sb_dl">
+                                    <span class="o_sb_tag o_sb_tag_ref">Reference statement</span>
+                                    <span><t t-esc="entry.reference_count"/> <t t-if="entry.reference_count === 1">delivery</t><t t-else="">deliveries</t> · no accounting entry · delivery shows as Closed</span>
+                                    <span class="o_sb_dl_amt" t-esc="money(entry.reference_amount)"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="o_sb_dlg_actions">
+                            <button type="button" class="o_sb_btn o_sb_btn_ghost" t-on-click="closeDialog">Cancel</button>
+                            <button type="button" class="o_sb_btn o_sb_btn_pri" t-att-disabled="state.dialog.busy" t-on-click="confirmSettlement" t-esc="confirmLabel"/>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+
+</templates>

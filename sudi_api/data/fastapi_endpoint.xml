@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Two endpoints, one code base. Separate root paths and separate
+             OpenAPI documents, so the staff app's operations never appear in
+             the customer contract and either surface can be switched off
+             without the other. -->
+        <record id="fastapi_endpoint_sudi_field" model="fastapi.endpoint">
+            <field name="name">Sudi Field Ops API</field>
+            <field name="description">Pickup, delivery and job-work staff. Consumed by the field flavour of the Sudi app.</field>
+            <field name="app">sudi_field</field>
+            <field name="root_path">/api/field/v1</field>
+            <!-- The app boots as the public user; each request then switches to
+                 the JWT-authenticated user, non-sudo, so record rules apply. -->
+            <field name="user_id" ref="base.public_user"/>
+            <!-- JWT is stateless: no Odoo session to persist, no session-store IO. -->
+            <field name="save_http_session" eval="False"/>
+        </record>
+
+        <record id="fastapi_endpoint_sudi_customer" model="fastapi.endpoint">
+            <field name="name">Sudi Customer API</field>
+            <field name="description">Customers uploading jangads and following their receipts.</field>
+            <field name="app">sudi_customer</field>
+            <field name="root_path">/api/customer/v1</field>
+            <field name="user_id" ref="base.public_user"/>
+            <field name="save_http_session" eval="False"/>
+        </record>
+    </data>
+</odoo>

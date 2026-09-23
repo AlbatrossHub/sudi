@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- How long a change log row must have settled before a device may be
+             told about it. A serial is allocated before commit, so without this
+             lag a client can read past a row that commits late and never see
+             it. Two seconds is invisible in a workflow measured in minutes. -->
+        <record id="param_sudi_sync_visibility_lag" model="ir.config_parameter">
+            <field name="key">sudi_sync.visibility_lag_seconds</field>
+            <field name="value">2</field>
+        </record>
+
+        <!-- Beyond this, the log is pruned and any device whose cursor is
+             older is answered with a full resync. Far longer than a field
+             phone realistically stays dark. -->
+        <record id="param_sudi_sync_retention_days" model="ir.config_parameter">
+            <field name="key">sudi_sync.retention_days</field>
+            <field name="value">30</field>
+        </record>
+
+        <record id="param_sudi_sync_upload_ttl_days" model="ir.config_parameter">
+            <field name="key">sudi_sync.upload_ttl_days</field>
+            <field name="value">7</field>
+        </record>
+
+        <record id="param_sudi_sync_upload_max_bytes" model="ir.config_parameter">
+            <field name="key">sudi_sync.upload_max_bytes</field>
+            <field name="value">8388608</field>
+        </record>
+    </data>
+</odoo>
