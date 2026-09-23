@@ -1,0 +1,12 @@
+from .system_router import router as system_router
+from .session_router import router as session_router
+from .auth_router import router as auth_router
+from .device_router import router as device_router
+from .sync_router import router as sync_router
+from .pickup_router import router as pickup_router
+from .delivery_router import router as delivery_router
+from .jobwork_router import router as jobwork_router
+from .upload_router import router as upload_router
+from .customer_auth_router import router as customer_auth_router
+from .customer_router import router as customer_router
+from .customer_jangad_router import router as customer_jangad_router

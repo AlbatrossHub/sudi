@@ -30,7 +30,15 @@
             <field name="name">Job Work User</field>
             <field name="sequence">15</field>
             <field name="privilege_id" ref="res_groups_privilege_sudi_diamond_operations"/>
-            <field name="implied_ids" eval="[Command.link(ref('base.group_user'))]"/>
+            <!-- Timesheets/User is part of the role, not an extra an
+                 administrator has to remember: booking time against a receipt
+                 is what a job-work person does all day, and the implied group
+                 is the narrow "own timesheets only" one. Without it the timer
+                 fails on account.analytic.line create. -->
+            <field name="implied_ids" eval="[
+                Command.link(ref('base.group_user')),
+                Command.link(ref('hr_timesheet.group_hr_timesheet_user')),
+            ]"/>
         </record>
     </data>
 
@@ -213,6 +221,57 @@
                     '&amp;',
                         ('picking_id.date_done', '&gt;=', user._sudi_operator_today_start_utc()),
                         ('picking_id.date_done', '&lt;', user._sudi_operator_tomorrow_start_utc()),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_delivery_operator'))]"/>
+        </record>
+
+        <!-- Receipts this operator collected today.
+
+             Confirming a pickup moves the receipt into the job-work scope, and
+             without this the operator loses sight of it the instant they act:
+             they cannot review what they collected, check the jangad they
+             collected against, or spot a parcel they missed. That is a
+             functional hole, not a security boundary, and the delivery side
+             already solves it the same way with
+             rule_sudi_operator_today_done_deliveries.
+
+             Visibility only: working on job work (the timer, department
+             transfer, finishing) stays gated on the Job Work User role. -->
+        <record id="rule_sudi_operator_own_pickups_today" model="ir.rule">
+            <field name="name">Sudi operator: receipts I collected today</field>
+            <field name="model_id" ref="stock.model_stock_picking"/>
+            <field name="domain_force">[
+                ('sudi_is_diamond_job_work', '=', True),
+                ('picking_type_id.code', '=', 'incoming'),
+                ('sudi_pickup_user_id', '=', user.id),
+                ('sudi_pickup_datetime', '&gt;=', user._sudi_operator_today_start_utc()),
+                ('sudi_pickup_datetime', '&lt;', user._sudi_operator_tomorrow_start_utc()),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_delivery_operator'))]"/>
+        </record>
+
+        <record id="rule_sudi_operator_own_pickup_moves_today" model="ir.rule">
+            <field name="name">Sudi operator: moves of receipts I collected today</field>
+            <field name="model_id" ref="stock.model_stock_move"/>
+            <field name="domain_force">[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'incoming'),
+                ('picking_id.sudi_pickup_user_id', '=', user.id),
+                ('picking_id.sudi_pickup_datetime', '&gt;=', user._sudi_operator_today_start_utc()),
+                ('picking_id.sudi_pickup_datetime', '&lt;', user._sudi_operator_tomorrow_start_utc()),
+            ]</field>
+            <field name="groups" eval="[Command.link(ref('group_sudi_pickup_delivery_operator'))]"/>
+        </record>
+
+        <record id="rule_sudi_operator_own_pickup_move_lines_today" model="ir.rule">
+            <field name="name">Sudi operator: move lines of receipts I collected today</field>
+            <field name="model_id" ref="stock.model_stock_move_line"/>
+            <field name="domain_force">[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'incoming'),
+                ('picking_id.sudi_pickup_user_id', '=', user.id),
+                ('picking_id.sudi_pickup_datetime', '&gt;=', user._sudi_operator_today_start_utc()),
+                ('picking_id.sudi_pickup_datetime', '&lt;', user._sudi_operator_tomorrow_start_utc()),
             ]</field>
             <field name="groups" eval="[Command.link(ref('group_sudi_pickup_delivery_operator'))]"/>
         </record>

@@ -3,6 +3,7 @@ import logging
 from urllib.parse import quote
 
 from odoo import http, SUPERUSER_ID, _
+from odoo.exceptions import ValidationError
 from odoo.http import request
 from odoo.addons.web.controllers.home import Home
 from odoo.addons.web_auth_otp_login.controllers.main import WebAuthOtpController
@@ -11,72 +12,16 @@ _logger = logging.getLogger(__name__)
 
 
 def _get_or_create_gst_company_partner(vat):
+    """The company partner behind a GSTIN.
+
+    The implementation moved to ``res.partner._sudi_resolve_gst_company`` so
+    the customer API shares it; this stays as the name the templates and the
+    rest of this controller already use. Unlike the version that lived here,
+    it validates the format and refuses an invalid GSTIN.
     """
-    Search for or create a Company res.partner (is_company=True) for the given GST number.
-    Auto-fetches address & company details using Odoo l10n_in TIN state lookup and enrich_by_gst if available.
-    """
-    vat_clean = (vat or '').strip().upper()
-    if not vat_clean:
+    if not (vat or "").strip():
         return False
-
-    Partner = request.env['res.partner'].with_user(SUPERUSER_ID)
-
-    # 1. Look for existing company partner with this GSTIN
-    company_partner = Partner.search([
-        ('vat', '=ilike', vat_clean),
-        ('is_company', '=', True),
-    ], limit=1)
-
-    if company_partner:
-        return company_partner
-
-    # 2. Extract state & country default from GSTIN prefix (first 2 digits)
-    state_id = False
-    country = request.env['res.country'].with_user(SUPERUSER_ID).search([('code', '=', 'IN')], limit=1)
-    country_id = country.id if country else False
-
-    if len(vat_clean) >= 2 and vat_clean[:2].isdigit():
-        tin_code = vat_clean[:2]
-        state = request.env['res.country.state'].with_user(SUPERUSER_ID).search([('l10n_in_tin', '=', tin_code)], limit=1)
-        if state:
-            state_id = state.id
-
-    company_vals = {
-        'name': f"Company ({vat_clean})",
-        'is_company': True,
-        'company_type': 'company',
-        'vat': vat_clean,
-        'country_id': country_id,
-        'state_id': state_id,
-        'x_skip_gst': False,
-    }
-
-    if 'l10n_in_gst_treatment' in Partner._fields:
-        company_vals['l10n_in_gst_treatment'] = 'regular'
-
-    # 3. Attempt GST IAP enrichment if available in Odoo environment
-    try:
-        if hasattr(Partner, '_l10n_in_get_partner_vals_by_vat'):
-            enriched = Partner._l10n_in_get_partner_vals_by_vat(vat_clean)
-            if enriched:
-                for fname in ['name', 'street', 'street2', 'city', 'zip', 'state_id', 'country_id', 'l10n_in_gst_treatment']:
-                    if enriched.get(fname):
-                        company_vals[fname] = enriched[fname]
-        elif hasattr(Partner, 'enrich_by_gst'):
-            enriched = Partner.enrich_by_gst(vat_clean)
-            if enriched and not enriched.get('error'):
-                for fname in ['name', 'street', 'street2', 'city', 'zip']:
-                    if enriched.get(fname):
-                        company_vals[fname] = enriched[fname]
-                if enriched.get('state_id') and isinstance(enriched['state_id'], dict):
-                    company_vals['state_id'] = enriched['state_id'].get('id')
-                if enriched.get('country_id') and isinstance(enriched['country_id'], dict):
-                    company_vals['country_id'] = enriched['country_id'].get('id')
-    except Exception as e:
-        _logger.warning("GST auto-enrichment failed for VAT %s: %s", vat_clean, e)
-
-    company_partner = Partner.create(company_vals)
-    return company_partner
+    return request.env["res.partner"].sudo()._sudi_resolve_gst_company(vat)
 
 
 class SudiDiamondHome(Home):
@@ -165,17 +110,14 @@ class SudiDiamondGstOnboardingController(http.Controller):
         vat = (post.get('vat') or '').strip()
 
         if skip_gst:
-            partner.write({'x_skip_gst': True})
+            partner._sudi_skip_gst()
         elif vat:
-            company_partner = _get_or_create_gst_company_partner(vat)
-            partner_vals = {'vat': vat, 'x_skip_gst': False}
-            if company_partner:
-                partner_vals.update({
-                    'parent_id': company_partner.id,
-                    'is_company': False,
-                    'company_type': 'person',
-                })
-            partner.write(partner_vals)
+            try:
+                partner._sudi_apply_gstin(vat)
+            except ValidationError as error:
+                return self.gst_onboarding_form(
+                    error=error.args[0], redirect=redirect
+                )
         else:
             return self.gst_onboarding_form(error=_('Please enter a GST Number or choose to skip for now.'), redirect=redirect)
 
@@ -235,18 +177,16 @@ class SudiDiamondCustomerRegistrationController(http.Controller):
             'x_skip_gst': skip_gst,
         }
 
-        if vat:
-            company_partner = _get_or_create_gst_company_partner(vat)
-            if company_partner:
-                partner_vals.update({
-                    'parent_id': company_partner.id,
-                    'vat': vat,
-                })
-
         if partner:
             partner.write(partner_vals)
         else:
             partner = Partner.create(partner_vals)
+
+        if vat:
+            try:
+                partner._sudi_apply_gstin(vat)
+            except ValidationError as error:
+                return self.otp_register_form(error=error.args[0], redirect=redirect)
 
         # Find or create user
         user = User.search([('partner_id', '=', partner.id), ('active', '=', True)], limit=1)

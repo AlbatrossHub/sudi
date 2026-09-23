@@ -67,10 +67,20 @@ class StockPicking(models.Model):
         """
         domain = Domain([("sudi_is_diamond_job_work", "=", True)])
         if scope == "pickup":
+            start, end = self.env.user._sudi_operator_today_bounds_utc()
+            awaiting = Domain([("state", "=", "sudi_pickup_pending")])
+            # The tail of what this operator collected today. Without it the
+            # receipt vanishes from their phone the instant they confirm, so
+            # they cannot review the round or notice a parcel they missed.
+            # Symmetric with the delivery scope below.
+            mine_today = Domain([
+                ("sudi_pickup_user_id", "=", self.env.user.id),
+                ("sudi_pickup_datetime", ">=", start),
+                ("sudi_pickup_datetime", "<", end),
+            ])
             return domain & Domain([
                 ("picking_type_id.code", "=", "incoming"),
-                ("state", "=", "sudi_pickup_pending"),
-            ])
+            ]) & (awaiting | mine_today)
         if scope == "delivery":
             start, end = self.env.user._sudi_operator_today_bounds_utc()
             active = Domain([("sudi_delivery_stage", "in", ("awaiting", "out"))])
@@ -98,7 +108,7 @@ class StockPicking(models.Model):
         """Ids in a scope, under sudo and the explicit domain, oldest first."""
         domain = self._sudi_sync_scope_domain(scope)
         if extra_domain is not None:
-            domain = domain & extra_domain
+            domain = domain & Domain(extra_domain)
         return self.sudo().search(domain, order="id", limit=limit).ids
 
     # ------------------------------------------------------------------
@@ -134,6 +144,7 @@ class StockPicking(models.Model):
         "pickup": [
             "name", "partner_id", "sudi_customer_contact", "sudi_pickup_address",
             "scheduled_date", "create_date", "sudi_jangad_page_count",
+            "state", "sudi_pickup_datetime", "sudi_pickup_user_id",
         ],
         "delivery": [
             "name", "partner_id", "sudi_customer_contact", "sudi_partner_address",
@@ -157,7 +168,9 @@ class StockPicking(models.Model):
         """
         if not picking_ids:
             return []
-        rows = self.sudo().search_read(
+        rows = self.sudo().with_context(active_test=False).search_read(
+            # active_test off: a cancelled pickup is archived, and an intent
+            # that cancels one still has to hand back the document it acted on.
             [("id", "in", list(picking_ids))],
             self._SUDI_SYNC_FIELDS[scope],
         )
@@ -206,11 +219,18 @@ class StockPicking(models.Model):
             "id": row["id"],
             "rev": rev,
             "name": row["name"],
+            # Two lists in one scope, so the client can separate what is still
+            # to collect from what it already has.
+            "stage": (
+                "awaiting" if row["state"] == "sudi_pickup_pending" else "collected"
+            ),
             "customer": _ref(row["partner_id"]),
             "contact_phone": row["sudi_customer_contact"] or None,
             "pickup_address": row["sudi_pickup_address"] or None,
             "scheduled_date": _iso(row["scheduled_date"]),
             "created_at": _iso(row["create_date"]),
+            "collected_at": _iso(row["sudi_pickup_datetime"]),
+            "collected_by": _ref(row["sudi_pickup_user_id"]),
             "jangad_pages": row["sudi_jangad_page_count"],
         }
 

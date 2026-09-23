@@ -11,7 +11,7 @@ real invariants, and keeping them here means they are testable without a client
 and reusable by anything other than FastAPI. The HTTP surface lives in
 sudi_api.
 
-See docs/MOBILE_API_PLAN.md sections 5.4, 6 and 7.
+See docs/MOBILE_API_PLAN.md sections 5.5, 6 and 7.
 """,
     "category": "Inventory/Inventory",
     "author": "Sudi",

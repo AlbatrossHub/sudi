@@ -426,6 +426,8 @@
                 <field name="sudi_customer_contact"/>
                 <field name="sudi_pickup_address" string="Pickup Address"/>
                 <field name="scheduled_date"/>
+                <field name="sudi_pickup_datetime" string="Collected" optional="show"/>
+                <field name="sudi_pickup_user_id" string="Collected By" widget="many2one_avatar_user" optional="hide"/>
                 <field name="state" widget="badge"
                        decoration-warning="state == 'sudi_pickup_pending'"
                        decoration-success="state == 'done'"
@@ -820,6 +822,26 @@
         </field>
     </record>
 
+    <record id="view_sudi_operator_pickup_search" model="ir.ui.view">
+        <field name="name">stock.picking.search.sudi.operator.pickup</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="partner_id" string="Customer"/>
+                <field name="sudi_customer_contact"/>
+                <filter name="to_collect" string="To Collect" domain="[('state', '=', 'sudi_pickup_pending')]"/>
+                <filter name="collected_today" string="Collected by me today"
+                        domain="[('sudi_pickup_user_id', '=', uid),
+                                 ('sudi_pickup_datetime', '&gt;=', datetime.datetime.combine(context_today(), datetime.time(0, 0, 0)))]"/>
+                <group>
+                    <filter name="group_customer" string="Customer" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_sudi_operator_pickups" model="ir.actions.act_window">
         <field name="name">Pickup</field>
         <field name="res_model">stock.picking</field>
@@ -827,12 +849,17 @@
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('view_sudi_operator_pickup_list')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('view_sudi_operator_pickup_form')})]"/>
+        <field name="search_view_id" ref="view_sudi_operator_pickup_search"/>
         <field name="domain">[
             ('sudi_is_diamond_job_work', '=', True),
             ('picking_type_id.code', '=', 'incoming'),
-            ('state', '=', 'sudi_pickup_pending'),
+            '|',
+                ('state', '=', 'sudi_pickup_pending'),
+                '&amp;',
+                    ('sudi_pickup_user_id', '=', uid),
+                    ('sudi_pickup_datetime', '&gt;=', datetime.datetime.combine(context_today(), datetime.time(0, 0, 0))),
         ]</field>
-        <field name="context">{'create': False, 'delete': False}</field>
+        <field name="context">{'create': False, 'delete': False, 'search_default_to_collect': 1}</field>
     </record>
 
     <record id="view_sudi_operator_delivery_search" model="ir.ui.view">

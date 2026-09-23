@@ -92,14 +92,26 @@ from a UI quirk into a reachable defect. They form **Stage 0**.
 
 ### 2.9 What the Stage 0 build turned up
 
-- **An operator who confirms a pickup immediately loses sight of it.** Confirming
-  moves the receipt from the pickup scope into the job-work scope, and those are
-  now different roles, so a pickup-and-delivery operator can no longer read the
-  record a second after acting on it. The provenance note is therefore written
-  with `sudo()`; without it the chatter write raises and rolls the confirmation
-  back. For the app this is just a `gone` event on the next pull (§6.1); for the
-  web client it means the operator's list stays correct but their own history is
-  not browsable. Correct as designed, and worth telling the operations team.
+- **An operator who confirms a pickup immediately lost sight of it.** I first
+  recorded this as "correct as designed". It was not. Confirming moves the
+  receipt from the pickup scope into the job-work scope, and those are now
+  different roles, so the operator could no longer read the record a second
+  after acting on it: no way to review the round, to check the jangad they had
+  just collected against, or to notice a parcel they had missed. The old record
+  rules hid the hole by granting every internal user everything.
+
+  **Fixed in the flow rather than papered over.**
+  `rule_sudi_operator_own_pickups_today`, with its move and move-line siblings,
+  keeps a receipt with the operator who collected it for the rest of the day —
+  which is exactly what `rule_sudi_operator_today_done_deliveries` already did
+  for the delivery side, so this restores a symmetry rather than inventing a
+  concept. It is **visibility only**: the timer, department transfer and
+  finishing stay gated on the Job Work User role.
+
+  The `pickup` sync scope and the Pickup app list gained the same tail, so the
+  web and the app agree. `PickupDoc` carries `stage` (`awaiting` / `collected`)
+  so one list holds both, and the web action defaults to its "To Collect"
+  filter, leaving the day's own round one tap away.
 - **Proof of delivery ships switched off.** Requiring a receiver name changes what
   an existing "Mark Delivered" click does, for the office web form as much as for
   the app, so all three switches default to `0` and the operations team turns them
@@ -262,7 +274,112 @@ point of failure for every customer login, and a support person needs to be able
 to see *that* a code failed to send rather than guess. Stage 8 adds an alert when
 the WhatsApp account leaves `connected`.
 
-### 5.4 Device registry
+### 5.4 What the builds settled
+
+Each of these was found by running real HTTP against the mounted app, and none
+of them would have shown up in a test that called the router functions directly.
+
+**Stage 2.** *The error envelope comes from a middleware, not an exception
+handler.* The OCA addon calls `_clear_fastapi_exception_handlers` over the whole
+mounted app tree, on purpose, to hand error rendering back to Odoo — so any
+handler registered here is thrown away. `SudiErrorMiddleware` produces the flat
+`{code, message, retryable, resync, detail}` body instead, and also catches
+`RequestValidationError` so a malformed body answers in the same shape.
+
+*The endpoint record is read with `sudo()`, by id.* The OCA `fastapi_endpoint`
+dependency reads it as the **request** user, and the request user is whoever an
+Odoo session cookie says it is. A member of staff with a live web session, or a
+customer signed in to the `/jangad` PWA on the same phone, would get a 403 about
+`fastapi.endpoint` — on a route that never needed access to that record.
+
+**Stage 3.** *System notifications run under `sudo()`.* Confirming a pickup moves
+the receipt into the job-work scope, and `_sudi_notify_pickup_confirmed` then
+read `sudi_jangad_image` as the operator, who could no longer see it: an
+`AccessError` on a successful confirmation. The same latent fault sat in
+`_sudi_notify_delivery_completed`, reachable as soon as a delivery is backdated
+with `occurred_at` past the "done today" window. All five `_sudi_notify_*`
+methods now iterate `self.sudo()`. It went unnoticed because it is
+**cache-dependent**: with the record already in the ORM cache the notification
+reads from memory and never checks access, so it raises in production far more
+often than in a test. The regression test calls `invalidate_recordset()` first
+to make it deterministic. The underlying *flow* problem is fixed separately
+(§2.9); the `sudo()` stays as defence in depth, since these are system
+notifications rather than reads on the actor's behalf in any case.
+
+**Stage 4.** *ORM refusals are mapped in the middleware, not per route.* A
+`UserError` escaping a route came back as a bare `{"detail": "..."}` with a 400,
+outside the envelope entirely.
+
+*A record that has left the caller's scope is fetched once more.* A bare 404 is
+technically true and useless: the app is holding a queued tap and has to tell
+the operator **why** it did not land. `intents.record()` re-reads it restricted
+to diamond job work of the right direction, and the route's own state checks
+turn it into `ALREADY_CONFIRMED`, `ALREADY_TAKEN` or `ALREADY_DONE`.
+
+*`button_validate` runs under `sudo()` after the role check.* It moves a receipt
+through states no record rule can describe — a move line written while the
+picking is between `assigned` and `done` matches neither — so the alternative
+was granting a field role blanket write on `stock.move.line`, which is the
+over-granting §2 just removed. `env.user` is unchanged, so the moves and the
+chatter still name the operator.
+
+*Job Work User now implies Timesheets/User.* The role was created in stage 0
+without the capability it exists for: booking time failed on
+`account.analytic.line` create. The implied group is the narrow "own timesheets
+only" one, and it belongs to the role rather than to an administrator's memory.
+
+*The timer stops without a wizard.* The web flow returns
+`hr.timesheet.stop.timer.confirmation.wizard` so a user can adjust the figure
+before saving; a phone has no wizard and an operator has nothing to adjust
+against on the road, so `_sudi_stop_timer` banks the measured time.
+
+**Stage 5.** *The registration token replaces the session.* Verification hands
+back a short-lived token (15 minutes, its own `typ`, no `sub`) saying only "this
+number answered a code"; `/auth/register` will not proceed without one. The
+alternative — trusting a phone number in the register call — would let anyone
+create an account for any number.
+
+*A staff phone number is refused, not offered registration.* Filtering the
+account lookup to portal users would have hidden a staff account rather than
+refusing it, and registration would then have created a second user on the same
+partner: one person, two accounts, two sets of rights.
+
+*Registration lands on the record the office already has.* The partner id
+travels inside the registration token, so a customer whose jangad upload left a
+`Guest (…)` partner gets that record renamed rather than a duplicate beside it.
+
+*GSTIN is validated with Odoo's own `check_vat_in`*, which knows the normal,
+composite, casual, UN, NRI, TDS and TCS shapes. A hand-rolled regex would get
+one of them wrong, and the controller validated nothing at all.
+
+*A skip is not final.* `gst_state` is `present` / `skipped` / `missing` rather
+than a boolean, so a customer who skipped can be asked again later.
+
+**Stage 6.** *A validator's `ValueError` was answering 500, not 422.* Pydantic
+puts the original exception **object** in the error's `ctx`, and `JSONResponse`
+cannot serialise it — so the first `model_validator` written turned a plainly
+bad request into an internal error. Every custom validator hits this; plain
+field constraints do not, which is why it stayed hidden through stages 2 to 5.
+`_jsonable_errors` in `errors.py` now flattens them.
+
+*Staged uploads are read under `sudo()`.* `_sudi_resolve` filters by `user_id`,
+and that filter **is** the ownership check — but it then browsed non-sudo, and a
+portal customer has no rights on `ir.attachment` at all. The field intents never
+showed it, because an operator is an internal user.
+
+### 5.5 An existing weakness stage 5 did not fix
+
+`web_auth_otp_login`, which the `/jangad` PWA still logs in through, generates
+its codes with `random.randint(100000, 999999)` and keeps the **plaintext** code
+in `request.session`. `random` is a clock-seeded Mersenne Twister, not a CSPRNG:
+given one or two observed codes the sequence is recoverable. The new
+`sudi.auth.otp` model uses `secrets` and stores only a salted PBKDF2 hash, but
+**only the API path goes through it** — the web login still does not. Pointing
+the web controller at `sudi.auth.otp` fixes both in one change and is the
+obvious follow-on; it is flagged rather than done because it touches the live
+customer PWA.
+
+### 5.6 Device registry
 
 `sudi.api.device`: `device_uid` (client-generated, stable), `user_id`,
 `platform`, `app_version`, `push_token`, `token_epoch`, `last_seen_at`,
@@ -354,7 +471,7 @@ of "in scope" is code the test suite can pin:
 
 | Scope | Domain |
 |---|---|
-| `pickup` | job work, incoming, `state = sudi_pickup_pending` |
+| `pickup` | job work, incoming, `state = sudi_pickup_pending`, **plus** whatever `sudi_pickup_user_id = me` collected today (§2.9) |
 | `delivery` | job work, outgoing, has origin receipt, stage in (`awaiting`, `out`), **plus** `delivered` where `sudi_pickup_user_id = me` and `date_done >= today` |
 | `jobwork` | job work, incoming, `state = assigned`, department/user filter per Q5 |
 
@@ -538,16 +655,17 @@ WhatsApp templates, which attach it today.
 |---|---|---|
 | POST | `/auth/otp/request` | phone → OTP (WhatsApp today) |
 | POST | `/auth/otp/verify` | code → tokens, or `registration_required` |
-| POST | `/auth/register` | name + optional GST → portal user + partner |
+| POST | `/auth/register` | registration token + name + optional GST → portal user + partner |
 | POST | `/auth/refresh`, `/auth/logout` | as staff |
 | GET | `/me` | profile, GST state, whether onboarding is complete |
-| POST | `/gst` | submit GSTIN → enrich + link company partner |
+| POST | `/gst` | submit GSTIN → validate, enrich, link the company partner |
+| POST | `/gst/skip` | carry on without one (D3); not final |
 | GET | `/addresses` | pickup-address suggestions for this customer |
 | POST | `/addresses` | add a manual pickup address |
 | POST | `/jangad` | create a receipt from staged uploads — **the offline one** |
-| GET | `/receipts` | my receipts, paged, with a stage |
-| GET | `/receipts/{id}` | one receipt with its items |
-| GET | `/invoices`, `/invoices/{id}/pdf` | settled job work |
+| ~~GET~~ | ~~`/receipts`~~ | **descoped** — not built |
+| ~~GET~~ | ~~`/receipts/{id}`~~ | **descoped** — not built |
+| ~~GET~~ | ~~`/invoices`~~ | **descoped** — not built |
 
 The `/jangad` intent reuses the whole §7 machinery — idempotency key,
 `occurred_at`, two-phase upload — so an image captured in a basement submits
@@ -555,11 +673,14 @@ itself when the customer walks outside. Server side it calls the existing
 `sudi_create_public_jangad_receipt`, which already resolves the partner by
 phone and validates that the chosen address belongs to it.
 
-`GET /receipts` is new capability rather than a port: today the customer sees
-nothing after uploading. Deriving a customer-facing stage from `state` +
-`sudi_delivery_stage` + `sudi_billing_status` ("picked up → in job work → out
-for delivery → delivered → invoiced") is cheap here and is the main reason a
-customer would keep the app installed.
+`GET /receipts` **is not built.** It was argued for here as the reason a
+customer keeps the app: after uploading they see nothing at all, and deriving a
+customer-facing stage from `state` + `sudi_delivery_stage` +
+`sudi_billing_status` ("picked up → in job work → out for delivery → delivered
+→ invoiced") would be cheap. The product owner descoped it, so submission is
+the whole of the customer app for now and the `reference` returned by
+`POST /jangad` is the only acknowledgement the customer gets. The derivation
+stays cheap whenever it is wanted.
 
 **GST onboarding keeps today's behaviour (D3):** `POST /gst` enriches from the
 GSTIN via `l10n_in`, creates or links the company partner and accepts it with no
@@ -611,11 +732,11 @@ Each stage ends green (ORM + router tests) and is independently deployable.
 |---|---|---|
 | **0** | **Done** (19.0.1.4.0) — job-work group split + carry-over migration, record rules and ACLs re-gated, role checks tightened, `occurred_at` on the event actions, `_sudi_transfer_department`, multi-page jangad, proof of delivery | — |
 | **1** | **Done** (`sudi_sync` 19.0.1.0.0) — change log + cursor + visibility lag + retention cron, device registry with per-device epochs, idempotency keys, upload staging, scope domains, payload builders and the whole pull. 66 ORM tests, no HTTP. | 0 |
-| **2** | `sudi_api` skeleton: two endpoint records, JWT + device claims, `/health`, staff `/auth/*`, `/me`, `/devices`. | 1 |
-| **3** | Field read: `/sync/pull` for all three scopes, ETag, pagination, `gone`, `full_resync`. | 2 |
-| **4** | Field write: the eight intents, the error taxonomy, `/uploads`. | 3 |
-| **5** | Customer auth: `sudi.auth.otp` model, OTP request/verify/register, `/gst` (D3), the `_get_or_create_gst_company_partner` move of §9. | 2 |
-| **6** | Customer read/write: `/jangad`, `/receipts`, `/invoices`. | 5, 4 |
+| **2** | **Done** (`sudi_api` 19.0.1.0.0) — two endpoint records, JWT with audience/device/role claims, the error envelope, `/health`, staff `/auth/login|refresh|logout`, `/auth/me`, `/devices`. 28 HTTP tests. | 1 |
+| **3** | **Done** — `GET /sync/pull` with role-entitled scopes, weak ETag, both paging modes, `gone`, `full_resync`, device cursor recording, and `GET /pickups/{id}/jangad/{page}`. 22 more HTTP tests. | 2 |
+| **4** | **Done** — the eight intents with row-locked conflict detection, idempotency, `occurred_at` clamping, `POST /uploads`, and the taxonomy in anger. 34 more HTTP tests. | 3 |
+| **5** | **Done** — `sudi.auth.otp` (hashed, rate limited), OTP request/verify/register with a registration token, `/gst` and `/gst/skip`, and the GST resolution moved onto `res.partner` and shared with the web form. 34 more HTTP tests. | 2 |
+| **6** | **Done, narrowed** — `POST /jangad` and `GET /addresses` only. `/receipts` and `/invoices` were **descoped** by the product owner: the customer app's job right now is to get a photograph of a handwritten slip into the office, and nothing else. 22 more HTTP tests. | 5, 4 |
 | **7** | Push: device tokens wired into the existing notification methods, queued sender. | 4 |
 | **8** | Hardening: per-route rate limits, audit trail on every intent, load test of `/sync/pull` at expected device count, `openapi.json` frozen and handed over. | all |
 
@@ -631,7 +752,9 @@ build the offline core in parallel:
 [`FLUTTER_INTEGRATION_BRIEF.md`](FLUTTER_INTEGRATION_BRIEF.md). Following the
 `investo_be` precedent (`docs/FLUTTER_INTEGRATION_BRIEF.md`, which worked), a
 frozen `openapi.json` per endpoint joins it at the end of stage 4 and again at
-stage 6. Between them they cover what the spec cannot express —
+stage 6. **Both are exported**: `docs/openapi.field.json` (19 operations, 36
+schemas) and `docs/openapi.customer.json` (15 operations, 21 schemas),
+generated from the running endpoints rather than written by hand. Between them they cover what the spec cannot express —
 
 - the outbox contract: capture-time idempotency keys, serial-per-record flush,
   the retryable/drop table of §7.6;
@@ -687,10 +810,12 @@ None of these block stages 0–3. Each is flagged at the stage that needs it.
   assigned receipts, only their department (`sudi_current_department_id`), or
   only ones assigned to them (`user_id`)? And should they be able to enter or
   correct item lines (pcs/carats/size) from the phone, or is that office-only?
-- **Q6. Multi-page jangads.** One image per receipt, or many?
-- **Q7. Proof of delivery.** Should `mark delivered` require a receiver name, a
-  signature, and/or a photo? Any of them is easy now and awkward later, because
-  it changes the intent body and the local schema.
+- ~~**Q6. Multi-page jangads.**~~ **Answered: many.** Built in stage 0
+  (`sudi_jangad_attachment_ids`, page 1 still in `sudi_jangad_image`).
+- ~~**Q7. Proof of delivery.**~~ **Answered: yes, all three.** Built in stage 0:
+  receiver name, drawn signature and photos are always captured, and which of
+  them is *mandatory* is an `ir.config_parameter` so operations can tighten it
+  without an app release. All three ship off.
 - **Q8. Location capture.** Record device lat/lon on pickup/delivery
   confirmation? Useful for disputes, but it is employee tracking and needs a
   decision (and an OS permission) rather than a default.

@@ -140,6 +140,55 @@ class TestSudiFieldEventCapture(SudiJobWorkCase):
             "an event recorded as it happens needs no provenance note",
         )
 
+    def test_confirming_runs_the_notifications_without_a_read_error(self):
+        """The actor loses read access the moment the state advances.
+
+        Confirming moves the receipt out of the pickup scope, so an operator
+        holding only the field role can no longer read it -- and the WhatsApp
+        notification that runs immediately afterwards must not fail because of
+        that. ``invalidate_recordset`` is what makes this deterministic: with a
+        warm cache the notification reads from memory and never checks access,
+        which is exactly why this went unnoticed.
+        """
+        receipt = self._pending_receipt()
+        receipt.invalidate_recordset()
+
+        receipt.with_user(self.operator).action_sudi_confirm_pickup()
+
+        self.assertTrue(receipt.sudi_pickup_datetime)
+        self.assertEqual(receipt.sudi_pickup_user_id, self.operator)
+
+    def test_an_operator_can_still_read_what_they_just_collected(self):
+        """The functional requirement behind the notification fix.
+
+        Confirming moves the receipt into the job-work scope, which the
+        operator has no role for. They keep it for the rest of the day through
+        rule_sudi_operator_own_pickups_today, so they can review the round,
+        check the jangad they collected against, and spot a missed parcel.
+        """
+        receipt = self._pending_receipt()
+        receipt.with_user(self.operator).action_sudi_confirm_pickup()
+        receipt.invalidate_recordset()
+
+        as_operator = receipt.with_user(self.operator)
+        self.assertEqual(as_operator.sudi_pickup_user_id, self.operator)
+        self.assertTrue(as_operator.name)
+
+    def test_an_operator_cannot_read_someone_elses_collection(self):
+        other = self.env["res.users"].create({
+            "name": "Other Onfield",
+            "login": "sudi_capture_operator_2",
+            "group_ids": [Command.set([
+                self.env.ref("diamond.group_sudi_pickup_delivery_operator").id,
+            ])],
+        })
+        receipt = self._pending_receipt()
+        receipt.with_user(other).action_sudi_confirm_pickup()
+        receipt.invalidate_recordset()
+
+        with self.assertRaises(AccessError):
+            receipt.with_user(self.operator).name
+
     def test_a_stale_pickup_is_refused(self):
         receipt = self._pending_receipt()
         with self.assertRaises(UserError):

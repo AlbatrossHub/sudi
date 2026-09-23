@@ -619,7 +619,13 @@ class StockPicking(models.Model):
             and picking.picking_type_code == "incoming"
             and (picking.state == "sudi_pickup_pending" or picking.sudi_jangad_image)
         )
-        for receipt in receipts:
+        # sudo: these are system notifications, not reads on the actor's
+        # behalf. By the time one runs, the record has usually moved on to a
+        # state the actor can no longer read -- a confirmed pickup belongs to
+        # job work, and a delivery backdated with occurred_at drops out of the
+        # operator's "done today" window -- and a WhatsApp to the customer must
+        # not fail because of that.
+        for receipt in receipts.sudo():
             if notify_users:
                 receipt._sudi_post_user_notification(
                     notify_users,
@@ -659,7 +665,13 @@ class StockPicking(models.Model):
     def _sudi_notify_pickup_confirmed(self):
         """Trigger 2: Notify Customer & Admin on Pickup Done."""
         notify_users = self._sudi_get_pickup_confirmed_notify_users()
-        for receipt in self:
+        # sudo: these are system notifications, not reads on the actor's
+        # behalf. By the time one runs, the record has usually moved on to a
+        # state the actor can no longer read -- a confirmed pickup belongs to
+        # job work, and a delivery backdated with occurred_at drops out of the
+        # operator's "done today" window -- and a WhatsApp to the customer must
+        # not fail because of that.
+        for receipt in self.sudo():
             if notify_users:
                 receipt._sudi_post_user_notification(
                     notify_users,
@@ -703,7 +715,13 @@ class StockPicking(models.Model):
 
     def _sudi_notify_pickup_cancelled(self):
         """Send WhatsApp cancellation intimation to customer with Jangad attachment."""
-        for receipt in self:
+        # sudo: these are system notifications, not reads on the actor's
+        # behalf. By the time one runs, the record has usually moved on to a
+        # state the actor can no longer read -- a confirmed pickup belongs to
+        # job work, and a delivery backdated with occurred_at drops out of the
+        # operator's "done today" window -- and a WhatsApp to the customer must
+        # not fail because of that.
+        for receipt in self.sudo():
             customer_partner = receipt.partner_id
             customer_phone = receipt.sudi_customer_contact or (customer_partner.phone if customer_partner else False)
 
@@ -725,7 +743,13 @@ class StockPicking(models.Model):
             and picking.picking_type_code == "outgoing"
             and picking.state == "assigned"
         )
-        for delivery in deliveries:
+        # sudo: these are system notifications, not reads on the actor's
+        # behalf. By the time one runs, the record has usually moved on to a
+        # state the actor can no longer read -- a confirmed pickup belongs to
+        # job work, and a delivery backdated with occurred_at drops out of the
+        # operator's "done today" window -- and a WhatsApp to the customer must
+        # not fail because of that.
+        for delivery in deliveries.sudo():
             customer_partner = delivery.partner_id
             customer_phone = delivery.sudi_customer_contact or (customer_partner.phone if customer_partner else False)
 
@@ -760,7 +784,13 @@ class StockPicking(models.Model):
             and picking.picking_type_code == "outgoing"
             and picking.state == "done"
         )
-        for delivery in deliveries:
+        # sudo: these are system notifications, not reads on the actor's
+        # behalf. By the time one runs, the record has usually moved on to a
+        # state the actor can no longer read -- a confirmed pickup belongs to
+        # job work, and a delivery backdated with occurred_at drops out of the
+        # operator's "done today" window -- and a WhatsApp to the customer must
+        # not fail because of that.
+        for delivery in deliveries.sudo():
             customer_partner = delivery.partner_id
             customer_phone = delivery.sudi_customer_contact or (customer_partner.phone if customer_partner else False)
 
@@ -1193,6 +1223,28 @@ class StockPicking(models.Model):
                 }
             return super().action_timer_stop()
         return False
+
+    def _sudi_stop_timer(self):
+        """Stop the receipt timer and bank the measured time.
+
+        The web flow returns ``hr.timesheet.stop.timer.confirmation.wizard`` so
+        the user can adjust the figure before it is saved. A phone has no
+        wizard, and an operator has nothing to adjust against on the road, so
+        the elapsed time is banked as measured. Returns the minutes.
+        """
+        self.ensure_one()
+        self._sudi_check_job_work_access()
+        timer = self.user_timer_id
+        if not timer:
+            return 0.0
+        timesheet = self._get_record_with_timer_running()
+        minutes = timer.action_timer_stop() or 0.0
+        timer.unlink()
+        if timesheet:
+            timesheet.sudo().write({
+                "unit_amount": (timesheet.unit_amount or 0.0) + minutes / 60.0,
+            })
+        return minutes
 
     def _sudi_get_default_timesheet_job_type(self):
         self.ensure_one()

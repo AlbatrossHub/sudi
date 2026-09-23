@@ -117,8 +117,13 @@ class SudiUpload(models.Model):
         })
 
     @api.model
-    def _sudi_claim(self, user, references, record):
-        """Resolve ``references`` for ``user`` and bind them to ``record``.
+    def _sudi_resolve(self, user, references):
+        """Validate and order ``references`` for ``user``, consuming nothing.
+
+        Split out from :meth:`_sudi_claim` because a jangad submission has
+        nothing to bind to yet: the receipt is created *from* these files, so
+        they have to be readable before the record exists and consumed once it
+        does.
 
         Ownership is checked here, in code: an upload reference is a bearer
         token for a file, and one user must not be able to staple another's
@@ -147,23 +152,34 @@ class SudiUpload(models.Model):
         # Order the result the way the client listed them, so page 1 of a
         # jangad stays page 1.
         by_reference = {upload.reference: upload for upload in uploads}
-        ordered = self.env["sudi.upload"].browse(
+        # sudo: the `user_id` filter above *is* the ownership check, and the
+        # caller may be a portal user with no rights on ir.attachment at all.
+        return self.env["sudi.upload"].sudo().browse(
             [by_reference[reference].id for reference in references]
         )
-        ordered.sudo().write({
+
+    def _sudi_bind(self, record):
+        """Mark these uploads used, and attach their files to ``record``."""
+        self.sudo().write({
             "consumed_model": record._name,
             "consumed_res_id": record.id,
             "consumed_at": fields.Datetime.now(),
         })
-        ordered.attachment_id.sudo().write({
+        self.attachment_id.sudo().write({
             "res_model": record._name,
             "res_id": record.id,
         })
-        return ordered
+        return self
+
+    @api.model
+    def _sudi_claim(self, user, references, record):
+        """Resolve ``references`` for ``user`` and bind them to ``record``."""
+        uploads = self._sudi_resolve(user, references)
+        return uploads._sudi_bind(record) if uploads else uploads
 
     def _sudi_datas(self):
         """The staged files, in recordset order, as base64."""
-        return [upload.attachment_id.datas for upload in self]
+        return [upload.attachment_id.datas for upload in self.sudo()]
 
     @api.model
     def _cron_prune(self):

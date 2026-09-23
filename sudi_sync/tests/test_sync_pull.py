@@ -30,12 +30,55 @@ class TestSudiSyncScopes(SudiSyncCase):
         self.assertNotIn(" ", doc["created_at"])
         self.assertIn("T", doc["created_at"])
 
-    def test_a_confirmed_pickup_leaves_the_pickup_scope_for_job_work(self):
+    def test_a_receipt_collected_by_someone_else_is_only_job_work(self):
+        # _assigned_receipt carries a pickup time but no pickup person, so it
+        # is nobody's "collected today".
         receipt = self._assigned_receipt()
         self._sync_flush()
         result = self._pull(scopes=["pickup", "jobwork"])
         self.assertNotIn(receipt.id, self._ids(result, "pickup"))
         self.assertIn(receipt.id, self._ids(result, "jobwork"))
+
+    def test_a_receipt_i_collected_today_stays_on_my_pickup_list(self):
+        """The operator has to be able to review their own round.
+
+        Before this, confirming a pickup made the receipt vanish from the
+        phone immediately: no way to check the jangad just collected, and no
+        way to notice a parcel that was missed.
+        """
+        receipt = self._pending_receipt()
+        receipt.with_user(self.operator).action_sudi_confirm_pickup()
+        self._sync_flush()
+
+        mine = self._pull(user=self.operator, scopes=["pickup"])
+
+        docs = [
+            doc for doc in mine["scopes"]["pickup"]["upserts"]
+            if doc["id"] == receipt.id
+        ]
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]["stage"], "collected")
+        self.assertEqual(docs[0]["collected_by"]["id"], self.operator.id)
+        self.assertTrue(docs[0]["collected_at"])
+
+    def test_someone_elses_round_is_not_on_my_pickup_list(self):
+        receipt = self._pending_receipt()
+        receipt.with_user(self.operator_2).action_sudi_confirm_pickup()
+        self._sync_flush()
+
+        theirs = self._pull(user=self.operator, scopes=["pickup"])
+
+        self.assertNotIn(receipt.id, self._ids(theirs, "pickup"))
+
+    def test_a_pending_receipt_is_staged_as_awaiting(self):
+        receipt = self._pending_receipt()
+        self._sync_flush()
+        docs = [
+            doc for doc in self._pull(scopes=["pickup"])["scopes"]["pickup"]["upserts"]
+            if doc["id"] == receipt.id
+        ]
+        self.assertEqual(docs[0]["stage"], "awaiting")
+        self.assertIsNone(docs[0]["collected_at"])
 
     def test_a_job_work_document_carries_its_item_lines(self):
         receipt = self._assigned_receipt()
@@ -116,13 +159,14 @@ class TestSudiSyncDelta(SudiSyncCase):
         self.assertGreater(result["cursor"], cursor)
 
     def test_a_record_leaving_a_scope_is_reported_as_gone(self):
-        # No item lines: diamond refuses data entry while a pickup is still
-        # pending, and confirming is all this needs to leave the scope.
+        # Collected by somebody else, which is the real-world scope exit: a
+        # receipt this operator collects themselves stays on their phone for
+        # the rest of the day, so confirming it here would prove nothing.
         receipt = self._pending_receipt()
         self._sync_flush()
         cursor = self._pull(scopes=["pickup"])["cursor"]
 
-        receipt.with_user(self.operator).action_sudi_confirm_pickup()
+        receipt.with_user(self.operator_2).action_sudi_confirm_pickup()
         self._sync_flush()
         result = self._pull(scopes=["pickup"], cursor=cursor)
 

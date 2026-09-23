@@ -12,3 +12,4 @@ from . import account_move
 from . import billing_log
 from . import reference_statement
 from . import sudi_whatsapp_template
+from . import sudi_auth_otp
