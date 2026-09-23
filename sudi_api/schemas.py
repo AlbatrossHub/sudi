@@ -276,7 +276,43 @@ class IntentEnvelope(BaseModel):
     )
 
 
-class ConfirmPickupInput(IntentEnvelope):
+class FieldEventEnvelope(IntentEnvelope):
+    """An intent that also records **where** it happened.
+
+    Only on the two customer-facing field events. Deliberately not on the
+    envelope every intent shares: accepting a coordinate on a route that
+    ignores it is worse than not offering the field, and a customer's location
+    is a separate consent question nobody has asked for.
+    """
+
+    latitude: float | None = Field(
+        default=None, ge=-90, le=90,
+        description="Optional, and never required: this app is used in "
+                    "basements and back rooms where there is no fix, so a "
+                    "missing one must never block the event.",
+    )
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    accuracy_m: float | None = Field(
+        default=None, ge=0, description="Whatever the device reported."
+    )
+
+    @model_validator(mode="after")
+    def _location_is_a_pair(self):
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("Give both latitude and longitude, or neither.")
+        return self
+
+    def location(self) -> dict | None:
+        if self.latitude is None:
+            return None
+        return {
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "accuracy_m": self.accuracy_m,
+        }
+
+
+class ConfirmPickupInput(FieldEventEnvelope):
     upload_ids: list[str] = Field(
         default_factory=list,
         description="Jangad pages staged with POST /uploads, in page order.",
@@ -300,12 +336,17 @@ class ReleaseDeliveryInput(IntentEnvelope):
     pass
 
 
-class DeliverInput(IntentEnvelope):
+class DeliverInput(FieldEventEnvelope):
     receiver_name: str | None = Field(
-        default=None, description="Who took the parcel."
+        default=None,
+        description="Who took the parcel. **Required** by default: the server "
+                    "refuses the delivery without it (422 VALIDATION).",
     )
     signature_upload_id: str | None = Field(
-        default=None, description="A drawn signature, staged as an upload."
+        default=None,
+        description="A drawn signature, staged as an upload. **Required** by "
+                    "default. Offline this means the signature image has to "
+                    "flush before the intent can.",
     )
     upload_ids: list[str] = Field(
         default_factory=list, description="Delivery photos, staged as uploads."

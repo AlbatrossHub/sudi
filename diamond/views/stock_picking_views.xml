@@ -197,15 +197,26 @@
                 <field name="sudi_pod_receiver_name"
                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing'"
                        readonly="state in ['cancel', 'done']"/>
+                <!-- Editable until the transfer is done, because the office
+                     is subject to the same proof-of-delivery rule and has to be
+                     able to close an exception rather than be locked out of it. -->
                 <field name="sudi_pod_signature"
-                       widget="image"
-                       options="{'size': [0, 90]}"
-                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing' or not sudi_pod_signature"
-                       readonly="1"/>
+                       widget="signature"
+                       options="{'full_name': 'sudi_pod_receiver_name'}"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing'"
+                       readonly="state in ['cancel', 'done']"/>
                 <field name="sudi_pod_attachment_ids"
                        widget="many2many_binary"
                        string="Delivery Photos"
-                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing' or not sudi_pod_attachment_ids"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'outgoing'"
+                       readonly="state in ['cancel', 'done']"/>
+                <field name="sudi_event_location_url"
+                       widget="url"
+                       text="Open on a map"
+                       invisible="not sudi_event_location_url"
+                       readonly="1"/>
+                <field name="sudi_event_accuracy_m"
+                       invisible="not sudi_event_location_url"
                        readonly="1"/>
                 <field name="sudi_timesheet_job_type_id"
                        invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'"

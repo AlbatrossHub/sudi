@@ -802,29 +802,99 @@ Stated so they can be corrected cheaply rather than discovered late.
   indirection with delivery-state tracking, so the provider is replaceable and
   a failed send is visible. See §5.3.
 
-## 15. Open questions
+## 15. Open and pending
 
-None of these block stages 0–3. Each is flagged at the stage that needs it.
+Three kinds of thing, kept apart because they need different people. Nothing
+here blocks stages 0 to 6, which are built and green; the marks say what each
+one would move.
 
-- **Q5. Job-work scoping and data entry.** Should a job-work person see *all*
-  assigned receipts, only their department (`sudi_current_department_id`), or
-  only ones assigned to them (`user_id`)? And should they be able to enter or
-  correct item lines (pcs/carats/size) from the phone, or is that office-only?
-- ~~**Q6. Multi-page jangads.**~~ **Answered: many.** Built in stage 0
-  (`sudi_jangad_attachment_ids`, page 1 still in `sudi_jangad_image`).
-- ~~**Q7. Proof of delivery.**~~ **Answered: yes, all three.** Built in stage 0:
-  receiver name, drawn signature and photos are always captured, and which of
-  them is *mandatory* is an `ir.config_parameter` so operations can tighten it
-  without an app release. All three ship off.
-- **Q8. Location capture.** Record device lat/lon on pickup/delivery
-  confirmation? Useful for disputes, but it is employee tracking and needs a
-  decision (and an OS permission) rather than a default.
-- **Q9. Device policy.** One active device per operator (new login revokes the
-  old), or several? Diamonds on a lost phone argue for one, plus remote wipe of
-  the local cache on revoke.
-- **Q10. Does the `/jangad` PWA stay?** Running it alongside the customer app is
-  fine and is a good fallback for iOS users who will not install; it just means
-  two customer surfaces to keep in step.
+### 15.1 Product decisions
+
+- ~~**Q5. Job-work scoping.**~~ **Answered: all receipts in progress.** Which is
+  what was already built, so no change. `_sudi_sync_jobwork_extra_domain` stays
+  as the hook if it ever needs narrowing.
+- **Q5b. Item data entry — still open.** May a job-work person enter or correct
+  item lines (pcs, carats, size) from the phone, or is that office-only?
+  *Now: office-only (A3).* This is the half of Q5 that was not answered, and it
+  is the one that would add an intent.
+- ~~**Q6. Multi-page jangads.**~~ **Answered: many.** Built in stage 0.
+- ~~**Q7. Proof of delivery.**~~ **Answered: yes, all three.** Built in stage 0.
+- ~~**Q7b. Proof-of-delivery switches.**~~ **Answered: on.** Tapping "Mark
+  Delivered" asks for the receiver's name and a signature, and only a successful
+  capture completes the delivery. Both requirements now ship **on**; the photo
+  stays off, since a signature already evidences the handover and a required
+  photo doubles the time at every door. Two consequences were handled with it:
+  the office form's signature field became **editable before the transfer is
+  done**, because the office is subject to the same rule and has to be able to
+  close an exception rather than be locked out by it; and offline, the signature
+  image must now flush **before** the delivery intent can, which is a dependency
+  between outbox items the client has to honour (brief section 6.4).
+- ~~**Q8. Location capture.**~~ **Answered: yes.** `sudi_event_latitude`,
+  `sudi_event_longitude` and `sudi_event_accuracy_m` on `stock.picking`, set by
+  the confirm-pickup and deliver intents, with a map link on the office form.
+
+  Two properties on purpose. It is **captured, never required**: this app is for
+  basements and back rooms, which is exactly where there is no fix, so a missing
+  one must not block the event, and an out-of-range pair is logged and dropped
+  rather than refused. And it is **per event, not continuous** — one point at
+  the moment of a handover, not a track of someone's day. That distinction is
+  worth keeping, and worth stating in whatever privacy notice field staff are
+  given, because this is employee location data and the office can see it.
+- ~~**Q9. Device policy.**~~ **Answered: several.** Which is what was built.
+  The mitigation for a lost handset stays per-device revocation, which raises
+  that device's token epoch and makes the client wipe its local database on the
+  next `DEVICE_REVOKED`.
+- ~~**Q10. Does the `/jangad` PWA stay?**~~ **Answered: both.** Which makes
+  §5.5 sharper rather than softer: the PWA is a permanent surface, so its OTP
+  generator is a permanent weakness, not one that retires with the app's
+  arrival. Two customer surfaces also means any change to the submission rules
+  has to land in both.
+- ~~**Q12. Is WhatsApp-only OTP final?**~~ **Answered: WhatsApp now, email
+  next.** Accepted as a roadmap item rather than built. The model is already
+  shaped for it: `sudi.auth.otp.channel` is a selection and `_sudi_deliver` is
+  the single indirection, so adding email is small.
+
+  One design point to settle before it is: a customer is identified by
+  **phone** everywhere — the portal login *is* the number, and the jangad
+  receipt is filed against it. Email OTP therefore needs either an email on the
+  partner to send to (a lookup, not a new identity) or a second identity for the
+  same customer. The first is straightforward; the second is not, and should be
+  ruled out deliberately rather than by accident.
+
+### 15.2 Sizing, which stage 8 needs
+
 - **Q11. Expected scale.** How many field devices, and how many customers? It
-  sets the `/sync/pull` poll interval, the log retention and whether stage 8
-  needs a real load test.
+  sets the `/sync/pull` poll interval, the change-log retention, the page sizes,
+  and whether a load test is worth running at all.
+
+### 15.3 Decisions I need before touching these
+
+- **The web OTP weakness (§5.5).** `random.randint` and a plaintext code in the
+  session, on the live customer PWA login. Pointing the web controller at
+  `sudi.auth.otp` fixes both in about thirty lines, and the model and its tests
+  already exist. Go-ahead needed because it touches a live login path.
+- **The reference-ledger `noupdate` bug (§2.9).** In the in-flight billing work,
+  not in this project: a system administrator cannot reopen a reference
+  statement on any upgraded database. Who fixes it?
+- **Separating the commits.** Everything from stages 0 to 6 is uncommitted
+  alongside the billing work, in the same files. Do you want them split?
+
+### 15.4 What has to be provided before stage 7 or a release
+
+- An **FCM project** and an **APNs key**, for push.
+- **Apple Developer and Google Play accounts**, and the two application ids
+  (one per flavour, e.g. `com.sudi.field` and `com.sudi.customer`).
+- **A Mac**, for iOS builds. This machine cannot make them.
+- A **deployment window** for `-u diamond -i sudi_api` on the live database: the
+  stage 0 migration re-grants groups, and the record-rule and ACL tightening
+  changes what existing internal users can see.
+- Afterwards, somebody to **trim Job Work User membership**. The migration
+  grants it to every current Onfield user so nobody loses a menu on upgrade;
+  only the people who actually do job work should keep it.
+
+### 15.5 Assumptions worth confirming rather than discovering
+
+- **A4. One company.** Multi-company would add `company_id` to the cursor and
+  to every scope.
+- **A6. English only** in the first release.
+- **A3. Item data entry stays in the web client** (see Q5).

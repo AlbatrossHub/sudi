@@ -188,6 +188,30 @@ class StockPicking(models.Model):
         string="Delivery Photos",
         copy=False,
     )
+    # Where the field event happened: for a receipt, where it was collected;
+    # for a delivery, where it was handed over. One pair per picking is enough
+    # because those are two different records.
+    #
+    # Captured when the device offers it and **never required**: this app exists
+    # for basements and back rooms in Mahidharpura, which is exactly where a fix
+    # is not available, so requiring one would block the case it is for.
+    sudi_event_latitude = fields.Float(
+        string="Event Latitude", digits=(10, 7), copy=False, readonly=True
+    )
+    sudi_event_longitude = fields.Float(
+        string="Event Longitude", digits=(10, 7), copy=False, readonly=True
+    )
+    sudi_event_accuracy_m = fields.Float(
+        string="Event Accuracy (m)",
+        copy=False,
+        readonly=True,
+        help="What the device claimed. A large number means a coarse fix.",
+    )
+    sudi_event_location_url = fields.Char(
+        string="Event Location",
+        compute="_compute_sudi_event_location_url",
+        help="Opens the recorded spot on a map, for settling a dispute.",
+    )
     sudi_customer_contact = fields.Char(string="Customer Contact", tracking=True)
     sudi_pickup_address_id = fields.Many2one(
         "res.partner",
@@ -1084,7 +1108,7 @@ class StockPicking(models.Model):
             },
         }
 
-    def action_sudi_confirm_pickup(self, occurred_at=None):
+    def action_sudi_confirm_pickup(self, occurred_at=None, location=None):
         self._sudi_check_pickup_delivery_operator_access()
         invalid_pickings = self.filtered(
             lambda picking: not picking.sudi_is_diamond_job_work
@@ -1099,6 +1123,7 @@ class StockPicking(models.Model):
             "sudi_pickup_user_id": self.env.user.id,
             "sudi_pickup_datetime": picked_at,
         })
+        self._sudi_apply_event_location(location)
         self._sudi_post_event_provenance(_("Pickup"), picked_at)
         self._sudi_notify_pickup_confirmed()
         return True
@@ -1723,6 +1748,44 @@ class StockPicking(models.Model):
             delivery.action_confirm()
             delivery.action_assign()
 
+    @api.depends("sudi_event_latitude", "sudi_event_longitude")
+    def _compute_sudi_event_location_url(self):
+        for picking in self:
+            if picking.sudi_event_latitude or picking.sudi_event_longitude:
+                picking.sudi_event_location_url = (
+                    "https://www.google.com/maps/search/?api=1&query="
+                    f"{picking.sudi_event_latitude},{picking.sudi_event_longitude}"
+                )
+            else:
+                picking.sudi_event_location_url = False
+
+    def _sudi_apply_event_location(self, location):
+        """Record where a field event happened, if the device knew.
+
+        Silently ignored when absent or out of range rather than refused: a
+        delivery must not fail because a phone could not see the sky, and a
+        device sending nonsense is a device bug, not a reason to strand a
+        parcel. ``readonly`` on the fields keeps this the only way in.
+        """
+        if not location:
+            return False
+        latitude = location.get("latitude")
+        longitude = location.get("longitude")
+        if latitude is None or longitude is None:
+            return False
+        if not (-90.0 <= latitude <= 90.0 and -180.0 <= longitude <= 180.0):
+            _logger.warning(
+                "Ignoring an out-of-range event location %s,%s on %s",
+                latitude, longitude, self.display_name,
+            )
+            return False
+        self.sudo().write({
+            "sudi_event_latitude": latitude,
+            "sudi_event_longitude": longitude,
+            "sudi_event_accuracy_m": location.get("accuracy_m") or 0.0,
+        })
+        return True
+
     def _sudi_pod_is_required(self, requirement):
         """Whether this part of the proof of delivery is mandatory."""
         value = self.env["ir.config_parameter"].sudo().get_param(
@@ -1792,6 +1855,7 @@ class StockPicking(models.Model):
         receiver_name=None,
         signature=None,
         photo_datas=None,
+        location=None,
     ):
         self._sudi_check_pickup_delivery_operator_access()
         invalid_pickings = self.filtered(
@@ -1824,6 +1888,7 @@ class StockPicking(models.Model):
         delivered = self.filtered(lambda picking: picking.state == "done")
         if delivered:
             delivered.write({"date_done": delivered_at})
+            delivered._sudi_apply_event_location(location)
             delivered._sudi_post_event_provenance(_("Delivery"), delivered_at)
         return result
 

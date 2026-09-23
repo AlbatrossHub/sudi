@@ -221,7 +221,7 @@ before the tap, never after**:
 | Pickup or delivery detail, jangad page 1 | works | cached image |
 | Confirm / cancel pickup | works | queued marker |
 | Take / release a delivery | works | queued marker **and** "confirmed when you're back online" |
-| Mark delivered, with proof of delivery | works | queued marker |
+| Mark delivered, with proof of delivery | works | capture screen, then a queued marker; the signature uploads before the intent |
 | Timer start / stop | works | queued marker |
 | Transfer department | works | queued marker |
 | **Finish job work** | **blocked** | disabled, "needs a connection" (§8.2) |
@@ -479,6 +479,15 @@ went home.
 - Backoff on retryable failures: 2s, 4s, 8s … capped at 5 min, with jitter.
 - Never drop an intent silently. A non-retryable failure becomes a visible item
   the operator can read and dismiss.
+- **An intent may depend on an upload, and the upload goes first.** A delivery
+  now requires a signature, and a signature is an image: offline you have no
+  `reference` for it, because references only exist once `POST /uploads`
+  succeeds. So the outbox holds the signature as an upload task, the delivery as
+  an intent that names it *locally*, and on flush it sends the upload, takes the
+  `reference` from the response, patches it into the queued intent, and only
+  then sends the intent. Same for jangad pages. Flush the dependency first or
+  the intent is unsendable, and model it explicitly rather than hoping ordering
+  works out.
 
 ---
 
@@ -538,7 +547,7 @@ Every one is `POST`, carries `Idempotency-Key` as a **header**, and carries
 | cancel pickup | `POST /pickups/{id}/cancel` | `reason` |
 | take deliveries | `POST /deliveries/take` | `ids: [int]` |
 | release delivery | `POST /deliveries/{id}/release` | — |
-| mark delivered | `POST /deliveries/{id}/deliver` | `receiver_name?`, `signature_upload_id?`, `upload_ids?` |
+| mark delivered | `POST /deliveries/{id}/deliver` | **`receiver_name`**, **`signature_upload_id`**, `upload_ids?` |
 | timer | `POST /jobwork/{id}/timer` | `action: "start"\|"stop"`, `job_type_id?` |
 | transfer department | `POST /jobwork/{id}/department` | `department_id` |
 | finish job work | `POST /jobwork/{id}/finish` | — — **ONLINE ONLY** |
@@ -563,6 +572,25 @@ replace your local row without waiting for the next pull:
 effect** — both are successes, and both carry the current record. Treat
 `ALREADY_DONE` as "the outcome I wanted has happened", clear the outbox row,
 and do not show an error.
+
+**Mark Delivered is a capture step, not a button.** The receiver's name and a
+drawn signature are **required**: tapping it opens a capture screen, and only a
+successful capture completes the delivery. Without either, the server answers
+422 `VALIDATION` and the parcel stays out for delivery — validation runs before
+any write, so a refusal leaves nothing half-recorded. Photos remain optional.
+
+Offline this is the case §6.4 is about: the signature has to be staged as an
+upload before the intent can go, so queue it as a dependency rather than
+assuming a reference exists.
+
+**Both field events may carry a location.** `confirm` and `deliver` accept
+`latitude`, `longitude` and `accuracy_m`. Give both coordinates or neither — half
+a pair is a 422. It is **never required**: the app is used in basements, so a
+missing fix must not stop a pickup or a handover. Ask for the OS permission in
+context (at the first confirm, not at launch), carry on gracefully when it is
+refused, and do not poll location in the background — one reading at the moment
+of the event is the whole design, and it is what makes this defensible to the
+people being recorded.
 
 `take deliveries` is the one multi-record intent, because operators select a
 handful of parcels at once. It answers per id, so a partial result is normal —
@@ -647,13 +675,13 @@ more than every byte this saves. Keep the original until the server acks.
 Auto-crop, deskew or brighten only with the operator able to see and reject the
 result — an unreadable "improved" scan is worse than a plain one.
 
-### 9.3 Multi-page jangads **[PENDING Q6]**
+### 9.3 Multi-page jangads [FROZEN — many]
 
-The backend holds **one** image per receipt today. Multi-page means a model
-change (§9.3 of the plan). Build the capture UI as a **list of pages** with an
-`upload_ids` array from day one even if the answer is one — a list that happens
-to hold one item costs nothing; retrofitting single-image screens into a gallery
-costs a sprint.
+**Answered: many.** The backend stores page 1 in the receipt's image field and
+pages 2+ as attachments, and `POST /uploads` plus `upload_ids` carries them in
+page order. Build the capture UI as a list of pages; `jangad_pages` on the
+document tells you how many to fetch from
+`GET /pickups/{id}/jangad/{n}`.
 
 ---
 
@@ -782,12 +810,13 @@ to one team: `dio`, `flutter_riverpod`, `go_router`, `flutter_secure_storage`,
 
 | # | Question | What it moves |
 |---|---|---|
-| Q5 | Do job-work staff see all assigned receipts, only their department, or only their own? Can they edit item lines (pcs/carats/size) on the phone? | the `jobwork` scope, and whether an item-edit intent exists at all |
+| ~~Q5~~ | **Answered: all receipts in progress.** No change; that is what is built. | — |
+| Q5b | Can job-work staff edit item lines (pcs/carats/size) on the phone, or is that office-only? *Now office-only.* | whether an item-edit intent exists at all |
 | Q6 | Multi-page jangads? | §9.3 — build the page-list UI regardless |
-| Q7 | Does `mark delivered` need a receiver name, a signature, a photo? | the deliver intent body and the local schema — **ask early**, it is cheap now |
-| Q8 | Capture lat/lon on pickup/delivery? | an OS permission and a privacy decision, plus two body fields |
-| Q9 | One active device per operator, or several? | whether a new login wipes the previous phone |
-| Q10 | Does the `/jangad` PWA stay alongside the customer app? | whether customer features must be kept in step in two places |
+| ~~Q7~~ | **Answered: receiver name and signature, both required.** Photos optional. Built. | — |
+| ~~Q8~~ | **Answered: yes, captured and never required.** Built. | — |
+| ~~Q9~~ | **Answered: several.** Built. | — |
+| ~~Q10~~ | **Answered: both stay.** Any change to the submission rules has to land in the PWA as well. | — |
 | Q11 | How many devices and customers? | poll interval and page sizes |
 
 ## 13. Out of scope — do not build client flows that assume these

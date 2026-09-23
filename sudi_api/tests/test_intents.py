@@ -18,6 +18,10 @@ def _png(size=(4, 4)):
     return buffer.getvalue()
 
 
+def _png_b64(size=(4, 4)):
+    return base64.b64encode(_png(size))
+
+
 @tagged("post_install", "-at_install")
 class SudiIntentCase(SudiApiCase):
 
@@ -235,6 +239,28 @@ class TestSudiConfirmPickup(SudiIntentCase):
 
         self.assertEnvelope(response, 409, "STALE_INTENT")
 
+    def test_a_pickup_records_where_it_was_collected(self):
+        receipt = self._pending_receipt()
+        token = self._token()
+
+        response = self._intent(
+            f"/pickups/{receipt.id}/confirm",
+            {"latitude": 21.1959, "longitude": 72.8302, "accuracy_m": 8.0},
+            token,
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertAlmostEqual(receipt.sudi_event_latitude, 21.1959, places=4)
+        self.assertAlmostEqual(receipt.sudi_event_longitude, 72.8302, places=4)
+        self.assertEqual(receipt.sudi_event_accuracy_m, 8.0)
+        self.assertIn("maps", receipt.sudi_event_location_url)
+
+    def test_a_pickup_without_a_fix_still_confirms(self):
+        receipt = self._pending_receipt()
+        response = self._intent(f"/pickups/{receipt.id}/confirm", {}, self._token())
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertFalse(receipt.sudi_event_latitude)
+
     def test_the_provenance_note_names_the_device(self):
         receipt = self._pending_receipt()
         token = self._token(uid="intent-device-42")
@@ -423,6 +449,7 @@ class TestSudiDeliveryIntents(SudiIntentCase):
         token = self._token()
         self._intent("/deliveries/take", {"ids": [delivery.id]}, token)
         photo = self._upload(token).json()["reference"]
+        signature = self._upload(token).json()["reference"]
         captured = (fields.Datetime.now() - timedelta(hours=1)).replace(microsecond=0)
 
         response = self._intent(
@@ -430,7 +457,11 @@ class TestSudiDeliveryIntents(SudiIntentCase):
             {
                 "occurred_at": captured.isoformat() + "Z",
                 "receiver_name": "Mehul Shah",
+                "signature_upload_id": signature,
                 "upload_ids": [photo],
+                "latitude": 21.1959,
+                "longitude": 72.8302,
+                "accuracy_m": 12.5,
             },
             token,
         )
@@ -440,12 +471,118 @@ class TestSudiDeliveryIntents(SudiIntentCase):
         self.assertEqual(delivery.state, "done")
         self.assertEqual(delivery.date_done, captured)
         self.assertEqual(len(delivery.sudi_pod_attachment_ids), 1)
+        self.assertTrue(delivery.sudi_pod_signature)
+        self.assertAlmostEqual(delivery.sudi_event_latitude, 21.1959, places=4)
+        self.assertIn("21.1959", delivery.sudi_event_location_url)
+
+    def test_a_delivery_needs_a_receiver_name(self):
+        # The handover evidence is mandatory by default: the app asks for it
+        # when the operator taps Mark Delivered, and the server is what makes
+        # that non-negotiable.
+        delivery = self._delivery()
+        token = self._token()
+        self._intent("/deliveries/take", {"ids": [delivery.id]}, token)
+        signature = self._upload(token).json()["reference"]
+
+        response = self._intent(
+            f"/deliveries/{delivery.id}/deliver",
+            {"signature_upload_id": signature},
+            token,
+        )
+
+        self.assertEnvelope(response, 422, "VALIDATION")
+        self.assertNotEqual(delivery.state, "done")
+
+    def test_a_delivery_needs_a_signature(self):
+        delivery = self._delivery()
+        token = self._token()
+        self._intent("/deliveries/take", {"ids": [delivery.id]}, token)
+
+        response = self._intent(
+            f"/deliveries/{delivery.id}/deliver",
+            {"receiver_name": "Mehul Shah"},
+            token,
+        )
+
+        self.assertEnvelope(response, 422, "VALIDATION")
+        self.assertNotEqual(delivery.state, "done")
+
+    def test_a_refused_delivery_leaves_nothing_behind(self):
+        # Validation runs before any write, so a refused handover does not
+        # leave a half-recorded receiver name on the record.
+        delivery = self._delivery()
+        token = self._token()
+        self._intent("/deliveries/take", {"ids": [delivery.id]}, token)
+
+        self._intent(
+            f"/deliveries/{delivery.id}/deliver",
+            {"receiver_name": "Mehul Shah"},
+            token,
+        )
+
+        self.assertFalse(delivery.sudi_pod_receiver_name)
+
+    def test_a_location_is_optional(self):
+        # The app is used in basements; a missing fix must never block a
+        # handover.
+        delivery = self._delivery()
+        token = self._token()
+        self._intent("/deliveries/take", {"ids": [delivery.id]}, token)
+        signature = self._upload(token).json()["reference"]
+
+        response = self._intent(
+            f"/deliveries/{delivery.id}/deliver",
+            {"receiver_name": "Mehul Shah", "signature_upload_id": signature},
+            token,
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertFalse(delivery.sudi_event_latitude)
+        self.assertFalse(delivery.sudi_event_location_url)
+
+    def test_half_a_location_is_refused(self):
+        delivery = self._delivery()
+        token = self._token()
+        self._intent("/deliveries/take", {"ids": [delivery.id]}, token)
+        signature = self._upload(token).json()["reference"]
+
+        response = self._intent(
+            f"/deliveries/{delivery.id}/deliver",
+            {
+                "receiver_name": "Mehul Shah",
+                "signature_upload_id": signature,
+                "latitude": 21.1959,
+            },
+            token,
+        )
+
+        self.assertEnvelope(response, 422, "VALIDATION")
+
+    def test_an_impossible_coordinate_is_refused(self):
+        delivery = self._delivery()
+        token = self._token()
+        self._intent("/deliveries/take", {"ids": [delivery.id]}, token)
+        signature = self._upload(token).json()["reference"]
+
+        response = self._intent(
+            f"/deliveries/{delivery.id}/deliver",
+            {
+                "receiver_name": "Mehul Shah",
+                "signature_upload_id": signature,
+                "latitude": 991.0, "longitude": 72.8302,
+            },
+            token,
+        )
+
+        self.assertEnvelope(response, 422, "VALIDATION")
 
     def test_delivering_something_already_delivered_is_a_success(self):
         # Delivered is delivered: whoever got there first, the outcome the
         # operator wanted has happened.
         delivery = self._delivery()
-        delivery.with_user(self.operator_2).action_sudi_mark_delivered()
+        delivery.with_user(self.operator_2).action_sudi_mark_delivered(
+            receiver_name="Mehul Shah", signature=_png_b64(),
+        )
         self._settle()
         token = self._token()
 

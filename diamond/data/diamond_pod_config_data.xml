@@ -4,19 +4,24 @@
          signature and photos on every delivery; which of the three is *mandatory*
          is configuration, so the business can tighten it without an app release.
 
-         All three ship OFF. Requiring any of them changes what an existing
-         "Mark Delivered" click does, for office staff and the current web flow
-         as well as the app, so the switch belongs to the operations team on the
-         day they are ready for it rather than to this file on upgrade day. The
-         enforcement is written and tested; only the default is permissive. -->
+         Receiver name and signature are ON: the delivery person taps "Mark
+         Delivered", the app asks for both, and only a successful capture
+         completes the delivery. Photos stay off, since a signature already
+         evidences the handover and a required photo doubles the time at every
+         door.
+
+         Because these apply to the office web form too, the signature field
+         there is editable before the transfer is done: an office user closing
+         an exception (a broken handset, say) has to be able to satisfy the same
+         rule rather than be locked out by it. -->
     <data noupdate="1">
         <record id="param_sudi_pod_require_receiver_name" model="ir.config_parameter">
             <field name="key">sudi_diamond.pod_require_receiver_name</field>
-            <field name="value">0</field>
+            <field name="value">1</field>
         </record>
         <record id="param_sudi_pod_require_signature" model="ir.config_parameter">
             <field name="key">sudi_diamond.pod_require_signature</field>
-            <field name="value">0</field>
+            <field name="value">1</field>
         </record>
         <record id="param_sudi_pod_require_photo" model="ir.config_parameter">
             <field name="key">sudi_diamond.pod_require_photo</field>

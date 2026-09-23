@@ -92,6 +92,12 @@ class TestSudiFieldEventCapture(SudiJobWorkCase):
                 cls.env.ref("diamond.group_sudi_pickup_delivery_operator").id,
             ])],
         })
+        # Proof of delivery is mandatory by default now; these tests are
+        # about event *timing*, so pin it off rather than thread a signature
+        # through every one of them.
+        params = cls.env["ir.config_parameter"].sudo()
+        for requirement in ("receiver_name", "signature", "photo"):
+            params.set_param(f"sudi_diamond.pod_require_{requirement}", "0")
 
     def _pending_receipt(self):
         return self.env["stock.picking"].create({
