@@ -47,6 +47,10 @@ class SudiSyncCase(SudiJobWorkCase):
         super().setUp()
         self.Change = self.env["sudi.sync.change"]
         self._set_param(PARAM_LAG_SECONDS, "0")
+        # Proof of delivery is mandatory by default; the sync engine is what is
+        # under test here, not the handover.
+        for requirement in ("receiver_name", "signature", "photo"):
+            self._set_param(f"sudi_diamond.pod_require_{requirement}", "0")
         self._set_param(PARAM_RETENTION_DAYS, "30")
         self._set_param(PARAM_PRUNED_THROUGH, "0")
         # Dispatch notifications go out over WhatsApp; the engine is not what

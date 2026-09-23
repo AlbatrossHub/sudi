@@ -135,7 +135,7 @@ def confirm_pickup(
 
     receipt.with_user(caller_obj.user).with_context(
         sudi_device_uid=caller_obj.device.device_uid
-    ).action_sudi_confirm_pickup(occurred_at=occurred_at)
+    ).action_sudi_confirm_pickup(occurred_at=occurred_at, location=data.location())
 
     return reservation.store(PickupIntentResult(
         code=intents.RESULT_OK,

@@ -172,6 +172,7 @@ def deliver(
         receiver_name=data.receiver_name,
         signature=signature,
         photo_datas=photos,
+        location=data.location(),
     )
 
     return reservation.store(DeliveryIntentResult(
