@@ -186,7 +186,7 @@ class OwaComposer(models.TransientModel):
                 'res_model': record._name,
                 'res_id': record.id,
                 'mimetype': 'application/pdf',
-                'datas': base64.b64encode(pdf_bytes),
+                'raw': pdf_bytes,
             })
         except Exception:
             _logger.exception(

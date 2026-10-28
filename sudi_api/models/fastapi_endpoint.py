@@ -7,13 +7,18 @@ from fastapi import APIRouter
 from ..errors import SudiErrorMiddleware
 from ..routers import (
     auth_router,
+    catalog_router,
     customer_auth_router,
     customer_jangad_router,
     customer_router,
     delivery_router,
     device_router,
     jobwork_router,
+    notice_router,
+    office_router,
+    onbehalf_router,
     pickup_router,
+    productivity_router,
     session_router,
     sync_router,
     system_router,
@@ -44,6 +49,11 @@ class FastapiEndpoint(models.Model):
                 delivery_router,
                 jobwork_router,
                 upload_router,
+                catalog_router,
+                onbehalf_router,
+                productivity_router,
+                notice_router,
+                office_router,
             ]
         if self.app == "sudi_customer":
             return [

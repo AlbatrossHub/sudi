@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { ImageField, imageField } from "@web/views/fields/image/image_field";
-import { useState, useRef, onMounted, onWillUnmount } from "@odoo/owl";
+import { onMounted, onWillUnmount, proxy, signal } from "@odoo/owl";
 import { closestScrollableY } from "@web/core/utils/scrolling";
 
 // Once the job table has this many rows the Jangad docks to the side and stays
@@ -15,7 +15,7 @@ export class JangadImageViewerField extends ImageField {
 
     setup() {
         super.setup();
-        this.viewerState = useState({
+        this.viewerState = proxy({
             scale: 1,
             rotation: 0,
             translateX: 0,
@@ -35,8 +35,8 @@ export class JangadImageViewerField extends ImageField {
             isWide: window.innerWidth >= 992,
         });
 
-        this.containerRef = useRef("viewerContainer");
-        this.imgRef = useRef("viewerImg");
+        this.containerRef = signal.ref();
+        this.imgRef = signal.ref();
 
         // Touch tracking variables
         this.touchStartDist = 0;
@@ -109,7 +109,7 @@ export class JangadImageViewerField extends ImageField {
     }
 
     startFloatWatch() {
-        const el = this.containerRef.el;
+        const el = this.containerRef();
         if (!el || typeof IntersectionObserver === "undefined") {
             return;
         }
@@ -182,8 +182,8 @@ export class JangadImageViewerField extends ImageField {
     }
 
     scrollToInlineViewer() {
-        if (this.containerRef.el) {
-            this.containerRef.el.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (this.containerRef()) {
+            this.containerRef().scrollIntoView({ behavior: "smooth", block: "center" });
         }
     }
 
@@ -230,7 +230,7 @@ export class JangadImageViewerField extends ImageField {
     }
 
     onMouseMove(ev) {
-        if (!this.viewerState.isHovering || !this.containerRef.el) {
+        if (!this.viewerState.isHovering || !this.containerRef()) {
             return;
         }
         if (this.viewerState.scale !== 1 || this.viewerState.translateX !== 0 || this.viewerState.translateY !== 0) {
@@ -238,7 +238,7 @@ export class JangadImageViewerField extends ImageField {
             return;
         }
 
-        const rect = this.containerRef.el.getBoundingClientRect();
+        const rect = this.containerRef().getBoundingClientRect();
         const mouseX = ev.clientX - rect.left;
         const mouseY = ev.clientY - rect.top;
 

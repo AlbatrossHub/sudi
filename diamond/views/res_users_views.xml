@@ -15,6 +15,12 @@
                         <field name="sudi_notify_pickup_confirmed"/>
                         <field name="sudi_notify_due_data_entry"/>
                     </group>
+                    <group string="Staff App" name="sudi_staff_app">
+                        <field name="sudi_can_post_jangad_on_behalf"/>
+                        <div class="text-muted" colspan="2">
+                            An extra ability for someone who already uses the staff app: it does not give access to the app by itself.
+                        </div>
+                    </group>
                 </page>
             </page>
         </field>

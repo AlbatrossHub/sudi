@@ -6,9 +6,26 @@ from odoo.addons.stock.tests.common import TestStockCommon
 class SudiJobWorkCase(TestStockCommon):
     """Shared fixtures: a job-work customer, a priced job type, receipt helpers."""
 
+    # Odoo 20: TestStockCommon runs every test as a limited "_test_user"
+    # (product manager only). Declare the groups a sudi back-office user
+    # actually has, so the suite exercises realistic diamond permissions.
+    _test_user_groups = (
+        'base.group_partner_manager',
+        'stock.group_stock_manager',
+        'account.group_account_invoice',
+        'hr_timesheet.group_hr_timesheet_approver',
+        'diamond.group_sudi_job_work_user',
+        'diamond.group_sudi_reference_ledger',
+    )
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Odoo 20: TestStockCommon creates its own journal-less "Stock Tests
+        # Company". The diamond master data (job types, products, l10n_in
+        # journals) lives in the MAIN company, so re-root the whole suite
+        # there — that is the company the v19 suite effectively ran in.
+        cls._sudi_use_main_company()
         cls.product = cls.env.ref("diamond.product_customer_diamond_parcel")
         cls.job_type = cls.env.ref("diamond.job_type_laser_inscription")
         cls.job_type.base_price = 100.0
@@ -19,6 +36,26 @@ class SudiJobWorkCase(TestStockCommon):
             "l10n_in_gst_treatment": "unregistered",
         })
         cls.picking_type_out.create_backorder = "always"
+
+
+    @classmethod
+    def _sudi_use_main_company(cls):
+        main = cls.env.ref("base.main_company")
+        cls.company = main
+        cls.env = cls.env(context=dict(cls.env.context, allowed_company_ids=[main.id]))
+        if cls._test_user:
+            cls._test_user.sudo().write({
+                "company_ids": [(4, main.id)],
+                "company_id": main.id,
+            })
+        warehouse = cls.env["stock.warehouse"].sudo().search(
+            [("company_id", "=", main.id)], limit=1)
+        cls.warehouse_1 = warehouse
+        cls.picking_type_in = warehouse.in_type_id
+        cls.picking_type_out = warehouse.out_type_id
+        cls.stock_location = warehouse.lot_stock_id
+        cls.supplier_location = cls.env.ref("stock.stock_location_suppliers")
+        cls.customer_location = cls.env.ref("stock.stock_location_customers")
 
     def _get_partner_price_line(self, partner=None, job_type=None):
         partner = (partner or self.partner).commercial_partner_id
@@ -32,7 +69,7 @@ class SudiJobWorkCase(TestStockCommon):
             "description_picking": self.product.display_name,
             "product_id": self.product.id,
             "product_uom_qty": qty,
-            "product_uom": self.product.uom_id.id,
+            "uom_id": self.product.uom_id.id,
             "location_id": self.supplier_location.id,
             "location_dest_id": self.stock_location.id,
             "sudi_sr": sr,

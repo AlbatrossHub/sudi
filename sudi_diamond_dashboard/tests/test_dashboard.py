@@ -3,10 +3,10 @@ from unittest.mock import patch
 
 from odoo import Command
 from odoo.exceptions import AccessError
-from odoo.addons.stock.tests.common import TestStockCommon
+from odoo.addons.diamond.tests.test_diamond_job_work import SudiJobWorkCase
 
 
-class TestSudiDiamondDashboard(TestStockCommon):
+class TestSudiDiamondDashboard(SudiJobWorkCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -55,7 +55,7 @@ class TestSudiDiamondDashboard(TestStockCommon):
             "move_ids": [Command.create({
                 "product_id": self.product.id,
                 "product_uom_qty": pcs,
-                "product_uom": self.product.uom_id.id,
+                "uom_id": self.product.uom_id.id,
                 "location_id": self.supplier_location.id,
                 "location_dest_id": self.stock_location.id,
                 "sudi_pcs_qty": pcs,

@@ -13,26 +13,28 @@
  * Each card hard-caps at 60 s so a misbehaving sidecar can't strand a
  * permanent banner on screen.
  */
-import { Component, onWillUnmount, useState } from "@odoo/owl";
+import { BusPlugin } from "@bus/services/bus_plugin";
+import { Component, onWillUnmount, proxy, usePlugin, useProps } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { ActionPlugin } from "@web/webclient/actions/action_plugin";
 
 const RING_AUDIO_URL =
     "/open_whatsapp_connector/static/src/calls/ring.ogg";
 const HARD_CAP_MS = 60_000;
 
 export class OwaCallRingingNotifier extends Component {
-    static props = {};
+    props = useProps({});
     static template = "open_whatsapp_connector.OwaCallRingingNotifier";
 
     setup() {
-        this.bus = useService("bus_service");
-        this.action = useService("action");
+        this.bus = usePlugin(BusPlugin);
+        this.action = usePlugin(ActionPlugin);
         this.orm = useService("orm");
 
         // Reactive map of call_log_id -> card data shown on screen.
-        this.state = useState({ calls: {} });
+        this.state = proxy({ calls: {} });
         // Per-card timers (not in state — opaque to the template).
         this._capTimers = new Map();
 

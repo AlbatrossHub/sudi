@@ -1,6 +1,6 @@
-"""Worklist scopes, their payloads, and the delta pull.
+"""Worklist scopes, their payloads, the delta pull, and the notices they raise.
 
-Three role-scoped worklists, each a flat denormalised document. The phone is
+Four role-scoped worklists, each a flat denormalised document. The phone is
 not a replica of the ORM, so nothing here exposes ``stock.picking`` generically:
 a scope is an explicit domain this test suite can pin, and a payload is a fixed
 shape the client's local schema mirrors.
@@ -9,10 +9,14 @@ See docs/MOBILE_API_PLAN.md sections 6.1 and 6.4, and
 docs/FLUTTER_INTEGRATION_BRIEF.md section 9 for the documents themselves.
 """
 
+import logging
+
 from odoo import api, fields, models
 from odoo.fields import Domain
 
-SUDI_SYNC_SCOPES = ("pickup", "delivery", "jobwork")
+_logger = logging.getLogger(__name__)
+
+SUDI_SYNC_SCOPES = ("pickup", "delivery", "jobwork", "office")
 
 DEFAULT_PULL_LIMIT = 200
 MAX_PULL_LIMIT = 500
@@ -101,6 +105,15 @@ class StockPicking(models.Model):
                 ("picking_type_id.code", "=", "incoming"),
                 ("state", "=", "assigned"),
             ]) & self._sudi_sync_jobwork_extra_domain()
+        if scope == "office":
+            # Collected and awaiting validation: the parcel is in, nothing has
+            # been marked ready yet. Marking it READY moves it to job work and
+            # out of here, which is the office's "done".
+            return domain & Domain([
+                ("picking_type_id.code", "=", "incoming"),
+                ("state", "=", "draft"),
+                ("sudi_pickup_datetime", "!=", False),
+            ])
         raise ValueError(f"Unknown sync scope {scope!r}")
 
     @api.model
@@ -130,6 +143,8 @@ class StockPicking(models.Model):
         grouped = {}
         for move in moves:
             grouped.setdefault(move["picking_id"][0], []).append({
+                # The key an editable table needs, and harmless everywhere else.
+                "move_id": move["id"],
                 "sr": move["sudi_sr"],
                 "product": move["product_id"][1] if move["product_id"] else None,
                 "size": move["sudi_size"] or None,
@@ -140,11 +155,55 @@ class StockPicking(models.Model):
             })
         return grouped
 
+    @api.model
+    def _sudi_sync_service_lines(self, picking_ids):
+        """``{picking_id: [ServiceLine, ...]}`` -- what each customer asked for."""
+        if not picking_ids:
+            return {}
+        requests = self.env["sudi.diamond.service.request"].sudo().search_read(
+            [("picking_id", "in", list(picking_ids))],
+            ["picking_id", "job_type_id", "quantity", "unit", "remarks", "move_id"],
+            order="picking_id, sequence, id",
+        )
+        grouped = {}
+        for request in requests:
+            grouped.setdefault(request["picking_id"][0], []).append({
+                "id": request["id"],
+                "job_type": _ref(request["job_type_id"]),
+                "quantity": request["quantity"],
+                "unit": request["unit"] or "",
+                "remarks": request["remarks"] or None,
+                "move_id": request["move_id"][0] if request["move_id"] else None,
+            })
+        return grouped
+
+    @api.model
+    def _sudi_sync_my_hours(self, picking_ids):
+        """``{picking_id: hours}`` booked by the *requesting* user.
+
+        The one per-person figure in a document, which is why the pull must run
+        on an environment bound to the caller: ``env.uid`` survives ``sudo()``.
+        """
+        if not picking_ids:
+            return {}
+        groups = self.env["account.analytic.line"].sudo()._read_group(
+            [("sudi_picking_id", "in", list(picking_ids)), ("user_id", "=", self.env.uid)],
+            ["sudi_picking_id"],
+            ["unit_amount:sum"],
+        )
+        return {picking.id: hours for picking, hours in groups}
+
     _SUDI_SYNC_FIELDS = {
         "pickup": [
             "name", "partner_id", "sudi_customer_contact", "sudi_pickup_address",
             "scheduled_date", "create_date", "sudi_jangad_page_count",
             "state", "sudi_pickup_datetime", "sudi_pickup_user_id",
+        ],
+        "office": [
+            "name", "partner_id", "sudi_customer_contact", "sudi_pickup_address",
+            "scheduled_date", "create_date", "sudi_jangad_page_count",
+            "state", "sudi_pickup_datetime", "sudi_pickup_user_id",
+            "sudi_jangad_source", "sudi_posted_by_id",
         ],
         "delivery": [
             "name", "partner_id", "sudi_customer_contact", "sudi_partner_address",
@@ -178,8 +237,16 @@ class StockPicking(models.Model):
         related = {
             "items": (
                 self._sudi_sync_item_lines(picking_ids)
-                if scope in ("delivery", "jobwork")
+                if scope in ("delivery", "jobwork", "office")
                 else {}
+            ),
+            "services": (
+                self._sudi_sync_service_lines(picking_ids)
+                if scope in ("pickup", "jobwork", "office")
+                else {}
+            ),
+            "my_hours": (
+                self._sudi_sync_my_hours(picking_ids) if scope == "jobwork" else {}
             ),
             "departments": self._sudi_sync_department_names(rows),
         }
@@ -232,7 +299,24 @@ class StockPicking(models.Model):
             "collected_at": _iso(row["sudi_pickup_datetime"]),
             "collected_by": _ref(row["sudi_pickup_user_id"]),
             "jangad_pages": row["sudi_jangad_page_count"],
+            "services": related["services"].get(row["id"], []),
         }
+
+    @api.model
+    def _sudi_sync_office_doc(self, row, rev, related):
+        """The pickup document, plus what the office needs to validate it.
+
+        Everything the collector saw, the item table being built (each line
+        with its ``move_id``, so the phone can edit it in place) and the
+        services the customer asked for, which the lines are entered from.
+        """
+        doc = self._sudi_sync_pickup_doc(row, rev, related)
+        doc.update({
+            "items": related["items"].get(row["id"], []),
+            "jangad_source": row["sudi_jangad_source"] or None,
+            "posted_by": _ref(row["sudi_posted_by_id"]),
+        })
+        return doc
 
     @api.model
     def _sudi_sync_delivery_doc(self, row, rev, related):
@@ -273,6 +357,8 @@ class StockPicking(models.Model):
             },
             "jangad_pages": row["sudi_jangad_page_count"],
             "items": related["items"].get(row["id"], []),
+            "services": related["services"].get(row["id"], []),
+            "my_hours": related["my_hours"].get(row["id"], 0.0),
         }
 
     # ------------------------------------------------------------------
@@ -404,3 +490,62 @@ class StockPicking(models.Model):
                 # leaves work stranded on a phone forever.
                 "gone": sorted(changed_ids - set(in_scope)),
             }
+
+    # ------------------------------------------------------------------
+    # notices
+    #
+    # Hooked here rather than in diamond because the bell belongs to the app:
+    # diamond's own Discuss and WhatsApp notifications are unchanged. Every
+    # hook calls the action first and raises afterwards, through
+    # sudi.app.notice._sudi_raise, which cannot fail the action.
+    # ------------------------------------------------------------------
+    @api.model_create_multi
+    def create(self, vals_list):
+        pickings = super().create(vals_list)
+        Notice = self.env["sudi.app.notice"]
+        diamond = pickings.filtered("sudi_is_diamond_job_work")
+        # A jangad receipt of any source lands in the pickup pool, and a
+        # delivery order created from finished work lands in the delivery
+        # pool. Both are what the pickup and delivery people need to hear.
+        Notice._sudi_raise("pickup_new", diamond.filtered(
+            lambda picking: picking.picking_type_code == "incoming"
+            and picking.state == "sudi_pickup_pending"
+        ))
+        Notice._sudi_raise("delivery_ready", diamond.filtered(
+            lambda picking: picking.picking_type_code == "outgoing"
+            and picking.sudi_origin_receipt_id
+        ))
+        return pickings
+
+    def action_sudi_confirm_pickup(self, occurred_at=None, location=None):
+        result = super().action_sudi_confirm_pickup(
+            occurred_at=occurred_at, location=location
+        )
+        self.env["sudi.app.notice"]._sudi_raise("office_validate", self)
+        return result
+
+    def action_confirm(self):
+        """Mark READY for job work, from the form or the app.
+
+        Only a receipt that actually *reached* "assigned" here is announced,
+        so confirming one that was already in job work rings nobody's bell.
+        """
+        before = {picking.id: picking.state for picking in self}
+        result = super().action_confirm()
+        ready = self.filtered(
+            lambda picking: picking.sudi_is_diamond_job_work
+            and picking.picking_type_code == "incoming"
+            and picking.state == "assigned"
+            and before.get(picking.id) != "assigned"
+        )
+        self.env["sudi.app.notice"]._sudi_raise("jobwork_ready", ready)
+        return result
+
+    def _sudi_transfer_department(self, job_type):
+        result = super()._sudi_transfer_department(job_type)
+        self.env["sudi.app.notice"]._sudi_raise(
+            "department_transfer", self,
+            department=job_type.sudo().display_name,
+            actor=self.env.user.name,
+        )
+        return result

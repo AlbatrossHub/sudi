@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Dynamic PWA Branding',
-    'version': '19.0.1.0.0',
+    'version': '20.0.1.0.0',
     'category': 'Website',
     'summary': 'Dynamic Progressive Web App Branding & AI-Powered Customization',
     'description': """
@@ -53,10 +53,10 @@ Use the built-in AI prompt templates to generate:
     ],
     'data': [
         'security/pwa_security.xml',
-        'security/ir.model.access.csv',
         'data/pwa_default_data.xml',
         'views/pwa_config_views.xml',
         'views/res_config_settings_views.xml',
+        'security/ir.access.csv',
     ],
     'assets': {
         'web.assets_backend': [

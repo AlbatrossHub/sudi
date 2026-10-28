@@ -1,6 +1,6 @@
 {
     "name": "Sudi Diamond Job Work Analytics",
-    "version": "19.0.1.0.0",
+    "version": "20.0.1.0.0",
     "summary": "Neumorphic analytical dashboard for diamond job work",
     "description": """
 Analytical dashboard for Sudi diamond job work.

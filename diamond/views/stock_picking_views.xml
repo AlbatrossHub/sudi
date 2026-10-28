@@ -15,7 +15,9 @@
             <xpath expr="//header/button[@name='button_validate'][2]" position="attributes">
                 <attribute name="invisible">state in ('sudi_pickup_pending', 'waiting', 'assigned', 'done', 'cancel') or (sudi_is_diamond_job_work and picking_type_code == 'outgoing' and sudi_origin_receipt_id)</attribute>
             </xpath>
-            <xpath expr="//header/field[@name='state'][@widget='statusbar'][1]" position="attributes">
+            <!-- Odoo 20: the picking statusbar widget is stock_picking_locked_statusbar,
+                 so anchor on the field name alone. -->
+            <xpath expr="//header/field[@name='state'][1]" position="attributes">
                 <attribute name="statusbar_visible">sudi_pickup_pending,draft,assigned,done</attribute>
             </xpath>
 
@@ -28,6 +30,13 @@
                         icon="fa-flag-checkered"
                         groups="stock.group_stock_user"
                         data-hotkey="q"/>
+                <field name="sudi_has_open_service_requests" invisible="1"/>
+                <button name="action_sudi_add_lines_from_requests"
+                        string="Add entries from requested services"
+                        type="object"
+                        class="btn-secondary"
+                        groups="stock.group_stock_user"
+                        invisible="state != 'draft' or not sudi_is_diamond_job_work or picking_type_code != 'incoming' or not sudi_has_open_service_requests"/>
                 <button name="action_sudi_open_confirm_pickup_wizard"
                         string="Confirm Pickup"
                         type="object"
@@ -181,6 +190,11 @@
                 <field name="sudi_pickup_datetime"
                        invisible="not sudi_is_diamond_job_work"
                        readonly="state in ['cancel', 'done']"/>
+                <field name="sudi_jangad_source"
+                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or not sudi_jangad_source"/>
+                <field name="sudi_posted_by_id"
+                       invisible="not sudi_posted_by_id"
+                       widget="many2one_avatar_user"/>
                 <field name="sudi_customer_contact"
                        invisible="not sudi_is_diamond_job_work"
                        readonly="state in ['cancel', 'done']"/>
@@ -241,6 +255,26 @@
             </xpath>
 
             <xpath expr="//page[@name='operations']" position="after">
+                <page string="Requested Services"
+                      name="sudi_service_requests"
+                      invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'">
+                    <div class="text-muted mb-2">
+                        <i class="oi" data-icon="info" role="img" aria-label="Information" title="Information"/>
+                        What the customer asked for when the jangad was posted. "Add entries from requested services" turns every request not yet entered into an item line.
+                    </div>
+                    <field name="sudi_service_request_ids"
+                           readonly="state in ('assigned', 'done', 'cancel')"
+                           context="{'default_picking_id': id}">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="job_type_id" options="{'no_create': True}"/>
+                            <field name="quantity"/>
+                            <field name="unit"/>
+                            <field name="remarks"/>
+                            <field name="move_id" readonly="1" optional="show"/>
+                        </list>
+                    </field>
+                </page>
                 <page string="Billing Details"
                       name="sudi_billing_details"
                       groups="stock.group_stock_manager"
@@ -297,19 +331,17 @@
                       groups="hr_timesheet.group_hr_timesheet_user"
                       invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming'">
                     <field name="sudi_timesheet_ids"
-                           widget="timesheets_one2many"
                            mode="list,kanban"
                            context="{'default_sudi_picking_id': id, 'default_sudi_job_type_id': sudi_timesheet_job_type_id}">
                         <list editable="top" string="Timesheet Activities" decoration-muted="readonly_timesheet == True">
                             <field name="readonly_timesheet" column_invisible="True"/>
                             <field name="is_timer_running" column_invisible="True"/>
-                            <field name="timer_start" column_invisible="True"/>
                             <field name="date" readonly="readonly_timesheet or is_timer_running"/>
                             <field name="user_id" column_invisible="True"/>
                             <field name="employee_id" widget="many2one_avatar_employee" required="1" context="{'active_test': True}" readonly="readonly_timesheet or is_timer_running"/>
                             <field name="sudi_job_type_id" required="1" readonly="readonly_timesheet or is_timer_running"/>
                             <field name="name" required="0" readonly="readonly_timesheet"/>
-                            <field name="unit_amount" string="Time Spent" widget="timesheet_uom_timer" decoration-danger="unit_amount &gt; 24 or unit_amount &lt; 0" readonly="id and (readonly_timesheet or is_timer_running)"/>
+                            <field name="unit_amount" string="Time Spent" widget="timesheet_uom" decoration-danger="unit_amount &gt; 24 or unit_amount &lt; 0" readonly="id and (readonly_timesheet or is_timer_running)"/>
                             <field name="project_id" column_invisible="True"/>
                             <field name="task_id" column_invisible="True"/>
                             <field name="company_id" column_invisible="True"/>
@@ -368,10 +400,10 @@
                 <attribute name="readonly">state in ('sudi_pickup_pending', 'cancel', 'done')</attribute>
             </xpath>
 
-            <xpath expr="//field[@name='move_ids']/list/field[@name='product_id']" position="before">
+            <xpath expr="//field[@name='move_ids']/list//field[@name='product_id']" position="before">
                 <field name="sudi_sr" optional="show"/>
             </xpath>
-            <xpath expr="//field[@name='move_ids']/list/field[@name='description_picking']" position="after">
+            <xpath expr="//field[@name='move_ids']/list//field[@name='description_picking']" position="after">
                 <field name="sudi_size" optional="show"/>
                 <field name="sudi_pcs_qty" optional="show"/>
                 <field name="sudi_carats" optional="show"/>
@@ -790,19 +822,17 @@
                               name="sudi_timesheets"
                               groups="hr_timesheet.group_hr_timesheet_user">
                             <field name="sudi_timesheet_ids"
-                                   widget="timesheets_one2many"
                                    mode="list,kanban"
                                    context="{'default_sudi_picking_id': id, 'default_sudi_job_type_id': sudi_timesheet_job_type_id}">
                                 <list editable="top" string="Timesheet Activities" decoration-muted="readonly_timesheet == True">
                                     <field name="readonly_timesheet" column_invisible="True"/>
                                     <field name="is_timer_running" column_invisible="True"/>
-                                    <field name="timer_start" column_invisible="True"/>
                                     <field name="date" readonly="readonly_timesheet or is_timer_running"/>
                                     <field name="user_id" column_invisible="True"/>
                                     <field name="employee_id" widget="many2one_avatar_employee" required="1" context="{'active_test': True}" readonly="readonly_timesheet or is_timer_running"/>
                                     <field name="sudi_job_type_id" required="1" readonly="readonly_timesheet or is_timer_running"/>
                                     <field name="name" required="0" readonly="readonly_timesheet"/>
-                                    <field name="unit_amount" string="Time Spent" widget="timesheet_uom_timer" decoration-danger="unit_amount &gt; 24 or unit_amount &lt; 0" readonly="id and (readonly_timesheet or is_timer_running)"/>
+                                    <field name="unit_amount" string="Time Spent" widget="timesheet_uom" decoration-danger="unit_amount &gt; 24 or unit_amount &lt; 0" readonly="id and (readonly_timesheet or is_timer_running)"/>
                                     <field name="project_id" column_invisible="True"/>
                                     <field name="task_id" column_invisible="True"/>
                                     <field name="company_id" column_invisible="True"/>

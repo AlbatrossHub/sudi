@@ -1,9 +1,11 @@
 /** @odoo-module **/
 
-import { Component, useState, useRef, onMounted, onWillUnmount } from "@odoo/owl";
+import { Component, onMounted, onWillUnmount, proxy, signal, usePlugin, useProps } from "@odoo/owl";
+import { NotificationPlugin } from "@web/core/notifications/notification_plugin";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
+import { ActionPlugin, standardActionServiceProps } from "@web/webclient/actions/action_plugin";
 
 // ── Step type metadata (icon / colour / label / has single output) ─────────
 const STEP_TYPES = {
@@ -29,20 +31,20 @@ function m2oId(val) {
 
 export class OwaChatbotDesigner extends Component {
     static template = "open_whatsapp_connector.OwaChatbotDesigner";
-    static props = ["*"];
+    props = useProps({ ...standardActionServiceProps });
 
     setup() {
         this.orm = useService("orm");
-        this.action = useService("action");
-        this.notification = useService("notification");
+        this.action = usePlugin(ActionPlugin);
+        this.notification = usePlugin(NotificationPlugin);
 
         const action = this.props.action || {};
         const params = action.params || action.context || {};
         this.chatbotId =
             params.chatbot_id || (action.context && action.context.active_id) || null;
 
-        this.canvasRef = useRef("canvas");
-        this.state = useState({
+        this.canvasRef = signal.ref();
+        this.state = proxy({
             loading: true,
             bot: {},
             nodes: [],
@@ -258,7 +260,7 @@ export class OwaChatbotDesigner extends Component {
 
     // Screen → world coordinate conversion.
     toWorld(clientX, clientY) {
-        const rect = this.canvasRef.el.getBoundingClientRect();
+        const rect = this.canvasRef().getBoundingClientRect();
         const v = this.state.view;
         return {
             x: (clientX - rect.left - v.panX) / v.zoom,
@@ -398,7 +400,7 @@ export class OwaChatbotDesigner extends Component {
     async createStep(type = "message", x = null, y = null) {
         if (x === null) {
             // Drop near the current viewport centre.
-            const rect = this.canvasRef.el.getBoundingClientRect();
+            const rect = this.canvasRef().getBoundingClientRect();
             const c = this.toWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
             x = c.x - NODE_W / 2;
             y = c.y - HEADER_H;

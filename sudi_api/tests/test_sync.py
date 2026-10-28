@@ -15,7 +15,7 @@ class SudiSyncApiCase(SudiApiCase):
         cls.operator.sudo().write({"group_ids": [
             Command.link(cls.env.ref("diamond.group_sudi_job_work_user").id)
         ]})
-        cls.env["ir.config_parameter"].sudo().set_param(
+        cls.env["ir.config_parameter"].sudo().set_str(
             "sudi_sync.visibility_lag_seconds", "0"
         )
         cls.partner = cls.env["res.partner"].create({"name": "Kiran Gems"})
@@ -159,7 +159,7 @@ class TestSudiSyncPullContent(SudiSyncApiCase):
     def test_a_stale_cursor_is_answered_with_a_full_resync(self):
         self._pending_receipt()
         token = self._login(device_uid="sync-op000014")["access_token"]
-        self.env["ir.config_parameter"].sudo().set_param(
+        self.env["ir.config_parameter"].sudo().set_str(
             "sudi_sync.pruned_through", "999999"
         )
         body = self._pull(token, "?scopes=pickup&cursor=5").json()
@@ -277,7 +277,7 @@ class TestSudiJangadPages(SudiSyncApiCase):
 
         buffer = io.BytesIO()
         Image.new("RGB", (4, 4), (255, 255, 255)).save(buffer, format="PNG")
-        return base64.b64encode(buffer.getvalue())
+        return base64.b64encode(buffer.getvalue()).decode()  # Odoo 20: Binary fields reject raw bytes
 
     def _fetch(self, token, picking_id, page):
         self.env.flush_all()

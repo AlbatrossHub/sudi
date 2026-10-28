@@ -22,7 +22,7 @@
                                 <strong>Period:</strong>
                                 <span t-field="o.sudi_billing_period_from"/> – <span t-field="o.sudi_billing_period_to"/><br/>
                             </t>
-                            <strong>Receipts:</strong> <span t-esc="', '.join(o.sudi_receipt_ids.sorted('name').mapped('name'))"/>
+                            <strong>Receipts:</strong> <span t-out="', '.join(o.sudi_receipt_ids.sorted('name').mapped('name'))"/>
                         </div>
                     </div>
 
@@ -45,33 +45,33 @@
                             <t t-foreach="annexure_groups" t-as="group">
                                 <t t-foreach="group['lines']" t-as="line">
                                     <tr>
-                                        <td><span t-if="line_first and group['date']" t-esc="group['date']" t-options="{'widget': 'date'}"/></td>
-                                        <td><span t-if="line_first" t-esc="group['receipt'].name"/></td>
-                                        <td><span t-if="line_first" t-esc="group['delivery'].name"/></td>
-                                        <td class="text-center"><span t-esc="line.sudi_sr or ''"/></td>
-                                        <td><span t-esc="line.sudi_size or ''"/></td>
+                                        <td><span t-if="line_first and group['date']" t-out="group['date']" t-options="{'widget': 'date'}"/></td>
+                                        <td><span t-if="line_first" t-out="group['receipt'].name"/></td>
+                                        <td><span t-if="line_first" t-out="group['delivery'].name"/></td>
+                                        <td class="text-center"><span t-out="line.sudi_sr or ''"/></td>
+                                        <td><span t-out="line.sudi_size or ''"/></td>
                                         <td>
-                                            <span t-esc="line.sudi_job_type_id.name"/>
+                                            <span t-out="line.sudi_job_type_id.name"/>
                                             <span t-if="line.sudi_returned_without_work" class="fst-italic"> — returned without job work</span>
                                         </td>
-                                        <td class="text-end"><span t-esc="line.sudi_pcs_qty" t-options="{'widget': 'float', 'precision': 2}"/></td>
-                                        <td class="text-end"><span t-esc="line.sudi_carats" t-options="{'widget': 'float', 'precision': 3}"/></td>
+                                        <td class="text-end"><span t-out="line.sudi_pcs_qty" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="text-end"><span t-out="line.sudi_carats" t-options="{'widget': 'float', 'precision': 3}"/></td>
                                         <td class="text-end">
-                                            <span t-if="not line.sudi_returned_without_work" t-esc="line.sudi_price_unit" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                                            <span t-if="not line.sudi_returned_without_work" t-out="line.sudi_price_unit" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
                                             <span t-else="">—</span>
                                         </td>
                                         <td class="text-end">
-                                            <span t-if="not line.sudi_returned_without_work" t-esc="line.sudi_billable_amount" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                                            <span t-if="not line.sudi_returned_without_work" t-out="line.sudi_billable_amount" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
                                             <span t-else="">—</span>
                                         </td>
                                     </tr>
                                 </t>
                                 <tr class="sudi_annexure_subtotal">
-                                    <td colspan="6" class="text-end fst-italic">Delivery <t t-esc="group['delivery'].name"/> total</td>
-                                    <td class="text-end"><span t-esc="group['pcs']" t-options="{'widget': 'float', 'precision': 2}"/></td>
-                                    <td class="text-end"><span t-esc="group['carats']" t-options="{'widget': 'float', 'precision': 3}"/></td>
+                                    <td colspan="6" class="text-end fst-italic">Delivery <t t-out="group['delivery'].name"/> total</td>
+                                    <td class="text-end"><span t-out="group['pcs']" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                    <td class="text-end"><span t-out="group['carats']" t-options="{'widget': 'float', 'precision': 3}"/></td>
                                     <td/>
-                                    <td class="text-end"><span t-esc="group['amount']" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                                    <td class="text-end"><span t-out="group['amount']" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
                                 </tr>
                             </t>
                         </tbody>
@@ -91,16 +91,16 @@
                                 </thead>
                                 <tbody>
                                     <tr t-foreach="job_totals" t-as="job">
-                                        <td><span t-esc="job['name']"/></td>
-                                        <td class="text-end"><span t-esc="job['pcs']" t-options="{'widget': 'float', 'precision': 2}"/></td>
-                                        <td class="text-end"><span t-esc="job['carats']" t-options="{'widget': 'float', 'precision': 3}"/></td>
-                                        <td class="text-end"><span t-esc="job['amount']" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                                        <td><span t-out="job['name']"/></td>
+                                        <td class="text-end"><span t-out="job['pcs']" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="text-end"><span t-out="job['carats']" t-options="{'widget': 'float', 'precision': 3}"/></td>
+                                        <td class="text-end"><span t-out="job['amount']" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
                                     </tr>
                                     <tr class="fw-bold">
                                         <td>Total (before tax)</td>
-                                        <td class="text-end"><span t-esc="sum(j['pcs'] for j in job_totals)" t-options="{'widget': 'float', 'precision': 2}"/></td>
-                                        <td class="text-end"><span t-esc="sum(j['carats'] for j in job_totals)" t-options="{'widget': 'float', 'precision': 3}"/></td>
-                                        <td class="text-end"><span t-esc="sum(j['amount'] for j in job_totals)" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                                        <td class="text-end"><span t-out="sum(j['pcs'] for j in job_totals)" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="text-end"><span t-out="sum(j['carats'] for j in job_totals)" t-options="{'widget': 'float', 'precision': 3}"/></td>
+                                        <td class="text-end"><span t-out="sum(j['amount'] for j in job_totals)" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
                                     </tr>
                                 </tbody>
                             </table>

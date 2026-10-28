@@ -56,7 +56,7 @@ class OwaSatisfactionScore(models.Model):
                 'survey_id': survey.id,
                 'partner_id': channel.whatsapp_partner_id.id,
             })
-            base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url') or ''
+            base_url = self.env['ir.config_parameter'].sudo().get_str('web.base.url')
             link = urljoin(base_url + '/', f'survey/start/{survey.access_token}?answer_token={user_input.access_token}')
             mobile = channel.whatsapp_partner_id.phone
             if not mobile:

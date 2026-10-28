@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, Header, Query, Response, status
 from ..dependencies import (
     Caller,
     ROLE_JOB_WORK,
+    ROLE_OFFICE,
     ROLE_PICKUP_DELIVERY,
     field_caller,
 )
@@ -25,11 +26,13 @@ from ..schemas import SyncPullResult
 router = APIRouter(prefix="/sync", tags=["sync"])
 
 # Which role a scope belongs to. Pickup and delivery are the same person;
-# job work is deliberately somebody else.
+# job work is deliberately somebody else, and so is the office validating what
+# was collected.
 SCOPE_ROLES = {
     "pickup": ROLE_PICKUP_DELIVERY,
     "delivery": ROLE_PICKUP_DELIVERY,
     "jobwork": ROLE_JOB_WORK,
+    "office": ROLE_OFFICE,
 }
 
 

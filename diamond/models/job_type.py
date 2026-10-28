@@ -1,6 +1,10 @@
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 
+# How a quantity of this service is counted, in the short form the apps show
+# next to a number. A manual basis has no natural unit, so it shows none.
+SUDI_UNIT_BY_BASIS = {"pieces": "pcs", "carats": "ct"}
+
 
 class SudiDiamondJobType(models.Model):
     _name = "sudi.diamond.job.type"
@@ -106,3 +110,13 @@ class SudiDiamondJobType(models.Model):
         """Description of the consolidated invoice line for this job type."""
         self.ensure_one()
         return self.invoice_description or self.name
+
+    def _sudi_unit(self):
+        """``pcs``, ``ct`` or ``""``: what a quantity of this service counts.
+
+        Derived from ``invoice_basis`` rather than stored beside it, so the
+        unit a customer requests in and the unit the invoice bills in cannot
+        disagree.
+        """
+        self.ensure_one()
+        return SUDI_UNIT_BY_BASIS.get(self.invoice_basis, "")

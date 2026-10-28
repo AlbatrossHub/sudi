@@ -15,7 +15,7 @@ def _png(size=(1, 1)):
     so a hand-written base64 literal is not good enough."""
     buffer = io.BytesIO()
     Image.new("RGB", size, (255, 255, 255)).save(buffer, format="PNG")
-    return base64.b64encode(buffer.getvalue())
+    return base64.b64encode(buffer.getvalue()).decode()  # Odoo 20: Binary fields reject raw bytes
 
 
 PIXEL = _png()
@@ -97,7 +97,7 @@ class TestSudiFieldEventCapture(SudiJobWorkCase):
         # through every one of them.
         params = cls.env["ir.config_parameter"].sudo()
         for requirement in ("receiver_name", "signature", "photo"):
-            params.set_param(f"sudi_diamond.pod_require_{requirement}", "0")
+            params.set_str(f"sudi_diamond.pod_require_{requirement}", "0")
 
     def _pending_receipt(self):
         return self.env["stock.picking"].create({
@@ -181,7 +181,10 @@ class TestSudiFieldEventCapture(SudiJobWorkCase):
         self.assertTrue(as_operator.name)
 
     def test_an_operator_cannot_read_someone_elses_collection(self):
-        other = self.env["res.users"].create({
+        # sudo: the v20 test harness runs as a limited _test_user that may
+        # not create users; user creation is fixture setup, not the behaviour
+        # under test.
+        other = self.env["res.users"].sudo().create({
             "name": "Other Onfield",
             "login": "sudi_capture_operator_2",
             "group_ids": [Command.set([
@@ -256,7 +259,7 @@ class TestSudiProofOfDelivery(SudiJobWorkCase):
         """
         params = self.env["ir.config_parameter"].sudo()
         for name in ("receiver_name", "signature", "photo"):
-            params.set_param(
+            params.set_str(
                 f"sudi_diamond.pod_require_{name}",
                 "1" if requirements.get(name) else "0",
             )

@@ -1,6 +1,6 @@
-import { Chatter } from "@mail/chatter/web_portal/chatter";
+import { Chatter } from "@mail/chatter/web_portal_project/chatter";
 import { patch } from "@web/core/utils/patch";
-import { useRef, useState } from "@odoo/owl";
+import { proxy, signal } from "@odoo/owl";
 
 patch(Chatter.prototype, {
     setup() {
@@ -9,10 +9,10 @@ patch(Chatter.prototype, {
         // INLINE inside the chatter when the 'WhatsApp' button is toggled on.
         // Stays in the chatter — never opens a compose dialog nor redirects to
         // the Discuss app. (#wa-open-chat)
-        this.owaState = useState({ thread: null });
+        this.owaState = proxy({ thread: null });
         // Scroll container for the inline conversation; passed to the Thread so
         // it auto-scrolls to the newest message (at the bottom).
-        this.owaScroller = useRef("owaScroller");
+        this.owaScroller = signal.ref();
     },
     // Toggle the inline WhatsApp conversation for this record's contact.
     async toggleWhatsapp() {
@@ -29,10 +29,7 @@ patch(Chatter.prototype, {
             if (!channelId) {
                 return;
             }
-            const channel = await this.store.Thread.getOrFetch({
-                model: "discuss.channel",
-                id: channelId,
-            });
+            const channel = await this.store["discuss.channel"].getOrFetch(channelId);
             if (channel) {
                 this.owaState.thread = channel;
                 // The embedded Thread isn't the "active" Discuss thread, so load

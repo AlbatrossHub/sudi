@@ -1,0 +1,6 @@
+id,name,model_id,group_id/id,operation,domain
+access_pwa_config_user,pwa.config.user,pwa.config,pwa_dynamic_branding.group_pwa_user,r,
+access_pwa_config_manager,pwa.config.manager,pwa.config,pwa_dynamic_branding.group_pwa_manager,crud,
+access_pwa_ai_branding_user,pwa.ai.branding.user,pwa.ai.branding,pwa_dynamic_branding.group_pwa_user,r,
+access_pwa_ai_branding_manager,pwa.ai.branding.manager,pwa.ai.branding,pwa_dynamic_branding.group_pwa_manager,crud,
+access_pwa_ai_branding_wizard,pwa.ai.branding.wizard.all,pwa.ai.branding.wizard,base.group_user,crud,

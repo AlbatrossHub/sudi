@@ -2,7 +2,6 @@ import logging
 
 from odoo import _, api, models
 from odoo.exceptions import UserError
-from odoo.addons.mail.tools.discuss import Store
 
 _logger = logging.getLogger(__name__)
 
@@ -10,13 +9,14 @@ _logger = logging.getLogger(__name__)
 class MailThread(models.AbstractModel):
     _inherit = 'mail.thread'
 
-    def _thread_to_store(self, store: Store, fields, *, request_list=None):
-        super()._thread_to_store(store, fields, request_list=request_list)
+    def _store_thread_fields(self, res, *, request_list, **kwargs):
+        # Odoo 20 port: _thread_to_store() became _store_thread_fields().
+        super()._store_thread_fields(res, request_list=request_list, **kwargs)
         if request_list:
             can_send = bool(self.env['owa.account'].search([
                 ('session_state', '=', 'connected'),
             ], limit=1))
-            store.add(self, {"canSendWhatsapp": can_send}, as_thread=True)
+            res.append({"canSendWhatsapp": can_send})
 
     def action_owa_get_channel_id(self):
         """Return the id of THIS record's WhatsApp conversation channel

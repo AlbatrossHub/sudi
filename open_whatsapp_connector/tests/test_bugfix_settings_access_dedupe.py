@@ -53,18 +53,18 @@ class TestOwaBugfixBatch(OwaTestCase):
     def test_autocreate_off_persists_and_reads_back(self):
         self.Settings.create({'owa_auto_create_contacts': False}).set_values()
         # OFF is stored as an explicit string (not deleted) ...
-        self.assertEqual(self.ICP.get_param(AUTO), 'false')
+        self.assertEqual(self.ICP.get_str(AUTO), 'false')
         # ... and a freshly-opened settings screen reflects OFF.
         self.assertFalse(self.Settings.create({}).owa_auto_create_contacts)
 
     def test_autocreate_back_on_persists(self):
         self.Settings.create({'owa_auto_create_contacts': False}).set_values()
         self.Settings.create({'owa_auto_create_contacts': True}).set_values()
-        self.assertEqual(self.ICP.get_param(AUTO), 'true')
+        self.assertEqual(self.ICP.get_str(AUTO), 'true')
         self.assertTrue(self.Settings.create({}).owa_auto_create_contacts)
 
     def test_autocreate_off_blocks_creation(self):
-        self.ICP.set_param(AUTO, 'false')
+        self.ICP.set_str(AUTO, 'false')
         before = self.Partner.search_count([])
         got = self.Partner._find_or_create_from_wa_number('919812390001', 'Ghost')
         self.assertFalse(got)
@@ -98,7 +98,7 @@ class TestOwaBugfixBatch(OwaTestCase):
 
     # == FIX2 — Allowed Group access pool =================================
     def test_allowed_group_member_added_on_new_inbound(self):
-        self.ICP.set_param(CHATVIS, 'shared')
+        self.ICP.set_str(CHATVIS, 'shared')
         group = self.env['res.groups'].create({'name': 'WA Agents T1'})
         agent = self._internal_user('wa_grp_agent1')
         group.sudo().write({'user_ids': [(4, agent.id)]})
@@ -108,7 +108,7 @@ class TestOwaBugfixBatch(OwaTestCase):
         self.assertIn(agent.partner_id, ch.channel_member_ids.partner_id)
 
     def test_allowed_group_backfills_existing_on_write(self):
-        self.ICP.set_param(CHATVIS, 'shared')
+        self.ICP.set_str(CHATVIS, 'shared')
         ch = self._channel_on(self.account, '+919812300002')
         agent = self._internal_user('wa_grp_agent2')
         group = self.env['res.groups'].create({'name': 'WA Agents T2'})
@@ -119,7 +119,7 @@ class TestOwaBugfixBatch(OwaTestCase):
         self.assertIn(agent.partner_id, ch.channel_member_ids.partner_id)
 
     def test_resync_button_applies_group(self):
-        self.ICP.set_param(CHATVIS, 'shared')
+        self.ICP.set_str(CHATVIS, 'shared')
         group = self.env['res.groups'].create({'name': 'WA Agents T3'})
         agent = self._internal_user('wa_grp_agent3')
         group.sudo().write({'user_ids': [(4, agent.id)]})
@@ -135,7 +135,7 @@ class TestOwaBugfixBatch(OwaTestCase):
     def test_delete_reassigns_to_default_account(self):
         acct2 = self._connected_account('reassign-target')
         ch = self._channel_on(self.account, '+919812300010')
-        self.ICP.set_param(DEFACC, str(acct2.id))
+        self.ICP.set_int(DEFACC, acct2.id)
         with self.mock_sidecar():
             self.account.unlink()
         self.assertEqual(ch.owa_account_id, acct2)
@@ -143,7 +143,7 @@ class TestOwaBugfixBatch(OwaTestCase):
     def test_delete_reassigns_to_first_connected_when_no_default(self):
         acct2 = self._connected_account('other-connected')
         ch = self._channel_on(self.account, '+919812300011')
-        self.ICP.set_param(DEFACC, '')
+        self.ICP.set_int(DEFACC, None)
         with self.mock_sidecar():
             self.account.unlink()
         self.assertEqual(ch.owa_account_id, acct2)
@@ -160,7 +160,7 @@ class TestOwaBugfixBatch(OwaTestCase):
         msg = self.Message.create({
             'mobile_number': '+919812300030', 'message_type': 'outbound',
             'state': 'outgoing', 'wa_account_id': self.account.id})
-        self.ICP.set_param(DEFACC, str(acct2.id))
+        self.ICP.set_int(DEFACC, acct2.id)
         with self.mock_sidecar():
             self.account.unlink()
         self.assertEqual(msg.wa_account_id, acct2)
@@ -173,7 +173,7 @@ class TestOwaBugfixBatch(OwaTestCase):
         num = '+919812300031'
         ch_a = self._channel_on(self.account, num)
         ch_c = self._channel_on(acct2, num)
-        self.ICP.set_param(DEFACC, str(acct2.id))
+        self.ICP.set_int(DEFACC, acct2.id)
         with self.mock_sidecar():
             self.account.unlink()
         self.assertFalse(ch_a.active)          # redundant one archived
@@ -193,7 +193,7 @@ class TestOwaBugfixBatch(OwaTestCase):
     def test_autocreate_legacy_capital_true_reads_on(self):
         # A DB upgraded from the old default-True config_parameter Boolean stored
         # 'True' (capital) — the settings screen must still read it as ON.
-        self.ICP.set_param(AUTO, 'True')
+        self.ICP.set_str(AUTO, 'True')
         self.assertTrue(self.Settings.create({}).owa_auto_create_contacts)
 
     def test_is_default_checkbox_syncs_param(self):
@@ -201,16 +201,16 @@ class TestOwaBugfixBatch(OwaTestCase):
         # delete-reassign and the reply fallback read.
         acct2 = self._connected_account('second-default')
         self.account.is_default = True
-        self.assertEqual(self.ICP.get_param(DEFACC), str(self.account.id))
+        self.assertEqual(self.ICP.get_int(DEFACC), self.account.id)
         self.assertTrue(self.account.is_default)
         self.assertFalse(acct2.is_default)
         # Moving the default to another account updates the param...
         acct2.is_default = True
-        self.assertEqual(self.ICP.get_param(DEFACC), str(acct2.id))
+        self.assertEqual(self.ICP.get_int(DEFACC), acct2.id)
         self.assertFalse(self.account.is_default)
         # ...and unchecking clears it.
         acct2.is_default = False
-        self.assertFalse(int(self.ICP.get_param(DEFACC) or 0))
+        self.assertFalse(self.ICP.get_int(DEFACC))
 
     # == 2026-07-02 v19 bug-hunt round =====================================
     def test_wa_phone_format_rejects_jids(self):
@@ -248,7 +248,7 @@ class TestOwaBugfixBatch(OwaTestCase):
         # With Auto-create Contacts OFF, composing to an unknown number must
         # still create the channel — an empty {} member row used to violate
         # mail's partner-or-guest CHECK constraint and crash the compose.
-        self.ICP.set_param(AUTO, 'false')
+        self.ICP.set_str(AUTO, 'false')
         ch = self.account._get_or_create_channel('919812300060')
         self.assertTrue(ch)
         self.assertFalse(ch.whatsapp_partner_id)
@@ -258,7 +258,7 @@ class TestOwaBugfixBatch(OwaTestCase):
     def test_explicit_import_bypasses_autocreate_off(self):
         # "Import contacts" is explicit user intent — the passive auto-create
         # toggle being OFF must not silently import zero contacts.
-        self.ICP.set_param(AUTO, 'false')
+        self.ICP.set_str(AUTO, 'false')
         Partner = self.Partner.with_context(owa_force_contact_create=True)
         p = Partner._find_or_create_from_wa_number('919812300070', 'Imported Guy')
         self.assertTrue(p)

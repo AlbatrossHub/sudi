@@ -1,14 +1,14 @@
-import { Component, onWillUnmount } from "@odoo/owl";
+import { BusPlugin } from "@bus/services/bus_plugin";
+import { Component, onWillUnmount, usePlugin, useProps } from "@odoo/owl";
 import { registry } from "@web/core/registry";
-import { useService } from "@web/core/utils/hooks";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
 
 export class OwaCampaignBusListener extends Component {
-    static props = standardWidgetProps;
+    props = useProps(standardWidgetProps);
     static template = "open_whatsapp_connector.OwaCampaignBusListener";
 
     setup() {
-        const busService = useService("bus_service");
+        const busService = usePlugin(BusPlugin);
         let active = true;
         const handler = ({ id }) => {
             if (!active) {

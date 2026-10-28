@@ -1,12 +1,16 @@
-"""Job-work intents: the timer, the department, and finishing.
+"""Job-work intents: the timer, manual time, the department, and finishing.
 
 Finishing is the one intent that cannot be queued offline (decision D2): it
-runs Odoo's stock validation chain, whose outcome cannot be predicted on the
+runs the stock validation chain, whose outcome cannot be predicted on the
 device, so queueing it would mean showing an operator a success that may not
 happen.
 """
 
+from datetime import timedelta
 from typing import Annotated
+
+from odoo import fields
+from odoo.exceptions import UserError
 
 from fastapi import APIRouter, Depends, Header
 
@@ -17,8 +21,14 @@ from ..schemas import (
     DepartmentInput,
     FinishJobWorkInput,
     JobWorkIntentResult,
+    TimeLogInput,
+    TimeLogResult,
     TimerInput,
 )
+
+# How far back a manual entry may be dated from the moment it was captured.
+# Time is logged for the week just worked, not for last quarter.
+MAX_TIMESHEET_BACKDATE_DAYS = 31
 
 router = APIRouter(prefix="/jobwork", tags=["jobwork"])
 
@@ -73,6 +83,80 @@ def timer(
     return reservation.store(JobWorkIntentResult(
         code=code, record=intents.document(caller_obj, "jobwork", picking_id)
     ).model_dump())
+
+
+def time_entry(line):
+    """One timesheet line as the app shows it, for the log and My work."""
+    return {
+        "id": line.id,
+        "date": line.date.isoformat() if line.date else None,
+        "picking": {"id": line.sudi_picking_id.id, "name": line.sudi_picking_id.name},
+        "job_type": (
+            {"id": line.sudi_job_type_id.id, "name": line.sudi_job_type_id.display_name}
+            if line.sudi_job_type_id else None
+        ),
+        "hours": line.unit_amount,
+        "description": line.name if line.name and line.name != "/" else None,
+        "running": bool(line.is_timer_running),
+    }
+
+
+@router.post(
+    "/{picking_id}/timesheets",
+    response_model=TimeLogResult,
+    summary="Log time spent on a receipt by hand",
+)
+def log_time(
+    picking_id: int,
+    data: TimeLogInput,
+    caller_obj: Annotated[Caller, Depends(job_work_caller)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> TimeLogResult:
+    """The hour that was worked and never timed. Works offline.
+
+    Unlike the timer this one is *not* naturally idempotent -- two identical
+    entries are two hours -- so the capture-time ``Idempotency-Key`` is what
+    stops a retried flush from booking the time twice. Always send it.
+    """
+    reservation = intents.claim(caller_obj, "jobwork.timesheets", idempotency_key)
+    if reservation.is_replay:
+        return reservation.replay
+
+    receipt = intents.in_scope(caller_obj, picking_id, ["jobwork"])
+    intents.lock(caller_obj, [picking_id])
+    occurred_at = intents.event_time(caller_obj, data.occurred_at)
+
+    # The day the work happened, in the worker's own timezone: an entry
+    # captured at 00:30 IST belongs to that day, not to the UTC one before.
+    captured_on = fields.Datetime.context_timestamp(caller_obj.user, occurred_at).date()
+    day = data.date or captured_on
+    if day > captured_on or day < captured_on - timedelta(days=MAX_TIMESHEET_BACKDATE_DAYS):
+        raise validation(
+            f"Time can be logged for {captured_on.isoformat()} or up to "
+            f"{MAX_TIMESHEET_BACKDATE_DAYS} days before it, not {day.isoformat()}.",
+            detail={"date": day.isoformat(), "captured_on": captured_on.isoformat()},
+        )
+
+    job_type = caller_obj.env["sudi.diamond.job.type"].sudo().browse(
+        data.job_type_id
+    ).exists()
+    if not job_type or not job_type.active:
+        raise validation(
+            "That job type does not exist.", detail={"job_type_id": data.job_type_id}
+        )
+
+    try:
+        line = receipt.with_user(caller_obj.user).with_context(
+            sudi_device_uid=caller_obj.device.device_uid
+        )._sudi_log_time(job_type, data.hours, description=data.description, date=day)
+    except UserError as error:
+        raise validation(str(error), detail={"picking_id": picking_id}) from error
+
+    return reservation.store(TimeLogResult(
+        code=intents.RESULT_OK,
+        entry=time_entry(line.sudo()),
+        jobwork=intents.document(caller_obj, "jobwork", picking_id),
+    ).model_dump(), record=line)
 
 
 @router.post(

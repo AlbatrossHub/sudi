@@ -1,3 +1,5 @@
+from markupsafe import Markup
+
 from odoo import models, fields, api
 
 class ResConfigSettings(models.TransientModel):
@@ -19,12 +21,23 @@ class ResConfigSettings(models.TransientModel):
         res = super().get_values()
         param = self.env['ir.config_parameter'].sudo()
         res.update({
-            'powered_by_html': param.get_param('hide_powered_by.powered_by_html', default=''),
+            'powered_by_html': param.get_str('hide_powered_by.powered_by_html'),
         })
         return res
 
     def set_values(self):
         super().set_values()
         param = self.env['ir.config_parameter'].sudo()
-        param.set_param('hide_powered_by.powered_by_html', self.powered_by_html or '')
+        param.set_str('hide_powered_by.powered_by_html', self.powered_by_html or '')
 
+
+    @api.model
+    def _get_powered_by_markup(self):
+        """Stored footer HTML as Markup, so QWeb t-out renders it unescaped.
+
+        The value is admin-configured (Settings form), the same trust level
+        the old t-raw gave it.
+        """
+        return Markup(
+            self.env['ir.config_parameter'].sudo().get_str('hide_powered_by.powered_by_html')
+        )

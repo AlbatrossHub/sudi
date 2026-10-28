@@ -45,7 +45,13 @@ APP_AUDIENCE = {"sudi_field": AUDIENCE_FIELD, "sudi_customer": AUDIENCE_CUSTOMER
 
 ROLE_PICKUP_DELIVERY = "pickup_delivery"
 ROLE_JOB_WORK = "job_work"
+ROLE_OFFICE = "office"
+ROLE_JANGAD_ON_BEHALF = "jangad_on_behalf"
 ROLE_CUSTOMER = "customer"
+
+# Any one of these opens the staff app. Posting a jangad on a customer's
+# behalf is an extra ability on top of one of them, never a way in by itself.
+FIELD_APP_ROLES = (ROLE_PICKUP_DELIVERY, ROLE_JOB_WORK, ROLE_OFFICE)
 
 
 @dataclasses.dataclass
@@ -156,7 +162,7 @@ def assert_audience_allowed(env: Environment, user, aud: str) -> None:
         if not user.share:
             raise forbidden("This account may not use the customer app.")
         return
-    gate = env["ir.config_parameter"].sudo().get_param(PARAM_FIELD_GROUPS_ONLY, "1")
+    gate = env["ir.config_parameter"].sudo().get_str(PARAM_FIELD_GROUPS_ONLY, "1")
     if str(gate).strip().lower() in ("1", "true", "yes"):
         if not env["res.users"]._sudi_api_has_field_role(user):
             raise forbidden("This account has no field role.")
@@ -170,9 +176,7 @@ def _require(caller_obj: Caller, role: str, what: str) -> Caller:
 
 def field_caller(caller_obj: Annotated[Caller, Depends(caller)]) -> Caller:
     """Any member of staff who has an app role at all."""
-    if not (
-        caller_obj.has_role(ROLE_PICKUP_DELIVERY) or caller_obj.has_role(ROLE_JOB_WORK)
-    ):
+    if not any(caller_obj.has_role(role) for role in FIELD_APP_ROLES):
         raise forbidden("Your account has no field role.")
     return caller_obj
 
@@ -183,6 +187,22 @@ def pickup_delivery_caller(caller_obj: Annotated[Caller, Depends(caller)]) -> Ca
 
 def job_work_caller(caller_obj: Annotated[Caller, Depends(caller)]) -> Caller:
     return _require(caller_obj, ROLE_JOB_WORK, "work on job-work receipts")
+
+
+def office_caller(caller_obj: Annotated[Caller, Depends(caller)]) -> Caller:
+    return _require(caller_obj, ROLE_OFFICE, "validate jangads for the office")
+
+
+def on_behalf_caller(caller_obj: Annotated[Caller, Depends(field_caller)]) -> Caller:
+    """Staff who may post a jangad for a customer.
+
+    Built on ``field_caller`` and not on ``caller``: the tick is an extra
+    ability, so an account holding only the tick and no app role is refused
+    exactly as it would be at login.
+    """
+    return _require(
+        caller_obj, ROLE_JANGAD_ON_BEHALF, "post jangads for customers"
+    )
 
 
 def customer_caller(caller_obj: Annotated[Caller, Depends(caller)]) -> Caller:

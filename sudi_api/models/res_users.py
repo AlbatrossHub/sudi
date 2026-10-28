@@ -3,7 +3,12 @@ from odoo import api, models
 ROLE_GROUPS = [
     ("pickup_delivery", "diamond.group_sudi_pickup_delivery_operator"),
     ("job_work", "diamond.group_sudi_job_work_user"),
+    ("office", "diamond.group_sudi_office_validator"),
 ]
+
+# The roles that open the staff app. ``jangad_on_behalf`` is deliberately not
+# one of them: it is an extra ability for someone who already works in the app.
+FIELD_ROLES = {"pickup_delivery", "job_work", "office"}
 
 
 class ResUsers(models.Model):
@@ -22,10 +27,12 @@ class ResUsers(models.Model):
             role for role, xmlid in ROLE_GROUPS
             if self.has_group(xmlid)
         ]
+        if not self.share and self.sudo().sudi_can_post_jangad_on_behalf:
+            roles.append("jangad_on_behalf")
         if self.share:
             roles.append("customer")
         return roles
 
     @api.model
     def _sudi_api_has_field_role(self, user):
-        return bool(set(user._sudi_api_roles()) & {"pickup_delivery", "job_work"})
+        return bool(set(user._sudi_api_roles()) & FIELD_ROLES)

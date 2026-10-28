@@ -1,10 +1,11 @@
 import { registry } from "@web/core/registry";
 
 /**
- * Phase B3 — pipes `owa_presence` bus events into the Thread model so the
- * sidebar/header can show an online dot. Backend emits one event per chat
+ * Phase B3 — pipes `owa_presence` bus events into the DiscussChannel model so
+ * the sidebar/header can show an online dot. Backend emits one event per chat
  * with `{ channel_id, typing, online }` payload; we mirror them onto the
- * matching Thread record's transient flags.
+ * matching channel record's transient flags. (Odoo 20: channels are
+ * DiscussChannel records, no longer Thread.)
  */
 export const owaPresenceListenerService = {
     dependencies: ["bus_service", "mail.store"],
@@ -13,15 +14,12 @@ export const owaPresenceListenerService = {
             if (!payload?.channel_id) {
                 return;
             }
-            const thread = store.Thread.get({
-                model: "discuss.channel",
-                id: payload.channel_id,
-            });
-            if (!thread) {
+            const channel = store["discuss.channel"].get(payload.channel_id);
+            if (!channel) {
                 return;
             }
-            thread.owaOnline = !!payload.online;
-            thread.owaTyping = !!payload.typing;
+            channel.owaOnline = !!payload.online;
+            channel.owaTyping = !!payload.typing;
         });
         bus_service.start();
     },

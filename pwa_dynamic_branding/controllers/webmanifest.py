@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 # Part of Aura Odoo Tech. See LICENSE file for full copyright and licensing details.
 
-import base64
 import mimetypes
 
 from odoo import http
 from odoo.http import request
-from odoo.tools import file_open
+from odoo.tools import BinaryBytes, file_open
 from odoo.tools.image import image_process
 from odoo.addons.web.controllers.webmanifest import WebManifest
 
@@ -31,24 +30,24 @@ class DynamicWebManifest(WebManifest):
         
         # Build config dict from system parameters with fallbacks
         return {
-            'app_name': IrConfigParam.get_param('pwa.app_name') or 
+            'app_name': IrConfigParam.get_str('pwa.app_name') or 
                        (config.app_name if config else False) or 
-                       IrConfigParam.get_param('web.web_app_name', 'Odoo'),
-            'app_short_name': IrConfigParam.get_param('pwa.app_short_name') or 
+                       IrConfigParam.get_str('web.web_app_name', 'Odoo'),
+            'app_short_name': IrConfigParam.get_str('pwa.app_short_name') or 
                              (config.app_short_name if config else False) or 'Odoo',
-            'app_description': IrConfigParam.get_param('pwa.app_description') or 
+            'app_description': IrConfigParam.get_str('pwa.app_description') or 
                               (config.app_description if config else False) or '',
-            'theme_color': IrConfigParam.get_param('pwa.theme_color') or 
+            'theme_color': IrConfigParam.get_str('pwa.theme_color') or 
                           (config.theme_color if config else False) or '#714B67',
-            'background_color': IrConfigParam.get_param('pwa.background_color') or 
+            'background_color': IrConfigParam.get_str('pwa.background_color') or 
                                (config.background_color if config else False) or '#714B67',
-            'display_mode': IrConfigParam.get_param('pwa.display_mode') or 
+            'display_mode': IrConfigParam.get_str('pwa.display_mode') or 
                            (config.display_mode if config else False) or 'standalone',
-            'orientation': IrConfigParam.get_param('pwa.orientation') or 
+            'orientation': IrConfigParam.get_str('pwa.orientation') or 
                           (config.orientation if config else False) or 'any',
-            'start_url': IrConfigParam.get_param('pwa.start_url') or 
+            'start_url': IrConfigParam.get_str('pwa.start_url') or 
                         (config.start_url if config else False) or '/odoo',
-            'scope': IrConfigParam.get_param('pwa.scope') or 
+            'scope': IrConfigParam.get_str('pwa.scope') or 
                     (config.scope if config else False) or '/odoo',
             'config_id': config.id if config else False,
             'has_icon_192': config.icon_192 if config else False,
@@ -62,8 +61,11 @@ class DynamicWebManifest(WebManifest):
         Returns a WebManifest with user-configured settings.
         """
         config = self._get_pwa_config()
-        
-        manifest = {
+
+        # Odoo 20: start from the core manifest so new keys the core adds
+        # (share_target, ...) are kept; then apply the dynamic branding.
+        manifest = super()._get_webmanifest()
+        manifest.update({
             'name': config['app_name'],
             'short_name': config['app_short_name'],
             'description': config['app_description'] or f"{config['app_name']} - Progressive Web App",
@@ -75,7 +77,7 @@ class DynamicWebManifest(WebManifest):
             'theme_color': config['theme_color'],
             'prefer_related_applications': False,
             'categories': ['business', 'productivity'],
-        }
+        })
         
         # Build icons list
         icons = []
@@ -104,18 +106,10 @@ class DynamicWebManifest(WebManifest):
                     'purpose': 'maskable',
                 })
         
-        # Fall back to default Odoo icons if no custom icons
-        if not icons:
-            icon_sizes = ['192x192', '512x512']
-            icons = [{
-                'src': f'/web/static/img/odoo-icon-{size}.png',
-                'sizes': size,
-                'type': 'image/png',
-            } for size in icon_sizes]
-        
-        manifest['icons'] = icons
-        manifest['shortcuts'] = self._get_shortcuts()
-        
+        # Keep the core's default icons/shortcuts unless custom icons exist
+        if icons:
+            manifest['icons'] = icons
+
         return manifest
 
     @http.route('/pwa/icon/<string:size>', type='http', auth='public', methods=['GET'])
@@ -139,13 +133,13 @@ class DynamicWebManifest(WebManifest):
         
         if config:
             if size == '192' and config.icon_192:
-                icon_data = base64.b64decode(config.icon_192)
+                icon_data = config.icon_192.content
             elif size == '512' and config.icon_512:
-                icon_data = base64.b64decode(config.icon_512)
+                icon_data = config.icon_512.content
             elif size == 'maskable' and config.icon_maskable:
-                icon_data = base64.b64decode(config.icon_maskable)
+                icon_data = config.icon_maskable.content
             elif size == 'apple' and config.apple_touch_icon:
-                icon_data = base64.b64decode(config.apple_touch_icon)
+                icon_data = config.apple_touch_icon.content
         
         if not icon_data:
             # Serve default Odoo icon
@@ -180,7 +174,7 @@ class DynamicWebManifest(WebManifest):
         ], limit=1)
         
         if config and config.splash_image:
-            image_data = base64.b64decode(config.splash_image)
+            image_data = config.splash_image.content
             return request.make_response(image_data, headers=[
                 ('Content-Type', 'image/png'),
                 ('Cache-Control', 'public, max-age=604800'),
@@ -224,9 +218,10 @@ const PWA_CONFIG = {{
         
         # Get icon for offline page
         if pwa_config and pwa_config.icon_192:
-            odoo_icon = pwa_config.icon_192
+            odoo_icon = pwa_config.icon_192  # BinaryValue; template calls .to_base64()
         else:
-            odoo_icon = base64.b64encode(file_open(self._icon_path(), 'rb').read())
+            with file_open(self._icon_path(), 'rb') as f:
+                odoo_icon = BinaryBytes(f.read())
         
         # Get offline message from config
         offline_title = 'You are offline'
@@ -257,7 +252,7 @@ const PWA_CONFIG = {{
         IrConfigParam = request.env['ir.config_parameter'].sudo()
         
         # Check if portal PWA is enabled
-        if IrConfigParam.get_param('pwa.enable_portal', 'False') != 'True':
+        if IrConfigParam.get_str('pwa.enable_portal', 'False') != 'True':
             # Return standard manifest
             return self.webmanifest()
         
@@ -268,9 +263,9 @@ const PWA_CONFIG = {{
             ('enable_portal_pwa', '=', True)
         ], limit=1)
         
-        portal_name = IrConfigParam.get_param('pwa.portal_app_name', 'Customer Portal')
-        portal_theme = IrConfigParam.get_param('pwa.portal_theme_color', '#00A09D')
-        portal_start = IrConfigParam.get_param('pwa.portal_start_url', '/my')
+        portal_name = IrConfigParam.get_str('pwa.portal_app_name', 'Customer Portal')
+        portal_theme = IrConfigParam.get_str('pwa.portal_theme_color', '#00A09D')
+        portal_start = IrConfigParam.get_str('pwa.portal_start_url', '/my')
         
         manifest = {
             'name': config.portal_app_name if config else portal_name,
@@ -332,9 +327,9 @@ const PWA_CONFIG = {{
         
         if config:
             if size == '192' and config.portal_icon_192:
-                icon_data = base64.b64decode(config.portal_icon_192)
+                icon_data = config.portal_icon_192.content
             elif size == '512' and config.portal_icon_512:
-                icon_data = base64.b64decode(config.portal_icon_512)
+                icon_data = config.portal_icon_512.content
         
         if not icon_data:
             return self.pwa_icon(size, config_id, **kwargs)
@@ -347,7 +342,7 @@ const PWA_CONFIG = {{
     # ========================================
     # PWA Info API
     # ========================================
-    @http.route('/pwa/config', type='json', auth='public', methods=['POST'])
+    @http.route('/pwa/config', type='jsonrpc', auth='public', methods=['POST'])
     def get_pwa_config_json(self, **kwargs):
         """
         JSON API to get current PWA configuration.

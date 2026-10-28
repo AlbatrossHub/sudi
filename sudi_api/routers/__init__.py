@@ -10,3 +10,8 @@ from .upload_router import router as upload_router
 from .customer_auth_router import router as customer_auth_router
 from .customer_router import router as customer_router
 from .customer_jangad_router import router as customer_jangad_router
+from .catalog_router import router as catalog_router
+from .onbehalf_router import router as onbehalf_router
+from .productivity_router import router as productivity_router
+from .notice_router import router as notice_router
+from .office_router import router as office_router

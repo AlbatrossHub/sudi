@@ -1,10 +1,13 @@
 /** @odoo-module **/
 
-import { Component, useState, useRef, onMounted, onPatched, onWillUnmount } from "@odoo/owl";
+import { BusPlugin } from "@bus/services/bus_plugin";
+import { Component, onMounted, onPatched, onWillUnmount, proxy, signal, usePlugin } from "@odoo/owl";
+import { NotificationPlugin } from "@web/core/notifications/notification_plugin";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
 import { loadChartJS } from "./utils/cdn_loader";
+import { ActionPlugin } from "@web/webclient/actions/action_plugin";
 
 const STATUS_LABELS = {
     outgoing: "Queued",
@@ -96,19 +99,19 @@ export class OwaDashboard extends Component {
 
     setup() {
         this.orm = useService("orm");
-        this.action = useService("action");
-        this.notification = useService("notification");
-        this.busService = useService("bus_service");
+        this.action = usePlugin(ActionPlugin);
+        this.notification = usePlugin(NotificationPlugin);
+        this.busService = usePlugin(BusPlugin);
 
-        this.statusChart = useRef("statusChart");
-        this.perDayChart = useRef("perDayChart");
-        this.topPartnersChart = useRef("topPartnersChart");
-        this.failureChart = useRef("failureChart");
+        this.statusChart = signal.ref();
+        this.perDayChart = signal.ref();
+        this.topPartnersChart = signal.ref();
+        this.failureChart = signal.ref();
 
         this._charts = [];
         this._pendingChartInit = false;
 
-        this.state = useState({
+        this.state = proxy({
             loading: true,
             startingSidecars: false,
             accounts: [],
@@ -268,13 +271,14 @@ export class OwaDashboard extends Component {
     }
 
     sidecarBtnIcon() {
+        // Material Symbols name; the template renders <i class="oi" data-icon=.../>
         if (this.state.startingSidecars) {
-            return "fa fa-spinner fa-spin";
+            return "autorenew";
         }
         if (this.hasNoAccounts()) {
-            return "fa fa-plus";
+            return "add";
         }
-        return this.sidecarsFullyOnline() ? "fa fa-check-circle" : "fa fa-play";
+        return this.sidecarsFullyOnline() ? "check_circle" : "play_arrow";
     }
 
     async onStartSidecars() {
@@ -366,6 +370,10 @@ export class OwaDashboard extends Component {
         });
     }
 
+    onDateFilterChange(field, ev) {
+        this.state.filters[field] = ev.target.value;
+    }
+
     onAccountFilterChange(ev) {
         const value = ev.target.value;
         this.state.filters.accountIds = value ? [parseInt(value, 10)] : [];
@@ -384,11 +392,11 @@ export class OwaDashboard extends Component {
         _applyChartTheme(Chart);
 
         // Status doughnut
-        if (this.statusChart.el) {
+        if (this.statusChart()) {
             const counts = this.state.data.status_counts || {};
             const keys = Object.keys(counts);
             if (keys.length) {
-                this._charts.push(new Chart(this.statusChart.el, {
+                this._charts.push(new Chart(this.statusChart(), {
                     type: "doughnut",
                     data: {
                         labels: keys.map((k) => STATUS_LABELS[k] || k),
@@ -410,19 +418,19 @@ export class OwaDashboard extends Component {
         }
 
         // Messages per day line
-        if (this.perDayChart.el) {
+        if (this.perDayChart()) {
             const out = this.state.data.messages_per_day.outbound || {};
             const inn = this.state.data.messages_per_day.inbound || {};
             const days = Array.from(new Set([...Object.keys(out), ...Object.keys(inn)])).sort();
             // Build vertical gradients for the area fills
-            const ctx = this.perDayChart.el.getContext("2d");
+            const ctx = this.perDayChart().getContext("2d");
             const gradOut = ctx.createLinearGradient(0, 0, 0, 260);
             gradOut.addColorStop(0, "rgba(37, 211, 102, 0.22)");
             gradOut.addColorStop(1, "rgba(37, 211, 102, 0)");
             const gradIn = ctx.createLinearGradient(0, 0, 0, 260);
             gradIn.addColorStop(0, "rgba(79, 70, 229, 0.18)");
             gradIn.addColorStop(1, "rgba(79, 70, 229, 0)");
-            this._charts.push(new Chart(this.perDayChart.el, {
+            this._charts.push(new Chart(this.perDayChart(), {
                 type: "line",
                 data: {
                     labels: days,
@@ -468,9 +476,9 @@ export class OwaDashboard extends Component {
         }
 
         // Top partners h-bar
-        if (this.topPartnersChart.el && this.state.data.top_partners.length) {
+        if (this.topPartnersChart() && this.state.data.top_partners.length) {
             const partners = this.state.data.top_partners;
-            this._charts.push(new Chart(this.topPartnersChart.el, {
+            this._charts.push(new Chart(this.topPartnersChart(), {
                 type: "bar",
                 data: {
                     labels: partners.map((p) => p.name),
@@ -497,9 +505,9 @@ export class OwaDashboard extends Component {
         }
 
         // Failure reasons bar
-        if (this.failureChart.el && this.state.data.top_failure_reasons.length) {
+        if (this.failureChart() && this.state.data.top_failure_reasons.length) {
             const reasons = this.state.data.top_failure_reasons;
-            this._charts.push(new Chart(this.failureChart.el, {
+            this._charts.push(new Chart(this.failureChart(), {
                 type: "bar",
                 data: {
                     labels: reasons.map((r) => r.failure_type),

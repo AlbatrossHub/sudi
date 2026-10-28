@@ -19,9 +19,9 @@ from .sync_router import SCOPE_ROLES
 
 router = APIRouter(prefix="/pickups", tags=["pickups"])
 
-# A jangad page is an incoming receipt's image, so only the two incoming
-# scopes can reach one.
-JANGAD_SCOPES = ("pickup", "jobwork")
+# A jangad page is an incoming receipt's image, so only the incoming scopes
+# can reach one: the office validates a collected jangad *from* its pages.
+JANGAD_SCOPES = ("pickup", "jobwork", "office")
 
 
 def _receipt_in_scope(caller_obj: Caller, picking_id: int, scopes=JANGAD_SCOPES):
@@ -68,7 +68,7 @@ def jangad_page(
         raise not_in_scope("A page number cannot be negative.")
 
     if page == 0:
-        datas = receipt.sudi_jangad_image
+        data = receipt.sudi_jangad_image
         mimetype = "image/jpeg"
     else:
         attachments = receipt.sudi_jangad_attachment_ids
@@ -77,12 +77,12 @@ def jangad_page(
                 f"This receipt has {len(attachments) + (1 if receipt.sudi_jangad_image else 0)} page(s)."
             )
         attachment = attachments[page - 1]
-        datas = attachment.datas
+        data = attachment.raw
         mimetype = attachment.mimetype or "image/jpeg"
-    if not datas:
+    if not data:
         raise not_in_scope("This receipt has no jangad image.")
 
-    raw = base64.b64decode(datas)
+    raw = data.content
     return Response(
         content=raw,
         media_type=mimetype,

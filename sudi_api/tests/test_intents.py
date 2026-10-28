@@ -19,7 +19,7 @@ def _png(size=(4, 4)):
 
 
 def _png_b64(size=(4, 4)):
-    return base64.b64encode(_png(size))
+    return base64.b64encode(_png(size)).decode()  # Odoo 20: Binary fields reject raw bytes
 
 
 @tagged("post_install", "-at_install")
@@ -31,7 +31,7 @@ class SudiIntentCase(SudiApiCase):
         cls.operator.sudo().write({"group_ids": [
             Command.link(cls.env.ref("diamond.group_sudi_job_work_user").id)
         ]})
-        cls.env["ir.config_parameter"].sudo().set_param(
+        cls.env["ir.config_parameter"].sudo().set_str(
             "sudi_sync.visibility_lag_seconds", "0"
         )
         cls.partner = cls.env["res.partner"].create({"name": "Kiran Gems"})
@@ -86,7 +86,7 @@ class SudiIntentCase(SudiApiCase):
         return Command.create({
             "product_id": self.product.id,
             "product_uom_qty": 10.0,
-            "product_uom": self.product.uom_id.id,
+            "uom_id": self.product.uom_id.id,
             "location_id": self.type_in.default_location_src_id.id,
             "location_dest_id": self.type_in.default_location_dest_id.id,
             "sudi_sr": 1,

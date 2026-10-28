@@ -1,9 +1,16 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
+from odoo.tools import SQL
 
 
 class AccountAnalyticLine(models.Model):
-    _inherit = "account.analytic.line"
+    # Odoo 20: timesheet_grid no longer mixes timer.mixin into
+    # account.analytic.line, but the diamond receipt timer flow
+    # (timer.parent.mixin on stock.picking -> record._create_timer() /
+    # record.action_timer_stop() on the timesheet line) requires it, so the
+    # module restores the mixin on the line itself.
+    _name = "account.analytic.line"
+    _inherit = ["account.analytic.line", "timer.mixin"]
 
     sudi_picking_id = fields.Many2one(
         "stock.picking",
@@ -85,3 +92,25 @@ class AccountAnalyticLine(models.Model):
                 raise ValidationError(_("A job type is required on receipt timesheet lines."))
             if line.task_id:
                 raise ValidationError(_("Receipt timesheet lines cannot also be linked to a project task."))
+
+
+class TimesheetsAnalysisReport(models.Model):
+    """Mirror the receipt/job-type columns onto the Timesheets Reporting model.
+
+    The shared timesheet search view (hr_timesheet_line_search_sudi_diamond) adds
+    sudi_picking_id / sudi_job_type_id, and the EE Reporting screens reuse that view
+    on this SQL-view model — without these columns the three "Timesheets/Reporting"
+    screens crash on an unknown field (they did on v19 production as well).
+    """
+
+    _inherit = "timesheets.analysis.report"
+
+    sudi_picking_id = fields.Many2one("stock.picking", string="Job Work Receipt", readonly=True)
+    sudi_job_type_id = fields.Many2one("sudi.diamond.job.type", string="Diamond Job Type", readonly=True)
+
+    @api.model
+    def _select(self):
+        return SQL(
+            "%s, A.sudi_picking_id AS sudi_picking_id, A.sudi_job_type_id AS sudi_job_type_id",
+            super()._select(),
+        )

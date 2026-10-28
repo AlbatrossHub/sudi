@@ -1,0 +1,8 @@
+id,name,model_id,group_id/id,operation,domain
+access_sudi_sync_change_system,sudi.sync.change.system,sudi.sync.change,base.group_system,rd,
+access_sudi_api_device_system,sudi.api.device.system,sudi.api.device,base.group_system,crud,
+access_sudi_api_device_stock_manager,sudi.api.device.stock.manager,sudi.api.device,stock.group_stock_manager,ru,
+access_sudi_idempotency_key_system,sudi.idempotency.key.system,sudi.idempotency.key,base.group_system,rd,
+access_sudi_upload_system,sudi.upload.system,sudi.upload,base.group_system,rd,
+access_sudi_app_notice_system,sudi.app.notice.system,sudi.app.notice,base.group_system,crud,
+access_sudi_app_notice_own,sudi.app.notice.own,sudi.app.notice,base.group_user,ru,"[('user_id', '=', user.id)]"

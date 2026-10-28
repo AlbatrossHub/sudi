@@ -75,8 +75,6 @@ class ResPartner(models.Model):
 
         vals = {
             "name": _("Company (%s)", cleaned),
-            "is_company": True,
-            "company_type": "company",
             "vat": cleaned,
             "country_id": country.id or False,
             "state_id": state.id or False,
@@ -141,8 +139,6 @@ class ResPartner(models.Model):
         self.sudo().write({
             "vat": company.vat,
             "parent_id": company.id,
-            "is_company": False,
-            "company_type": "person",
             "x_skip_gst": False,
         })
         return company

@@ -24,6 +24,15 @@ class ResUsers(models.Model):
         help="When enabled, this user receives daily WhatsApp digests of Jangad "
              "receipts due for data entry.",
     )
+    # An extra ability on top of a staff app role, not a role of its own: on
+    # its own it does not open the app. A tick and not a group because it is
+    # granted person by person, to whoever takes jangads over the phone.
+    sudi_can_post_jangad_on_behalf = fields.Boolean(
+        string="Can post jangad for customers",
+        help="Lets this person post a jangad from the staff app on a "
+             "customer's behalf: the same request a customer would make, "
+             "landing in the pickup pool like any other.",
+    )
 
     def _on_webclient_bootstrap(self):
         super()._on_webclient_bootstrap()

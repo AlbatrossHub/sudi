@@ -6,7 +6,10 @@ from odoo import http, SUPERUSER_ID, _
 from odoo.exceptions import ValidationError
 from odoo.http import request
 from odoo.addons.web.controllers.home import Home
-from odoo.addons.web_auth_otp_login.controllers.main import WebAuthOtpController
+from odoo.addons.web_auth_otp_login.controllers.main import (
+    WebAuthOtpController,
+    authenticate_verified_otp_user,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -172,8 +175,6 @@ class SudiDiamondCustomerRegistrationController(http.Controller):
         partner_vals = {
             'name': name,
             'phone': phone,
-            'is_company': False,
-            'company_type': 'person',
             'x_skip_gst': skip_gst,
         }
 
@@ -207,18 +208,11 @@ class SudiDiamondCustomerRegistrationController(http.Controller):
                     'active': True,
                 })
 
-        # Auto-authenticate session
-        request.session.uid = user.id
-        request.session.login = user.login
-        request.session.db = request.env.registry.db_name
-        request.session.context = dict(user.env['res.users'].context_get())
-        request.env.registry.clear_cache()
-        request.session.session_token = user._compute_session_token(request.session.sid)
-        request.session.should_rotate = True
+        # Auto-authenticate the session through the regular credential flow
+        authenticate_verified_otp_user(user)
 
         # Clear registration session state
         request.session.pop('otp_verified_phone', None)
         request.session.pop('otp_verified_partner_id', None)
-        request.session.touch()
 
         return request.redirect(redirect)

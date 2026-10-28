@@ -1,5 +1,4 @@
 from odoo import fields, models
-from odoo.addons.mail.tools.discuss import Store
 
 
 class MailMessage(models.Model):
@@ -11,40 +10,29 @@ class MailMessage(models.Model):
     owa_message_ids = fields.One2many(
         'owa.message', 'mail_message_id', string="WhatsApp Messages")
 
-    def _to_store(self, store, *args, **kwargs):
+    def _store_message_fields(self, res, **kwargs):
         # Inject the delivery state (whatsappStatus) for WhatsApp messages so
-        # the ✓✓ status icon renders on HISTORICAL messages too — previously
-        # only messages updated live via the status bus push carried it, so
-        # older messages showed "unknown" until the next live update.
-        # *args/**kwargs keeps the override signature-compatible across v18
-        # (fields is keyword-only) and v19 (fields is positional). store.add
-        # accepts a {field: value} dict on both versions. (#discuss)
-        super()._to_store(store, *args, **kwargs)
-        wa_msgs = self.filtered(lambda m: m.message_type == 'whatsapp_message')
-        for mail_msg in wa_msgs:
-            owa = mail_msg.sudo().owa_message_ids[:1]
-            if owa:
-                # Also expose, to the Discuss "Edit" message action, whether
-                # THIS message can be edited on WhatsApp (own recently-sent
-                # outbound on a connected QR account) and the owa.message id.
-                # (#wa-edit-action)
-                acc = owa.wa_account_id
-                extras = {
-                    'whatsappStatus': owa.state,
-                    'owaMessageId': owa.id,
-                    'owaEditable': bool(
-                        owa.msg_uid
-                        and owa.message_type == 'outbound'
-                        and owa.state not in ('error', 'cancel')
-                        and acc and acc.connection_type == 'qr'
-                    ),
-                }
-                # On v19, Store.add(records, fields) re-invokes _to_store() ->
-                # infinite recursion; add_records_fields() injects the value
-                # without recursing (its documented purpose). v18/v17 Store has
-                # no add_records_fields and its add(record, values) sets the
-                # value directly, so fall back there.
-                if hasattr(store, 'add_records_fields'):
-                    store.add_records_fields(mail_msg, extras)
-                else:
-                    store.add(mail_msg, extras)
+        # the ✓✓ status icon renders on HISTORICAL messages too, plus the
+        # "editable on WhatsApp" flag for the Discuss "Edit" action.
+        # Odoo 20 port: mail.message._to_store()/Store.add_records_fields()
+        # were removed; per-record values now go through the Store.FieldList
+        # attr() API (same pattern as the official whatsapp module).
+        super()._store_message_fields(res, **kwargs)
+
+        def _owa(message):
+            return message.sudo().owa_message_ids[:1]
+
+        is_wa = lambda m: m.message_type == 'whatsapp_message'
+        res.attr("whatsappStatus", lambda m: _owa(m).state or False, predicate=is_wa)
+        res.attr("owaMessageId", lambda m: _owa(m).id or False, predicate=is_wa)
+
+        def _editable(message):
+            owa = _owa(message)
+            acc = owa.wa_account_id
+            return bool(
+                owa.msg_uid
+                and owa.message_type == 'outbound'
+                and owa.state not in ('error', 'cancel')
+                and acc and acc.connection_type == 'qr'
+            )
+        res.attr("owaEditable", _editable, predicate=is_wa)

@@ -63,10 +63,7 @@ class SudiUpload(models.Model):
 
     @api.model
     def _sudi_int_param(self, key, default):
-        try:
-            value = int(self.env["ir.config_parameter"].sudo().get_param(key, default))
-        except (TypeError, ValueError):
-            return default
+        value = self.env["ir.config_parameter"].sudo().get_int(key, default)
         return value if value > 0 else default
 
     @api.model
@@ -97,7 +94,7 @@ class SudiUpload(models.Model):
         attachment = self.env["ir.attachment"].sudo().create({
             "name": filename or f"upload_{uuid4().hex[:8]}.jpg",
             "type": "binary",
-            "datas": datas,
+            "raw": raw,
             "mimetype": mimetype or "image/jpeg",
             # Deliberately unattached: it belongs to no record until an intent
             # claims it, and _cron_prune removes it if none ever does.
@@ -178,8 +175,8 @@ class SudiUpload(models.Model):
         return uploads._sudi_bind(record) if uploads else uploads
 
     def _sudi_datas(self):
-        """The staged files, in recordset order, as base64."""
-        return [upload.attachment_id.datas for upload in self.sudo()]
+        """The staged files, in recordset order, as base64 strings."""
+        return [upload.attachment_id.raw.to_base64() for upload in self.sudo()]
 
     @api.model
     def _cron_prune(self):

@@ -1,9 +1,12 @@
 /** @odoo-module */
-import { Component, useState } from "@odoo/owl";
+import { Component, proxy, usePlugin, useProps } from "@odoo/owl";
+import { NotificationPlugin } from "@web/core/notifications/notification_plugin";
 import { registry } from "@web/core/registry";
+import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
 import { useService } from "@web/core/utils/hooks";
 import { rpc } from "@web/core/network/rpc";
 import { _t } from "@web/core/l10n/translation";
+import { ActionPlugin } from "@web/webclient/actions/action_plugin";
 
 // A view widget (<widget name="owa_embedded_signup"/>) that runs Meta's
 // Embedded Signup: loads the Facebook JS SDK, opens the signup popup, captures
@@ -12,13 +15,13 @@ import { _t } from "@web/core/l10n/translation";
 // Meta App config (Settings) and an HTTPS host — Meta blocks the SDK on http.
 export class OwaEmbeddedSignup extends Component {
     static template = "open_whatsapp_connector.OwaEmbeddedSignup";
-    static props = { "*": true };
+    props = useProps(standardWidgetProps);
 
     setup() {
         this.orm = useService("orm");
-        this.action = useService("action");
-        this.notification = useService("notification");
-        this.state = useState({ busy: false });
+        this.action = usePlugin(ActionPlugin);
+        this.notification = usePlugin(NotificationPlugin);
+        this.state = proxy({ busy: false });
         this._esData = null; // {phone_number_id, waba_id} from the popup message
     }
 

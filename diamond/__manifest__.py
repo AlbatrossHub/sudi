@@ -1,6 +1,6 @@
 {
     "name": "Sudi Diamond Job Work",
-    "version": "19.0.1.7.0",
+    "version": "20.0.1.8.0",
     "summary": "Diamond job-work receipts, deliveries, and GST invoicing",
     "category": "Inventory/Inventory",
     "author": "Sudi",
@@ -20,7 +20,6 @@
     ],
     "data": [
         "security/diamond_security.xml",
-        "security/ir.model.access.csv",
         "data/diamond_product_data.xml",
         "data/diamond_sequence_data.xml",
         "data/diamond_job_type_data.xml",
@@ -37,12 +36,16 @@
         "views/stock_picking_views.xml",
         "views/account_analytic_line_views.xml",
         "views/account_move_views.xml",
+        # menu_views must load before billing_log_views: the latter hangs a
+        # menuitem under menu_sudi_diamond_root (fresh-install order bug,
+        # latent since 19).
+        "views/menu_views.xml",
         "views/billing_log_views.xml",
         "views/jangad_upload_templates.xml",
         "views/gst_onboarding_templates.xml",
         "report/diamond_receipt_report.xml",
         "report/diamond_invoice_annexure.xml",
-        "views/menu_views.xml",
+        'security/ir.access.csv',
     ],
     "assets": {
         "web.assets_backend": [

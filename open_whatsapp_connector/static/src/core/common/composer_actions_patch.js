@@ -9,7 +9,7 @@ import { _t } from "@web/core/l10n/translation";
 registerComposerAction("owa-revive-whatsapp-conversation", {
     condition: ({ composer, owner }) =>
         composer.thread?.channel_type === "whatsapp" && !owner.state.active,
-    icon: "fa fa-whatsapp",
+    icon: "oi_whatsapp",
     name: _t("Revive WhatsApp Conversation"),
     onSelected: ({ owner }) => owner.onclickWhatsAppChat(),
     sequenceQuick: 10,
@@ -19,7 +19,7 @@ registerComposerAction("owa-revive-whatsapp-conversation", {
 // (multi-account support). Only shown for this module's WhatsApp threads.
 registerComposerAction("owa-select-reply-account", {
     condition: ({ owner }) => owner.isOwaWhatsappThread,
-    icon: "fa fa-server",
+    icon: "dns",
     name: _t("Reply account"),
     onSelected: ({ owner }) => owner.openOwaAccountPicker(),
     sequenceQuick: 20,

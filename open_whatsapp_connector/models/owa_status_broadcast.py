@@ -63,11 +63,11 @@ class OwaStatusBroadcast(models.Model):
             preview = (rec.body_text or '')[:40]
             rec.name = f"[{rec.media_type}] {preview or _('(no text)')}"
 
-    @api.depends('attachment_id', 'attachment_id.datas', 'media_type')
+    @api.depends('attachment_id', 'attachment_id.raw', 'media_type')
     def _compute_media_image(self):
         for rec in self:
-            if rec.media_type == 'image' and rec.attachment_id and rec.attachment_id.datas:
-                rec.media_image = rec.attachment_id.datas
+            if rec.media_type == 'image' and rec.attachment_id and rec.attachment_id.raw:
+                rec.media_image = rec.attachment_id.raw
             else:
                 rec.media_image = False
 
@@ -99,7 +99,7 @@ class OwaStatusBroadcast(models.Model):
                     'recipients': recipients,
                 }
                 if rec.attachment_id:
-                    payload['attachment_b64'] = (rec.attachment_id.datas or b'').decode('ascii')
+                    payload['attachment_b64'] = rec.attachment_id.raw.to_base64() if rec.attachment_id.raw else ''
                     payload['mimetype'] = rec.attachment_id.mimetype or 'application/octet-stream'
                 resp = api._request('POST', '/status/broadcast', json=payload)
                 rec.write({
@@ -182,7 +182,7 @@ class OwaStatusBroadcast(models.Model):
         if b64 and media_type in ('image', 'video'):
             attachment = self.env['ir.attachment'].sudo().create({
                 'name': 'status.%s' % media_type,
-                'datas': b64,
+                'raw': base64.b64decode(b64),
                 'mimetype': payload.get('mimetype') or (
                     'image/jpeg' if media_type == 'image' else 'video/mp4'),
                 'res_model': 'owa.status.broadcast',

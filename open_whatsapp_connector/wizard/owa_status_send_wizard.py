@@ -67,7 +67,7 @@ class OwaStatusSendWizard(models.TransientModel):
             mimetype = 'image/jpeg' if self.media_type == 'image' else 'video/mp4'
             attachment = self.env['ir.attachment'].sudo().create({
                 'name': self.media_filename or f'status.{self.media_type}',
-                'datas': self.media_data,
+                'raw': self.media_data.content,
                 'mimetype': mimetype,
                 'res_model': 'owa.status.broadcast',
             })

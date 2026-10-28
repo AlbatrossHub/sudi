@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Web WhatsApp OTP Login',
-    'version': '19.0.1.0',
+    'version': '20.0.1.0.0',
     'category': 'Website/Website',
     'summary': 'Passwordless login using phone number and WhatsApp OTP',
     'description': """

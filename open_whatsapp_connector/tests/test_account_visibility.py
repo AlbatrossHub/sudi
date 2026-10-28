@@ -35,14 +35,14 @@ class TestAccountVisibility(OwaTestCase):
         self._set_mode('shared')
 
     def _set_mode(self, mode):
-        self.env['ir.config_parameter'].sudo().set_param(
+        self.env['ir.config_parameter'].sudo().set_str(
             'open_whatsapp_connector.account_visibility', mode)
         acl = self.env.ref(
             'open_whatsapp_connector.access_owa_account_user_manage',
             raise_if_not_found=False)
         if acl:
             acl.sudo().active = (mode == 'own_team')
-        self.env.registry.clear_cache()
+        self.env.transaction.invalidate_ormcache()
 
     def _mk_account(self, name, owner, **kw):
         vals = {'name': name, 'session_state': 'connected',
@@ -85,7 +85,7 @@ class TestAccountVisibility(OwaTestCase):
         acl = self.env.ref('open_whatsapp_connector.access_owa_account_user_manage')
         self.env['res.config.settings'].create(
             {'owa_account_visibility': 'own_team'}).set_values()
-        self.assertEqual(self.env['ir.config_parameter'].sudo().get_param(
+        self.assertEqual(self.env['ir.config_parameter'].sudo().get_str(
             'open_whatsapp_connector.account_visibility'), 'own_team')
         self.assertTrue(acl.active)
         self.env['res.config.settings'].create(

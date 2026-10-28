@@ -1,0 +1,2512 @@
+{
+ "generated": "2026-09-28T16:12:46.250923Z",
+ "src": "sudi_src19",
+ "dst": "sudi20_ref",
+ "tables_missing": [
+  {
+   "table": "mail_tracking_value",
+   "rows": 6984,
+   "model": "mail.tracking.value",
+   "module": "account",
+   "m2m_of": null,
+   "on_20_as_rel": false,
+   "rule": "REVIEW"
+  },
+  {
+   "table": "ir_model_access",
+   "rows": 990,
+   "model": "ir.model.access",
+   "module": "base",
+   "m2m_of": null,
+   "on_20_as_rel": false,
+   "rule": "REVIEW"
+  },
+  {
+   "table": "payment_method_payment_provider_rel",
+   "rows": 306,
+   "model": null,
+   "module": null,
+   "m2m_of": [
+    "payment.method.provider_ids",
+    "payment.provider.payment_method_ids"
+   ],
+   "on_20_as_rel": false,
+   "rule": "REVIEW m2m: find the 20 relation table of payment.method.provider_ids, payment.provider.payment_method_ids"
+  },
+  {
+   "table": "ir_rule",
+   "rows": 295,
+   "model": "ir.rule",
+   "module": "base",
+   "m2m_of": null,
+   "on_20_as_rel": false,
+   "rule": "REVIEW"
+  },
+  {
+   "table": "rule_group_rel",
+   "rows": 198,
+   "model": null,
+   "module": null,
+   "m2m_of": [
+    "ir.rule.groups",
+    "res.groups.rule_groups"
+   ],
+   "on_20_as_rel": false,
+   "rule": "REVIEW m2m: find the 20 relation table of ir.rule.groups, res.groups.rule_groups"
+  },
+  {
+   "table": "l10n_in_section_alert",
+   "rows": 87,
+   "model": "l10n_in.section.alert",
+   "module": "l10n_in",
+   "m2m_of": null,
+   "on_20_as_rel": false,
+   "rule": "REVIEW"
+  },
+  {
+   "table": "hr_timesheet_stop_timer_confirmation_wizard",
+   "rows": 13,
+   "model": "hr.timesheet.stop.timer.confirmation.wizard",
+   "module": "timesheet_grid",
+   "m2m_of": null,
+   "on_20_as_rel": false,
+   "rule": "REVIEW"
+  },
+  {
+   "table": "hr_contract_type",
+   "rows": 12,
+   "model": "hr.contract.type",
+   "module": "hr",
+   "m2m_of": null,
+   "on_20_as_rel": false,
+   "rule": "REVIEW"
+  },
+  {
+   "table": "mail_message_res_partner_starred_rel",
+   "rows": 1,
+   "model": null,
+   "module": null,
+   "m2m_of": [
+    "mail.message.starred_partner_ids"
+   ],
+   "on_20_as_rel": false,
+   "rule": "DROPPED BY DECISION"
+  },
+  {
+   "table": "res_bank",
+   "rows": 1,
+   "model": "res.bank",
+   "module": "base",
+   "m2m_of": null,
+   "on_20_as_rel": false,
+   "rule": "REVIEW"
+  },
+  {
+   "table": "whatsapp_template",
+   "rows": 1,
+   "model": null,
+   "module": null,
+   "m2m_of": null,
+   "on_20_as_rel": false,
+   "rule": "REVIEW"
+  }
+ ],
+ "columns_dropped": [
+  {
+   "table": "stock_move_line",
+   "rows": 3657,
+   "column": "product_uom_id",
+   "type": "integer",
+   "non_null": 3657,
+   "module": "stock",
+   "ttype": "many2one",
+   "relation": "uom.uom",
+   "samples": [
+    [
+     "1",
+     3657
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "stock_move",
+   "rows": 3640,
+   "column": "product_uom",
+   "type": "integer",
+   "non_null": 3640,
+   "module": "stock",
+   "ttype": "many2one",
+   "relation": "uom.uom",
+   "samples": null,
+   "rule": "RENAME -> uom_id"
+  },
+  {
+   "table": "stock_move",
+   "rows": 3640,
+   "column": "location_final_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "stock",
+   "ttype": "many2one",
+   "relation": "stock.location",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "stock_move",
+   "rows": 3640,
+   "column": "scrap_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "stock",
+   "ttype": "many2one",
+   "relation": "stock.scrap",
+   "samples": null,
+   "rule": "TRANSFORM -> is_scrap boolean"
+  },
+  {
+   "table": "sudi_diamond_billing_line",
+   "rows": 1883,
+   "column": "invoice_line_id",
+   "type": "integer",
+   "non_null": 190,
+   "module": "diamond",
+   "ttype": "many2one",
+   "relation": "account.move.line",
+   "samples": [
+    [
+     "22",
+     1
+    ],
+    [
+     "23",
+     1
+    ],
+    [
+     "18",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_device_log",
+   "rows": 1878,
+   "column": "platform",
+   "type": "character varying",
+   "non_null": 1878,
+   "module": "base",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROPPED BY DECISION"
+  },
+  {
+   "table": "res_device_log",
+   "rows": 1878,
+   "column": "browser",
+   "type": "character varying",
+   "non_null": 1869,
+   "module": "base",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROPPED BY DECISION"
+  },
+  {
+   "table": "res_device_log",
+   "rows": 1878,
+   "column": "device_type",
+   "type": "character varying",
+   "non_null": 1878,
+   "module": "base",
+   "ttype": "selection",
+   "relation": null,
+   "samples": null,
+   "rule": "DROPPED BY DECISION"
+  },
+  {
+   "table": "discuss_channel_member",
+   "rows": 727,
+   "column": "fetched_message_id",
+   "type": "integer",
+   "non_null": 418,
+   "module": "mail",
+   "ttype": "many2one",
+   "relation": "mail.message",
+   "samples": [
+    [
+     "1",
+     16
+    ],
+    [
+     "2395",
+     5
+    ],
+    [
+     "2404",
+     5
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "discuss_channel_member",
+   "rows": 727,
+   "column": "custom_channel_name",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "mail",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_partner",
+   "rows": 494,
+   "column": "company_registry",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "base",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "res_partner",
+   "rows": 494,
+   "column": "company_name",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "base",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "res_partner",
+   "rows": 494,
+   "column": "global_location_number",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "account_add_gln",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (account_add_gln merged; GLN unused on prod)"
+  },
+  {
+   "table": "res_partner",
+   "rows": 494,
+   "column": "peppol_endpoint",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "account_edi_ubl_cii",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "RENAME -> routing_endpoint (routing_scheme from peppol_eas)"
+  },
+  {
+   "table": "res_partner",
+   "rows": 494,
+   "column": "peppol_eas",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "account_edi_ubl_cii",
+   "ttype": "selection",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "res_partner",
+   "rows": 494,
+   "column": "vies_valid",
+   "type": "boolean",
+   "non_null": 494,
+   "module": "base_vat",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (base_vat merged into account; recheck on 20)"
+  },
+  {
+   "table": "res_partner",
+   "rows": 494,
+   "column": "online_partner_information",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "account_online_synchronization",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "account_tax",
+   "rows": 428,
+   "column": "l10n_in_section_id",
+   "type": "integer",
+   "non_null": 207,
+   "module": "l10n_in",
+   "ttype": "many2one",
+   "relation": "l10n_in.section.alert",
+   "samples": [
+    [
+     "74",
+     8
+    ],
+    [
+     "68",
+     6
+    ],
+    [
+     "51",
+     6
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_move_line",
+   "rows": 371,
+   "column": "deductible_amount",
+   "type": "double precision",
+   "non_null": 371,
+   "module": "account",
+   "ttype": "float",
+   "relation": null,
+   "samples": [
+    [
+     "100.0",
+     371
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_move_line",
+   "rows": 371,
+   "column": "sudi_stock_move_id",
+   "type": "integer",
+   "non_null": 190,
+   "module": "diamond",
+   "ttype": "many2one",
+   "relation": "stock.move",
+   "samples": [
+    [
+     "1521",
+     1
+    ],
+    [
+     "184",
+     1
+    ],
+    [
+     "384",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_move_line",
+   "rows": 371,
+   "column": "sudi_billing_line_id",
+   "type": "integer",
+   "non_null": 190,
+   "module": "diamond",
+   "ttype": "many2one",
+   "relation": "sudi.diamond.billing.line",
+   "samples": [
+    [
+     "116",
+     1
+    ],
+    [
+     "87",
+     1
+    ],
+    [
+     "184",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_country",
+   "rows": 251,
+   "column": "zip_required",
+   "type": "boolean",
+   "non_null": 251,
+   "module": "base",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "True",
+     241
+    ],
+    [
+     "False",
+     10
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_report_line",
+   "rows": 184,
+   "column": "foldable",
+   "type": "boolean",
+   "non_null": 23,
+   "module": "account",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "True",
+     22
+    ],
+    [
+     "False",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "ir_act_server",
+   "rows": 142,
+   "column": "mail_post_method",
+   "type": "character varying",
+   "non_null": 0,
+   "module": null,
+   "ttype": null,
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "ir_act_server",
+   "rows": 142,
+   "column": "sms_method",
+   "type": "character varying",
+   "non_null": 0,
+   "module": null,
+   "ttype": null,
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "project_task_type",
+   "rows": 134,
+   "column": "color",
+   "type": "integer",
+   "non_null": 0,
+   "module": "project",
+   "ttype": "integer",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "account_account",
+   "rows": 110,
+   "column": "l10n_in_tds_tcs_section_id",
+   "type": "integer",
+   "non_null": 5,
+   "module": "l10n_in",
+   "ttype": "many2one",
+   "relation": "l10n_in.section.alert",
+   "samples": [
+    [
+     "18",
+     2
+    ],
+    [
+     "22",
+     2
+    ],
+    [
+     "3",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_account",
+   "rows": 110,
+   "column": "create_asset",
+   "type": "character varying",
+   "non_null": 110,
+   "module": "account_asset",
+   "ttype": "selection",
+   "relation": null,
+   "samples": [
+    [
+     "no",
+     110
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_account",
+   "rows": 110,
+   "column": "multiple_assets_per_line",
+   "type": "boolean",
+   "non_null": 110,
+   "module": "account_asset",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "False",
+     110
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "l10n_in_pan_entity",
+   "rows": 81,
+   "column": "tds_certificate_filename",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "l10n_in",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "account_move",
+   "rows": 62,
+   "column": "checked",
+   "type": "boolean",
+   "non_null": 62,
+   "module": "account",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "False",
+     62
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_move",
+   "rows": 62,
+   "column": "l10n_in_withholding_ref_move_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "l10n_in",
+   "ttype": "many2one",
+   "relation": "account.move",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "account_move",
+   "rows": 62,
+   "column": "l10n_in_withholding_ref_payment_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "l10n_in",
+   "ttype": "many2one",
+   "relation": "account.payment",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "account_move",
+   "rows": 62,
+   "column": "l10n_in_is_withholding",
+   "type": "boolean",
+   "non_null": 0,
+   "module": "l10n_in",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "account_move",
+   "rows": 62,
+   "column": "asset_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "account_asset",
+   "ttype": "many2one",
+   "relation": "account.asset",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "account_move",
+   "rows": 62,
+   "column": "extract_partner_name",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "account_invoice_extract",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "account_return_check_template",
+   "rows": 51,
+   "column": "cycle",
+   "type": "character varying",
+   "non_null": 51,
+   "module": "account_reports",
+   "ttype": "selection",
+   "relation": null,
+   "samples": [
+    [
+     "treasury_financing",
+     16
+    ],
+    [
+     "equity",
+     8
+    ],
+    [
+     "state",
+     5
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "ir_act_report_xml",
+   "rows": 48,
+   "column": "report_file",
+   "type": "character varying",
+   "non_null": 47,
+   "module": null,
+   "ttype": null,
+   "relation": null,
+   "samples": [
+    [
+     "stock.report_package_barcode",
+     4
+    ],
+    [
+     "stock.label_package_template_view",
+     2
+    ],
+    [
+     "report_timesheet",
+     2
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_report",
+   "rows": 27,
+   "column": "prefix_groups_threshold",
+   "type": "integer",
+   "non_null": 27,
+   "module": "account",
+   "ttype": "integer",
+   "relation": null,
+   "samples": [
+    [
+     "4000",
+     27
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_report",
+   "rows": 27,
+   "column": "active",
+   "type": "boolean",
+   "non_null": 27,
+   "module": "account",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "True",
+     27
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_report",
+   "rows": 27,
+   "column": "filter_analytic",
+   "type": "boolean",
+   "non_null": 27,
+   "module": "account",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "False",
+     23
+    ],
+    [
+     "True",
+     4
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "payment_provider",
+   "rows": 23,
+   "column": "color",
+   "type": "integer",
+   "non_null": 23,
+   "module": "payment",
+   "ttype": "integer",
+   "relation": null,
+   "samples": [
+    [
+     "4",
+     23
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "payment_provider",
+   "rows": 23,
+   "column": "state",
+   "type": "character varying",
+   "non_null": 23,
+   "module": "payment",
+   "ttype": "selection",
+   "relation": null,
+   "samples": [
+    [
+     "disabled",
+     23
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "project_task",
+   "rows": 20,
+   "column": "email_cc",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "project",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "product_template",
+   "rows": 19,
+   "column": "sale_delay",
+   "type": "integer",
+   "non_null": 19,
+   "module": "stock",
+   "ttype": "integer",
+   "relation": null,
+   "samples": [
+    [
+     "0",
+     19
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "product_template",
+   "rows": 19,
+   "column": "property_price_difference_account_id",
+   "type": "jsonb",
+   "non_null": 0,
+   "module": "stock_account",
+   "ttype": "many2one",
+   "relation": "account.account",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "product_product",
+   "rows": 19,
+   "column": "is_in_selected_section_of_order",
+   "type": "boolean",
+   "non_null": 0,
+   "module": "product",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "res_users_settings",
+   "rows": 17,
+   "column": "voice_active_duration",
+   "type": "integer",
+   "non_null": 17,
+   "module": "mail",
+   "ttype": "integer",
+   "relation": null,
+   "samples": [
+    [
+     "200",
+     17
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_users_settings",
+   "rows": 17,
+   "column": "push_to_talk_key",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "mail",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "res_users_settings",
+   "rows": 17,
+   "column": "is_discuss_sidebar_category_channel_open",
+   "type": "boolean",
+   "non_null": 17,
+   "module": "mail",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "True",
+     17
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_users_settings",
+   "rows": 17,
+   "column": "is_discuss_sidebar_category_chat_open",
+   "type": "boolean",
+   "non_null": 17,
+   "module": "mail",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "True",
+     17
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_users_settings",
+   "rows": 17,
+   "column": "use_push_to_talk",
+   "type": "boolean",
+   "non_null": 16,
+   "module": "mail",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "False",
+     16
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "resource_calendar_attendance",
+   "rows": 15,
+   "column": "name",
+   "type": "character varying",
+   "non_null": 15,
+   "module": "resource",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "Monday Morning",
+     1
+    ],
+    [
+     "Friday Lunch",
+     1
+    ],
+    [
+     "Wednesday Afternoon",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "resource_calendar_attendance",
+   "rows": 15,
+   "column": "week_type",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "resource",
+   "ttype": "selection",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "resource_calendar_attendance",
+   "rows": 15,
+   "column": "display_type",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "resource",
+   "ttype": "selection",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "resource_calendar_attendance",
+   "rows": 15,
+   "column": "duration_days",
+   "type": "double precision",
+   "non_null": 15,
+   "module": "resource",
+   "ttype": "float",
+   "relation": null,
+   "samples": [
+    [
+     "0.5",
+     10
+    ],
+    [
+     "0.0",
+     5
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "hr_version",
+   "rows": 12,
+   "column": "departure_reason_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "hr",
+   "ttype": "many2one",
+   "relation": "hr.departure.reason",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "hr_version",
+   "rows": 12,
+   "column": "contract_type_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "hr",
+   "ttype": "many2one",
+   "relation": "hr.contract.type",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "hr_version",
+   "rows": 12,
+   "column": "ssnid",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "hr",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "hr_version",
+   "rows": 12,
+   "column": "employee_type",
+   "type": "character varying",
+   "non_null": 12,
+   "module": "hr",
+   "ttype": "selection",
+   "relation": null,
+   "samples": [
+    [
+     "employee",
+     12
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "hr_version",
+   "rows": 12,
+   "column": "departure_date",
+   "type": "date",
+   "non_null": 0,
+   "module": "hr",
+   "ttype": "date",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "hr_version",
+   "rows": 12,
+   "column": "departure_description",
+   "type": "text",
+   "non_null": 0,
+   "module": "hr",
+   "ttype": "html",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "hr_version",
+   "rows": 12,
+   "column": "additional_note",
+   "type": "text",
+   "non_null": 0,
+   "module": "hr",
+   "ttype": "text",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "hr_version",
+   "rows": 12,
+   "column": "is_flexible",
+   "type": "boolean",
+   "non_null": 12,
+   "module": "hr",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "False",
+     12
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "hr_version",
+   "rows": 12,
+   "column": "is_fully_flexible",
+   "type": "boolean",
+   "non_null": 12,
+   "module": "hr",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "False",
+     12
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_tax_group",
+   "rows": 12,
+   "column": "tax_payable_account_id",
+   "type": "integer",
+   "non_null": 12,
+   "module": "account",
+   "ttype": "many2one",
+   "relation": "account.account",
+   "samples": [
+    [
+     "35",
+     12
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_tax_group",
+   "rows": 12,
+   "column": "tax_receivable_account_id",
+   "type": "integer",
+   "non_null": 12,
+   "module": "account",
+   "ttype": "many2one",
+   "relation": "account.account",
+   "samples": [
+    [
+     "11",
+     12
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_tax_group",
+   "rows": 12,
+   "column": "advance_tax_payment_account_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "account",
+   "ttype": "many2one",
+   "relation": "account.account",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "hr_employee",
+   "rows": 12,
+   "column": "study_school",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "hr",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "hr_employee",
+   "rows": 12,
+   "column": "private_car_plate",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "hr",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "website_page",
+   "rows": 10,
+   "column": "date_publish",
+   "type": "timestamp without time zone",
+   "non_null": 0,
+   "module": "website",
+   "ttype": "datetime",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "website_menu",
+   "rows": 9,
+   "column": "url",
+   "type": "character varying",
+   "non_null": 9,
+   "module": "website",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "#",
+     2
+    ],
+    [
+     "/",
+     2
+    ],
+    [
+     "/contactus",
+     2
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "stock_picking_type",
+   "rows": 8,
+   "column": "sequence_code",
+   "type": "character varying",
+   "non_null": 8,
+   "module": "stock",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "QC",
+     1
+    ],
+    [
+     "OUT",
+     1
+    ],
+    [
+     "IN",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "stock_picking_type",
+   "rows": 8,
+   "column": "show_operations",
+   "type": "boolean",
+   "non_null": 8,
+   "module": "stock",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "False",
+     8
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "stock_picking_type",
+   "rows": 8,
+   "column": "auto_show_reception_report",
+   "type": "boolean",
+   "non_null": 0,
+   "module": "stock",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "mail_activity_type",
+   "rows": 7,
+   "column": "triggered_next_type_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "mail",
+   "ttype": "many2one",
+   "relation": "mail.activity.type",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "mail_activity_type",
+   "rows": 7,
+   "column": "chaining_type",
+   "type": "character varying",
+   "non_null": 7,
+   "module": "mail",
+   "ttype": "selection",
+   "relation": null,
+   "samples": [
+    [
+     "suggest",
+     7
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "mail_activity",
+   "rows": 6,
+   "column": "recommended_activity_type_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "mail",
+   "ttype": "many2one",
+   "relation": "mail.activity.type",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "mail_activity",
+   "rows": 6,
+   "column": "previous_activity_type_id",
+   "type": "integer",
+   "non_null": 1,
+   "module": "mail",
+   "ttype": "many2one",
+   "relation": "mail.activity.type",
+   "samples": [
+    [
+     "2",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "project_project_stage",
+   "rows": 4,
+   "column": "color",
+   "type": "integer",
+   "non_null": 0,
+   "module": "project",
+   "ttype": "integer",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "product_category",
+   "rows": 3,
+   "column": "complete_name",
+   "type": "character varying",
+   "non_null": 3,
+   "module": "product",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "Goods",
+     1
+    ],
+    [
+     "Services",
+     1
+    ],
+    [
+     "Expenses",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_followup_followup_line",
+   "rows": 2,
+   "column": "name",
+   "type": "jsonb",
+   "non_null": 2,
+   "module": "account_followup",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "{'en_US': '30 Days'}",
+     1
+    ],
+    [
+     "{'en_US': '15 Days'}",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_followup_followup_line",
+   "rows": 2,
+   "column": "join_invoices",
+   "type": "boolean",
+   "non_null": 2,
+   "module": "account_followup",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "True",
+     2
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "account_followup_followup_line",
+   "rows": 2,
+   "column": "auto_execute",
+   "type": "boolean",
+   "non_null": 2,
+   "module": "account_followup",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "False",
+     2
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "iap_account",
+   "rows": 2,
+   "column": "balance",
+   "type": "character varying",
+   "non_null": 0,
+   "module": "iap",
+   "ttype": "char",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "website",
+   "rows": 1,
+   "column": "social_twitter",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "website",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "https://x.com/SDPPL15",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "website",
+   "rows": 1,
+   "column": "social_facebook",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "website",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "https://www.facebook.com/sdppl",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "website",
+   "rows": 1,
+   "column": "social_github",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "website",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "website",
+   "rows": 1,
+   "column": "social_linkedin",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "website",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "https://www.linkedin.com/company/sdppl/",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "website",
+   "rows": 1,
+   "column": "social_youtube",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "website",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "website",
+   "rows": 1,
+   "column": "social_instagram",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "website",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "https://www.instagram.com/sdppl15/",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "website",
+   "rows": 1,
+   "column": "social_tiktok",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "website",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "website",
+   "rows": 1,
+   "column": "social_discord",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "website",
+   "ttype": "char",
+   "relation": null,
+   "samples": [
+    [
+     "",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "resource_calendar",
+   "rows": 1,
+   "column": "schedule_type",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "resource",
+   "ttype": "selection",
+   "relation": null,
+   "samples": [
+    [
+     "fully_fixed",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "resource_calendar",
+   "rows": 1,
+   "column": "tz",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "resource",
+   "ttype": "selection",
+   "relation": null,
+   "samples": [
+    [
+     "Asia/Kolkata",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "resource_calendar",
+   "rows": 1,
+   "column": "duration_based",
+   "type": "boolean",
+   "non_null": 0,
+   "module": "resource",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "resource_calendar",
+   "rows": 1,
+   "column": "flexible_hours",
+   "type": "boolean",
+   "non_null": 1,
+   "module": "resource",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "False",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "resource_calendar",
+   "rows": 1,
+   "column": "two_weeks_calendar",
+   "type": "boolean",
+   "non_null": 1,
+   "module": "resource",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "False",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "layout_background",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "base",
+   "ttype": "selection",
+   "relation": null,
+   "samples": [
+    [
+     "Blank",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "logo_web",
+   "type": "bytea",
+   "non_null": 1,
+   "module": "base",
+   "ttype": "binary",
+   "relation": null,
+   "samples": null,
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "income_account_id",
+   "type": "integer",
+   "non_null": 1,
+   "module": "account",
+   "ttype": "many2one",
+   "relation": "account.account",
+   "samples": [
+    [
+     "39",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "expense_account_id",
+   "type": "integer",
+   "non_null": 1,
+   "module": "account",
+   "ttype": "many2one",
+   "relation": "account.account",
+   "samples": [
+    [
+     "55",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "predict_bill_product",
+   "type": "boolean",
+   "non_null": 0,
+   "module": "account_accountant",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "account_stock_journal_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "stock_account",
+   "ttype": "many2one",
+   "relation": "account.journal",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "account_stock_valuation_id",
+   "type": "integer",
+   "non_null": 0,
+   "module": "stock_account",
+   "ttype": "many2one",
+   "relation": "account.account",
+   "samples": null,
+   "rule": "DROP (no data)"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "inventory_valuation",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "stock_account",
+   "ttype": "selection",
+   "relation": null,
+   "samples": [
+    [
+     "periodic",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "cost_method",
+   "type": "character varying",
+   "non_null": 1,
+   "module": "stock_account",
+   "ttype": "selection",
+   "relation": null,
+   "samples": [
+    [
+     "standard",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "l10n_in_withholding_account_id",
+   "type": "integer",
+   "non_null": 1,
+   "module": "l10n_in",
+   "ttype": "many2one",
+   "relation": "account.account",
+   "samples": [
+    [
+     "97",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  },
+  {
+   "table": "res_company",
+   "rows": 1,
+   "column": "l10n_in_is_gst_registered",
+   "type": "boolean",
+   "non_null": 1,
+   "module": "l10n_in",
+   "ttype": "boolean",
+   "relation": null,
+   "samples": [
+    [
+     "True",
+     1
+    ]
+   ],
+   "rule": "REVIEW"
+  }
+ ],
+ "type_changes": [
+  {
+   "table": "ir_model_fields",
+   "column": "index",
+   "type18": "boolean",
+   "type20": "character varying"
+  },
+  {
+   "table": "account_move_line",
+   "column": "name",
+   "type18": "character varying",
+   "type20": "text"
+  },
+  {
+   "table": "account_report_expression",
+   "column": "formula",
+   "type18": "character varying",
+   "type20": "text"
+  },
+  {
+   "table": "account_report_expression",
+   "column": "subformula",
+   "type18": "character varying",
+   "type20": "text"
+  },
+  {
+   "table": "ir_act_client",
+   "column": "params_store",
+   "type18": "bytea",
+   "type20": "text"
+  },
+  {
+   "table": "res_groups_privilege",
+   "column": "placeholder",
+   "type18": "character varying",
+   "type20": "jsonb"
+  },
+  {
+   "table": "res_groups_privilege",
+   "column": "description",
+   "type18": "text",
+   "type20": "jsonb"
+  },
+  {
+   "table": "website_page",
+   "column": "url",
+   "type18": "character varying",
+   "type20": "jsonb"
+  },
+  {
+   "table": "iap_service",
+   "column": "name",
+   "type18": "character varying",
+   "type20": "jsonb"
+  },
+  {
+   "table": "product_category",
+   "column": "name",
+   "type18": "character varying",
+   "type20": "jsonb"
+  },
+  {
+   "table": "resource_calendar",
+   "column": "hours_per_week",
+   "type18": "double precision",
+   "type20": "numeric"
+  },
+  {
+   "table": "res_company",
+   "column": "horizon_days",
+   "type18": "double precision",
+   "type20": "integer"
+  }
+ ],
+ "selection_keys_gone": [
+  {
+   "model": "account.tax",
+   "field": "l10n_in_tax_type",
+   "key": "tds_purchase",
+   "rows": 129,
+   "keys20": [
+    "exempt",
+    "gst",
+    "nil_rated",
+    "non_gst",
+    "tcs",
+    "tds"
+   ]
+  },
+  {
+   "model": "account.tax",
+   "field": "l10n_in_tax_type",
+   "key": "tds_sale",
+   "rows": 129,
+   "keys20": [
+    "exempt",
+    "gst",
+    "nil_rated",
+    "non_gst",
+    "tcs",
+    "tds"
+   ]
+  },
+  {
+   "model": "product.template",
+   "field": "tracking",
+   "key": "none",
+   "rows": 19,
+   "keys20": [
+    "lot",
+    "serial"
+   ]
+  },
+  {
+   "model": "resource.calendar.attendance",
+   "field": "day_period",
+   "key": "lunch",
+   "rows": 5,
+   "keys20": [
+    "afternoon",
+    "full_day",
+    "morning"
+   ]
+  }
+ ],
+ "new_not_null": [
+  {
+   "table": "stock_move_line",
+   "column": "uom_id",
+   "type": "integer"
+  },
+  {
+   "table": "stock_move",
+   "column": "uom_id",
+   "type": "integer"
+  },
+  {
+   "table": "res_device_log",
+   "column": "user_agent",
+   "type": "character varying"
+  },
+  {
+   "table": "stock_picking",
+   "column": "sudi_settlement_mode",
+   "type": "character varying"
+  },
+  {
+   "table": "res_country",
+   "column": "zip_applicability",
+   "type": "character varying"
+  },
+  {
+   "table": "payment_method",
+   "column": "provider_id",
+   "type": "integer"
+  },
+  {
+   "table": "account_move",
+   "column": "review_state",
+   "type": "character varying"
+  },
+  {
+   "table": "account_return_check_template",
+   "column": "cycle_id",
+   "type": "integer"
+  },
+  {
+   "table": "product_template",
+   "column": "base_unit_count",
+   "type": "numeric"
+  },
+  {
+   "table": "product_product",
+   "column": "base_unit_count",
+   "type": "numeric"
+  },
+  {
+   "table": "hr_version",
+   "column": "tz",
+   "type": "character varying"
+  },
+  {
+   "table": "account_reconcile_model",
+   "column": "payment_tolerance_type",
+   "type": "character varying"
+  },
+  {
+   "table": "account_reconcile_model",
+   "column": "matching_order",
+   "type": "character varying"
+  },
+  {
+   "table": "account_reconcile_model",
+   "column": "payment_tolerance",
+   "type": "double precision"
+  },
+  {
+   "table": "website",
+   "column": "header_search_type",
+   "type": "character varying"
+  },
+  {
+   "table": "website",
+   "column": "header_search_order_by",
+   "type": "character varying"
+  },
+  {
+   "table": "account_cash_rounding",
+   "column": "sequence",
+   "type": "integer"
+  },
+  {
+   "table": "resource_calendar",
+   "column": "calendar_type",
+   "type": "character varying"
+  },
+  {
+   "table": "res_company",
+   "column": "picking_policy",
+   "type": "character varying"
+  },
+  {
+   "table": "res_company",
+   "column": "deferred_expense_periodicity",
+   "type": "character varying"
+  },
+  {
+   "table": "res_company",
+   "column": "deferred_revenue_periodicity",
+   "type": "character varying"
+  }
+ ],
+ "tables_ok": 240,
+ "natural_keys": [
+  {
+   "model": "res.company",
+   "n18": 1,
+   "n20": 1,
+   "matched": 1,
+   "unmatched_sample": []
+  },
+  {
+   "model": "res.currency (active)",
+   "n18": 2,
+   "n20": 2,
+   "matched": 2,
+   "unmatched_sample": []
+  },
+  {
+   "model": "res.country",
+   "n18": 251,
+   "n20": 251,
+   "matched": 251,
+   "unmatched_sample": []
+  },
+  {
+   "model": "res.country.state",
+   "n18": 2083,
+   "n20": 2132,
+   "matched": 1899,
+   "unmatched_sample": [
+    "EG-HU",
+    "EG-SU",
+    "IN-DD",
+    "PK-AJK",
+    "PK-BA",
+    "PK-GB",
+    "PK-IS/ICT",
+    "PK-KP/KPK"
+   ]
+  },
+  {
+   "model": "res.lang (active)",
+   "n18": 1,
+   "n20": 1,
+   "matched": 0,
+   "unmatched_sample": [
+    "en_IN"
+   ]
+  },
+  {
+   "model": "uom.uom",
+   "n18": 30,
+   "n20": 30,
+   "matched": 29,
+   "unmatched_sample": [
+    "Ton"
+   ]
+  },
+  {
+   "model": "account.account (code)",
+   "n18": 110,
+   "n20": 8,
+   "matched": 7,
+   "unmatched_sample": [
+    "100204",
+    "100310",
+    "100400",
+    "100410",
+    "100510",
+    "100520",
+    "100530",
+    "100531"
+   ]
+  },
+  {
+   "model": "account.tax (name|type|amount)",
+   "n18": 424,
+   "n20": 275,
+   "matched": 143,
+   "unmatched_sample": [
+    "0.1% TDS 194O P|none|-0.1000",
+    "0.1% TDS 194O S|none|-0.1000",
+    "0.1% TDS 194Q P|none|-0.1000",
+    "0.1% TDS 194Q S|none|-0.1000",
+    "0.1% TDS 393(1) SI.8(ii) GOODS P|none|-0.1000",
+    "0.1% TDS 393(1) SI.8(ii) GOODS S|none|-0.1000",
+    "0.1% TDS 393(1) SI.8(v) ECOMM P|none|-0.1000",
+    "0.1% TDS 393(1) SI.8(v) ECOMM S|none|-0.1000"
+   ]
+  },
+  {
+   "model": "account.journal (code)",
+   "n18": 8,
+   "n20": 9,
+   "matched": 8,
+   "unmatched_sample": []
+  },
+  {
+   "model": "account.payment.term",
+   "n18": 10,
+   "n20": 10,
+   "matched": 10,
+   "unmatched_sample": []
+  },
+  {
+   "model": "account.fiscal.position",
+   "n18": 8,
+   "n20": 8,
+   "matched": 8,
+   "unmatched_sample": []
+  },
+  {
+   "model": "account.analytic.plan",
+   "n18": 1,
+   "n20": 1,
+   "matched": 0,
+   "unmatched_sample": [
+    "Project"
+   ]
+  },
+  {
+   "model": "account.analytic.account",
+   "n18": null,
+   "n20": null,
+   "matched": null,
+   "unmatched_sample": null
+  },
+  {
+   "model": "account.incoterms",
+   "n18": 11,
+   "n20": 11,
+   "matched": 11,
+   "unmatched_sample": []
+  },
+  {
+   "model": "product.category (complete_name)",
+   "n18": 3,
+   "n20": null,
+   "matched": null,
+   "unmatched_sample": null
+  },
+  {
+   "model": "product.pricelist",
+   "n18": 0,
+   "n20": 0,
+   "matched": 0,
+   "unmatched_sample": []
+  },
+  {
+   "model": "stock.warehouse (code)",
+   "n18": 1,
+   "n20": 1,
+   "matched": 0,
+   "unmatched_sample": [
+    "HO"
+   ]
+  },
+  {
+   "model": "stock.location (complete_name)",
+   "n18": 12,
+   "n20": 12,
+   "matched": 6,
+   "unmatched_sample": [
+    "HO",
+    "HO/Input",
+    "HO/Output",
+    "HO/Packing Zone",
+    "HO/Quality Control",
+    "HO/Stock"
+   ]
+  },
+  {
+   "model": "stock.picking.type (wh|seq)",
+   "n18": 8,
+   "n20": null,
+   "matched": null,
+   "unmatched_sample": null
+  },
+  {
+   "model": "crm.team",
+   "n18": 3,
+   "n20": 3,
+   "matched": 3,
+   "unmatched_sample": []
+  },
+  {
+   "model": "crm.stage",
+   "n18": null,
+   "n20": null,
+   "matched": null,
+   "unmatched_sample": null
+  },
+  {
+   "model": "crm.tag",
+   "n18": 0,
+   "n20": 0,
+   "matched": 0,
+   "unmatched_sample": []
+  },
+  {
+   "model": "crm.lost.reason",
+   "n18": null,
+   "n20": null,
+   "matched": null,
+   "unmatched_sample": null
+  },
+  {
+   "model": "utm.source",
+   "n18": 10,
+   "n20": 14,
+   "matched": 8,
+   "unmatched_sample": [
+    "Lead Recall",
+    "Search engine"
+   ]
+  },
+  {
+   "model": "utm.medium",
+   "n18": 10,
+   "n20": 6,
+   "matched": 4,
+   "unmatched_sample": [
+    "Banner",
+    "Facebook",
+    "Google Adwords",
+    "LinkedIn",
+    "Television",
+    "X"
+   ]
+  },
+  {
+   "model": "utm.campaign",
+   "n18": 0,
+   "n20": 0,
+   "matched": 0,
+   "unmatched_sample": []
+  },
+  {
+   "model": "res.partner.category",
+   "n18": 0,
+   "n20": 0,
+   "matched": 0,
+   "unmatched_sample": []
+  },
+  {
+   "model": "res.partner.industry",
+   "n18": 23,
+   "n20": 23,
+   "matched": 23,
+   "unmatched_sample": []
+  },
+  {
+   "model": "mail.message.subtype (xmlid)",
+   "n18": 31,
+   "n20": 34,
+   "matched": 31,
+   "unmatched_sample": []
+  },
+  {
+   "model": "mail.activity.type (xmlid)",
+   "n18": 7,
+   "n20": 6,
+   "matched": 6,
+   "unmatched_sample": [
+    "hr_skills.mail_activity_data_upload_certification"
+   ]
+  },
+  {
+   "model": "mail.activity.type (name)",
+   "n18": 7,
+   "n20": 6,
+   "matched": 6,
+   "unmatched_sample": [
+    "Certifications"
+   ]
+  },
+  {
+   "model": "res.groups (xmlid)",
+   "n18": 74,
+   "n20": 81,
+   "matched": 73,
+   "unmatched_sample": [
+    "stock.group_reception_report"
+   ]
+  },
+  {
+   "model": "ir.model (model)",
+   "n18": 667,
+   "n20": 711,
+   "matched": 637,
+   "unmatched_sample": [
+    "account.ec.sales.report.handler",
+    "account.group",
+    "barcodes.barcode_events_mixin",
+    "hr.contract.type",
+    "hr.departure.wizard",
+    "hr.employee.certification.report",
+    "hr.timesheet.stop.timer.confirmation.wizard",
+    "hr.version.wizard"
+   ]
+  },
+  {
+   "model": "ir.model.fields (model.name, stored)",
+   "n18": 8407,
+   "n20": 8974,
+   "matched": 7902,
+   "unmatched_sample": [
+    "account.account.asset_model_ids",
+    "account.account.create_asset",
+    "account.account.l10n_in_tds_tcs_section_id",
+    "account.account.multiple_assets_per_line",
+    "account.account.website_message_ids",
+    "account.analytic.account.website_message_ids",
+    "account.asset.account_depreciation_expense_id",
+    "account.asset.account_depreciation_id"
+   ]
+  },
+  {
+   "model": "ir.sequence (code)",
+   "n18": 7,
+   "n20": 9,
+   "matched": 7,
+   "unmatched_sample": []
+  },
+  {
+   "model": "ir.cron (xmlid)",
+   "n18": 55,
+   "n20": 64,
+   "matched": 52,
+   "unmatched_sample": [
+    "base_vat.vies_iap_check_update",
+    "payment.cron_post_process_payment_tx",
+    "stock_account.ir_cron_post_stock_valuation"
+   ]
+  },
+  {
+   "model": "mail.template (xmlid)",
+   "n18": 26,
+   "n20": 33,
+   "matched": 23,
+   "unmatched_sample": [
+    "account_followup.demo_followup_email_template_2",
+    "account_followup.email_template_followup_1",
+    "base_install_request.mail_template_base_install_request"
+   ]
+  },
+  {
+   "model": "ir.actions.report (xmlid)",
+   "n18": 48,
+   "n20": 37,
+   "matched": 30,
+   "unmatched_sample": [
+    "product.report_product_packaging",
+    "product.report_product_template_label_2x7",
+    "product.report_product_template_label_4x12",
+    "product.report_product_template_label_4x12_noprice",
+    "product.report_product_template_label_4x7",
+    "product.report_product_template_label_dymo",
+    "stock.action_report_location_barcode",
+    "stock.action_report_lot_label"
+   ]
+  },
+  {
+   "model": "res.users (login)",
+   "n18": 31,
+   "n20": 1,
+   "matched": 1,
+   "unmatched_sample": [
+    "+918108985187",
+    "+918767886465",
+    "+919322335689",
+    "+919510518233",
+    "+919638243361",
+    "+919819998355",
+    "+919820069794",
+    "+919820084222"
+   ]
+  },
+  {
+   "model": "hr.department",
+   "n18": 1,
+   "n20": 1,
+   "matched": 1,
+   "unmatched_sample": []
+  },
+  {
+   "model": "hr.job",
+   "n18": 0,
+   "n20": 0,
+   "matched": 0,
+   "unmatched_sample": []
+  },
+  {
+   "model": "helpdesk.team",
+   "n18": null,
+   "n20": null,
+   "matched": null,
+   "unmatched_sample": null
+  },
+  {
+   "model": "helpdesk.stage",
+   "n18": null,
+   "n20": null,
+   "matched": null,
+   "unmatched_sample": null
+  },
+  {
+   "model": "project.project",
+   "n18": null,
+   "n20": null,
+   "matched": null,
+   "unmatched_sample": null
+  },
+  {
+   "model": "project.task.type",
+   "n18": 8,
+   "n20": 10,
+   "matched": 8,
+   "unmatched_sample": []
+  },
+  {
+   "model": "res.bank",
+   "n18": 1,
+   "n20": null,
+   "matched": null,
+   "unmatched_sample": null
+  },
+  {
+   "model": "documents.folder/document type",
+   "n18": null,
+   "n20": null,
+   "matched": null,
+   "unmatched_sample": null
+  }
+ ],
+ "tables18_with_rows": 251
+}

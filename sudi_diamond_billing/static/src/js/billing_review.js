@@ -1,9 +1,11 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onWillStart, proxy, useProps, usePlugin } from "@odoo/owl";
+import { NotificationPlugin } from "@web/core/notifications/notification_plugin";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
-import { standardActionServiceProps } from "@web/webclient/actions/action_service";
+import { ActionPlugin } from "@web/webclient/actions/action_plugin";
+import { standardActionServiceProps } from "@web/webclient/actions/action_plugin";
 import { useSetupAction } from "@web/search/action_hook";
 import { browser } from "@web/core/browser/browser";
 import { _t } from "@web/core/l10n/translation";
@@ -31,15 +33,15 @@ function writeStoredFilters(filters) {
 
 export class SudiBillingReview extends Component {
     static template = "sudi_diamond_billing.BillingReview";
-    static props = { ...standardActionServiceProps };
+    props = useProps({ ...standardActionServiceProps });
 
     setup() {
         this.orm = useService("orm");
-        this.actionService = useService("action");
-        this.notification = useService("notification");
+        this.actionService = usePlugin(ActionPlugin);
+        this.notification = usePlugin(NotificationPlugin);
 
         const restored = { ...readStoredFilters(), ...(this.props.state || {}) };
-        this.state = useState({
+        this.state = proxy({
             tab: restored.tab || "ready",
             status: restored.status || "due",
             groupBy: restored.groupBy || "customer",

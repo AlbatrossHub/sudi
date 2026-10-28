@@ -1,0 +1,2 @@
+id,name,model_id,group_id/id,operation,domain
+ir_ui_menu_rule_user,Restrict Menu Access for Users,ir.ui.menu,,crud,"[('restrict_user_ids', 'not in', user.ids)]"

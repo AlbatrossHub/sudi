@@ -5,82 +5,82 @@
         <div class="owa_fd">
             <!-- ── Toolbar ─────────────────────────────────────────────── -->
             <div class="owa_fd_toolbar">
-                <button class="btn btn-secondary btn-sm" t-on-click="backToBot">
-                    <i class="fa fa-arrow-left"/> Back
+                <button class="btn btn-secondary btn-sm" t-on-click="this.backToBot">
+                    <i class="oi" data-icon="arrow_back"/> Back
                 </button>
-                <span class="owa_fd_title" t-esc="state.bot.name"/>
+                <span class="owa_fd_title" t-esc="this.state.bot.name"/>
                 <div class="owa_fd_add">
                     <span class="text-muted me-1">Add:</span>
-                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('message')"><i class="fa fa-comment"/> Message</button>
-                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('menu')"><i class="fa fa-list-ul"/> Menu</button>
-                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('question')"><i class="fa fa-question-circle"/> Question</button>
-                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('handoff')"><i class="fa fa-user"/> Hand off</button>
-                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('create_lead')"><i class="fa fa-star"/> Lead</button>
-                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('end')"><i class="fa fa-flag-checkered"/> End</button>
+                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('message')"><i class="oi" data-icon="chat_bubble"/> Message</button>
+                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('menu')"><i class="oi" data-icon="format_list_bulleted"/> Menu</button>
+                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('question')"><i class="oi" data-icon="help"/> Question</button>
+                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('handoff')"><i class="oi" data-icon="person"/> Hand off</button>
+                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('create_lead')"><i class="oi" data-icon="star"/> Lead</button>
+                    <button class="btn btn-light btn-sm" t-on-click="() => this.createStep('end')"><i class="oi" data-icon="flag"/> End</button>
                 </div>
                 <div class="owa_fd_spacer"/>
-                <span t-if="state.problems.length" class="badge text-bg-warning owa_fd_probbadge"
-                      t-att-title="state.problems.join('\n')">
-                    <i class="fa fa-exclamation-triangle"/> <t t-esc="state.problems.length"/> issue(s)
+                <span t-if="this.state.problems.length" class="badge text-bg-warning owa_fd_probbadge"
+                      t-att-title="this.state.problems.join('\n')">
+                    <i class="oi" data-icon="warning"/> <t t-esc="this.state.problems.length"/> issue(s)
                 </span>
-                <span t-else="" class="badge text-bg-success"><i class="fa fa-check"/> OK</span>
-                <button class="btn btn-primary btn-sm" t-on-click="startTest">
-                    <i class="fa fa-play"/> Test
+                <span t-else="" class="badge text-bg-success"><i class="oi" data-icon="check"/> OK</span>
+                <button class="btn btn-primary btn-sm" t-on-click="this.startTest">
+                    <i class="oi" data-icon="play_arrow"/> Test
                 </button>
             </div>
 
             <!-- ── Problems banner ─────────────────────────────────────── -->
-            <div t-if="state.problems.length" class="owa_fd_problems alert alert-warning">
+            <div t-if="this.state.problems.length" class="owa_fd_problems alert alert-warning">
                 <ul class="mb-0">
-                    <li t-foreach="state.problems" t-as="p" t-key="p_index" t-esc="p"/>
+                    <li t-foreach="this.state.problems" t-as="p" t-key="p_index" t-esc="p"/>
                 </ul>
             </div>
 
             <div class="owa_fd_body">
                 <!-- ── Canvas ──────────────────────────────────────────── -->
-                <div class="owa_fd_canvas" t-ref="canvas"
-                     t-on-pointerdown="onCanvasPointerDown" t-on-wheel="onWheel">
-                    <div t-if="state.loading" class="owa_fd_loading">
-                        <i class="fa fa-spinner fa-spin"/> Loading…
+                <div class="owa_fd_canvas" t-ref="this.canvasRef"
+                     t-on-pointerdown="this.onCanvasPointerDown" t-on-wheel="this.onWheel">
+                    <div t-if="this.state.loading" class="owa_fd_loading">
+                        <i class="oi oi-spin" data-icon="autorenew"/> Loading…
                     </div>
-                    <div class="owa_fd_world" t-att-style="worldStyle">
+                    <div class="owa_fd_world" t-att-style="this.worldStyle">
                         <!-- edges -->
                         <svg class="owa_fd_edges">
-                            <path t-foreach="edges" t-as="e" t-key="e.key"
-                                  t-att-d="edgePath(e)" class="owa_fd_edge"/>
-                            <path t-if="state.linking" t-att-d="linkingPath" class="owa_fd_edge owa_fd_edge_live"/>
+                            <path t-foreach="this.edges" t-as="e" t-key="e.key"
+                                  t-att-d="this.edgePath(e)" class="owa_fd_edge"/>
+                            <path t-if="this.state.linking" t-att-d="this.linkingPath" class="owa_fd_edge owa_fd_edge_live"/>
                         </svg>
                         <!-- nodes -->
-                        <div t-foreach="state.nodes" t-as="node" t-key="node.id"
+                        <div t-foreach="this.state.nodes" t-as="node" t-key="node.id"
                              class="owa_fd_node"
-                             t-att-class="{ 'owa_fd_sel': node.id === state.selectedId }"
-                             t-att-style="nodeStyle(node)"
+                             t-att-class="{ 'owa_fd_sel': node.id === this.state.selectedId }"
+                             t-att-style="this.nodeStyle(node)"
                              t-on-pointerdown="(ev) => this.onNodePointerDown(ev, node)">
                             <!-- input port -->
-                            <div class="owa_fd_port owa_fd_in" t-att-style="inPortStyle(node)"/>
+                            <div class="owa_fd_port owa_fd_in" t-att-style="this.inPortStyle(node)"/>
                             <!-- header -->
                             <div class="owa_fd_head">
-                                <i class="fa" t-att-class="stepIcon(node.step_type)"/>
+                                <i class="fa" t-att-class="this.stepIcon(node.step_type)"/>
                                 <span class="owa_fd_name" t-esc="node.name"/>
-                                <i class="fa fa-star owa_fd_first"
-                                   t-att-class="{ 'owa_fd_first_on': node.id === state.bot.first_step_id }"
+                                <i class="oi owa_fd_first" data-icon="star"
+                                   t-att-class="{ 'owa_fd_first_on': node.id === this.state.bot.first_step_id }"
                                    title="Set as entry point"
                                    t-on-pointerdown.stop="() => this.setFirstStep(node.id)"/>
                             </div>
                             <!-- body -->
                             <t t-if="node.step_type === 'menu'">
                                 <div class="owa_fd_opt" t-foreach="node.options" t-as="opt" t-key="opt.id"
-                                     t-att-style="optRowStyle()">
+                                     t-att-style="this.optRowStyle()">
                                     <span class="owa_fd_optnum" t-esc="opt_index + 1 + '.'"/>
                                     <span class="owa_fd_optlbl" t-esc="opt.label"/>
-                                    <div class="owa_fd_port owa_fd_out" t-att-style="optPortStyle(opt_index)"
+                                    <div class="owa_fd_port owa_fd_out" t-att-style="this.optPortStyle(opt_index)"
                                          t-on-pointerdown="(ev) => this.onPortPointerDown(ev, node, opt.id)"/>
                                 </div>
                             </t>
                             <t t-else="">
-                                <div class="owa_fd_snip" t-esc="node.message || stepLabel(node.step_type)"/>
-                                <div t-if="typeMeta(node.step_type).out === 'single'"
-                                     class="owa_fd_port owa_fd_out" t-att-style="outPortStyle()"
+                                <div class="owa_fd_snip" t-esc="node.message || this.stepLabel(node.step_type)"/>
+                                <div t-if="this.typeMeta(node.step_type).out === 'single'"
+                                     class="owa_fd_port owa_fd_out" t-att-style="this.outPortStyle()"
                                      t-on-pointerdown="(ev) => this.onPortPointerDown(ev, node)"/>
                             </t>
                         </div>
@@ -91,12 +91,12 @@
                 </div>
 
                 <!-- ── Inspector ───────────────────────────────────────── -->
-                <div t-if="selectedNode" class="owa_fd_inspector">
-                    <t t-set="node" t-value="selectedNode"/>
+                <div t-if="this.selectedNode" class="owa_fd_inspector">
+                    <t t-set="node" t-value="this.selectedNode"/>
                     <div class="owa_fd_insp_head">
                         <strong>Step</strong>
                         <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.deleteStep(node)">
-                            <i class="fa fa-trash"/>
+                            <i class="oi" data-icon="delete"/>
                         </button>
                     </div>
                     <label>Name</label>
@@ -150,7 +150,7 @@
                         <select class="form-select form-select-sm"
                                 t-on-change="(ev) => this.onStepField(node, 'handoff_user_id', ev)">
                             <option value="">(account owner)</option>
-                            <option t-foreach="state.users" t-as="u" t-key="u.id"
+                            <option t-foreach="this.state.users" t-as="u" t-key="u.id"
                                     t-att-value="u.id" t-att-selected="node.handoff_user_id === u.id"
                                     t-esc="u.name"/>
                         </select>
@@ -158,7 +158,7 @@
                         <select class="form-select form-select-sm"
                                 t-on-change="(ev) => this.onStepField(node, 'handoff_team_id', ev)">
                             <option value="">(none)</option>
-                            <option t-foreach="state.teams" t-as="tm" t-key="tm.id"
+                            <option t-foreach="this.state.teams" t-as="tm" t-key="tm.id"
                                     t-att-value="tm.id" t-att-selected="node.handoff_team_id === tm.id"
                                     t-esc="tm.name"/>
                         </select>
@@ -169,7 +169,7 @@
                         <div class="owa_fd_insp_head mt-2">
                             <strong>Options</strong>
                             <button class="btn btn-sm btn-light" t-on-click="() => this.addOption(node)">
-                                <i class="fa fa-plus"/> Add
+                                <i class="oi" data-icon="add"/> Add
                             </button>
                         </div>
                         <div class="owa_fd_optedit" t-foreach="node.options" t-as="opt" t-key="opt.id">
@@ -180,7 +180,7 @@
                                    placeholder="keyword"
                                    t-on-change="(ev) => this.writeOption(node, opt, { keyword: ev.target.value })"/>
                             <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.deleteOption(node, opt)">
-                                <i class="fa fa-times"/>
+                                <i class="oi" data-icon="close"/>
                             </button>
                         </div>
                         <small class="text-muted">Drag each option's right-side dot to its next step.</small>
@@ -188,27 +188,27 @@
                 </div>
 
                 <!-- ── Test / preview panel ────────────────────────────── -->
-                <div t-if="state.test.open" class="owa_fd_test">
+                <div t-if="this.state.test.open" class="owa_fd_test">
                     <div class="owa_fd_insp_head">
-                        <strong><i class="fa fa-flask"/> Preview</strong>
-                        <button class="btn btn-sm btn-light" t-on-click="() => (state.test.open = false)">
-                            <i class="fa fa-times"/>
+                        <strong><i class="oi" data-icon="science"/> Preview</strong>
+                        <button class="btn btn-sm btn-light" t-on-click="() => (this.state.test.open = false)">
+                            <i class="oi" data-icon="close"/>
                         </button>
                     </div>
                     <div class="owa_fd_testlog">
-                        <div t-foreach="state.test.log" t-as="m" t-key="m_index"
+                        <div t-foreach="this.state.test.log" t-as="m" t-key="m_index"
                              class="owa_fd_msg" t-att-class="'owa_fd_' + m.who">
                             <span t-esc="m.text"/>
                         </div>
-                        <div t-if="state.test.ended" class="text-muted text-center mt-1">— conversation ended —</div>
+                        <div t-if="this.state.test.ended" class="text-muted text-center mt-1">— conversation ended —</div>
                     </div>
                     <div class="owa_fd_testin">
                         <input type="text" class="form-control form-control-sm" placeholder="Type a reply…"
-                               t-on-keydown="onTestKeydown"/>
-                        <button class="btn btn-sm btn-primary" t-on-click="sendTest"><i class="fa fa-paper-plane"/></button>
+                               t-on-keydown="this.onTestKeydown"/>
+                        <button class="btn btn-sm btn-primary" t-on-click="this.sendTest"><i class="oi" data-icon="send"/></button>
                     </div>
-                    <button class="btn btn-sm btn-light w-100 mt-1" t-on-click="startTest">
-                        <i class="fa fa-refresh"/> Restart
+                    <button class="btn btn-sm btn-light w-100 mt-1" t-on-click="this.startTest">
+                        <i class="oi" data-icon="refresh"/> Restart
                     </button>
                     <small class="text-muted d-block mt-1">Approximate preview — real replies also post to Discuss and WhatsApp.</small>
                 </div>

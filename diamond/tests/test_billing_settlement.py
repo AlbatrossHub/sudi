@@ -232,7 +232,9 @@ class TestSudiBillingSettlement(SudiJobWorkCase):
         delivery.sudi_settlement_mode = "reference"
         _invoices, statements = delivery._sudi_settle_deliveries()
 
-        reviewer = self.env["res.users"].create({
+        # sudo: the v20 test harness runs as a limited _test_user that may
+        # not create users; fixture setup, not the behaviour under test.
+        reviewer = self.env["res.users"].sudo().create({
             "name": "Reviewer",
             "login": "sudi_reviewer",
             "group_ids": [Command.set([self.env.ref("diamond.group_sudi_billing_reviewer").id])],

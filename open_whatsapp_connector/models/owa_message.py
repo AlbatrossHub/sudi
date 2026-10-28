@@ -307,7 +307,7 @@ class OwaMessage(models.Model):
                 record = self.env[mm.model].sudo().browse(mm.res_id)
                 attachment = self.env['ir.attachment'].sudo().create({
                     'name': '%s.pdf' % (record.display_name or report.report_name),
-                    'datas': base64.b64encode(pdf),
+                    'raw': pdf,
                     'mimetype': 'application/pdf',
                     'res_model': mm.model,
                     'res_id': mm.res_id,
@@ -381,7 +381,7 @@ class OwaMessage(models.Model):
             elif attachments:
                 api = account._get_cloud_api()
                 for idx, att in enumerate(attachments):
-                    raw = base64.b64decode(att.datas) if att.datas else b''
+                    raw = att.raw.content if att.raw else b''
                     media_type = self._cloud_media_type(att.mimetype)
                     media_id = api.upload_media(
                         raw, att.mimetype or 'application/octet-stream',
@@ -557,7 +557,7 @@ class OwaMessage(models.Model):
             try:
                 items_payload = []
                 for idx, attachment in enumerate(media_items):
-                    raw = base64.b64decode(attachment.datas) if attachment.datas else b''
+                    raw = attachment.raw.content if attachment.raw else b''
                     size_mb = len(raw) / (1024 * 1024) if raw else 0
                     max_mb = account.media_max_mb or 50
                     mimetype = attachment.mimetype or 'application/octet-stream'
@@ -613,10 +613,7 @@ class OwaMessage(models.Model):
         so the rest of the message doesn't silently drop."""
         self.ensure_one()
         mimetype = attachment.mimetype or 'application/octet-stream'
-        try:
-            raw = base64.b64decode(attachment.datas) if attachment.datas else b''
-        except Exception:
-            raw = b''
+        raw = attachment.raw.content if attachment.raw else b''
         size_mb = len(raw) / (1024 * 1024) if raw else 0
         max_mb = account.media_max_mb or 50
         ptt = mimetype.startswith('audio/')
@@ -784,7 +781,7 @@ class OwaMessage(models.Model):
                     Store(bus_channel=channel).add(
                         message.mail_message_id,
                         {"whatsappStatus": message.state},
-                    ).bus_send()
+                    )
         self._notify_campaign_update()
 
     def _notify_campaign_update(self):

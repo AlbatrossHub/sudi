@@ -185,7 +185,7 @@ class OwaChatbot(models.Model):
             agent = self.wa_account_id.user_id
             if agent and agent.partner_id:
                 try:
-                    channel.add_members(partner_ids=agent.partner_id.ids)
+                    channel._add_members(partners=agent.partner_id)
                 except Exception:
                     _logger.exception("chatbot agent-keyword: add_members failed on %s",
                                       channel.id)
@@ -570,7 +570,7 @@ class OwaChatbotStep(models.Model):
         partner_ids = members.partner_id.ids
         if partner_ids:
             try:
-                channel.add_members(partner_ids=partner_ids)
+                channel._add_members(partners=self.env['res.partner'].browse(partner_ids))
             except Exception:
                 _logger.exception("chatbot handoff: add_members failed on channel %s",
                                   channel.id)

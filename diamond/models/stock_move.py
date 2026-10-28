@@ -222,6 +222,42 @@ class StockMove(models.Model):
                     and picking.state == "sudi_pickup_pending"
                 ):
                     raise UserError(_("This pickup is still pending you can not input the data please confirm the pick up"))
+        if (
+            "sudi_pcs_qty" in vals
+            and "product_uom_qty" not in vals
+            and not self.env.context.get("sudi_skip_pcs_qty_sync")
+        ):
+            # Pieces are a diamond line's demand. create() and the form's
+            # onchange already keep the two in step; a plain write (the mobile
+            # API, an import, a server action) used to leave product_uom_qty
+            # behind, and then Mark READY confirmed the old demand.
+            followers = self.filtered(
+                lambda move: move.picking_id.sudi_is_diamond_job_work
+                and move.state not in ("done", "cancel")
+            )
+            if followers:
+                synced = dict(
+                    vals,
+                    product_uom_qty=vals["sudi_pcs_qty"],
+                    quantity=vals["sudi_pcs_qty"],
+                )
+                # A draft line already carries a quantity (create() sets it), so
+                # the core write recomputes its state from it and the receipt
+                # turns "assigned": editing a collected receipt's table marked it
+                # READY behind the office's back (found on the phone: the READY
+                # call answered ALREADY_DONE and no job worker was told). The
+                # line stays draft until Mark READY confirms it.
+                draft = followers.filtered(lambda move: move.state == "draft")
+                started = followers - draft
+                result = True
+                if draft:
+                    result = super(StockMove, draft.with_context(preserve_state=True)).write(synced)
+                if started:
+                    result = super(StockMove, started).write(synced) and result
+                rest = self - followers
+                if rest:
+                    result = super(StockMove, rest).write(vals) and result
+                return result
         return super().write(vals)
 
     def unlink(self):
@@ -263,7 +299,7 @@ class StockMove(models.Model):
             if not move.picking_id.sudi_is_diamond_job_work:
                 continue
             original_qty = move.product_uom_qty or move.product_qty
-            if float_is_zero(original_qty, precision_rounding=move.product_uom.rounding):
+            if move.uom_id.is_zero(original_qty):
                 continue
             ratio = qty / original_qty
             vals.update(move._sudi_prepare_split_quantity_vals(ratio))
@@ -295,7 +331,7 @@ class StockMove(models.Model):
     def _split(self, qty, restrict_partner_id=False):
         original_values = {}
         for move in self.filtered(lambda m: m.picking_id.sudi_is_diamond_job_work):
-            if float_is_zero(move.product_qty, precision_rounding=move.product_id.uom_id.rounding):
+            if move.product_id.uom_id.is_zero(move.product_qty):
                 continue
             ratio = qty / move.product_qty
             original_values[move.id] = move._sudi_prepare_split_quantity_vals(ratio)
@@ -304,7 +340,10 @@ class StockMove(models.Model):
 
         for move in self.filtered(lambda m: m.id in original_values):
             split_vals = original_values[move.id]
-            move.write({
+            # super() has already reduced the demand by the split quantity;
+            # the pieces follow proportionally, so they must not drag the
+            # demand along with them (see write()).
+            move.with_context(sudi_skip_pcs_qty_sync=True).write({
                 "sudi_pcs_qty": max(move.sudi_pcs_qty - split_vals.get("sudi_pcs_qty", 0.0), 0.0),
                 "sudi_carats": max(move.sudi_carats - split_vals.get("sudi_carats", 0.0), 0.0),
             })

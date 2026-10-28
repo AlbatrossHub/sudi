@@ -27,5 +27,12 @@
             <field name="key">sudi_sync.upload_max_bytes</field>
             <field name="value">8388608</field>
         </record>
+
+        <!-- The bell is not an archive: notices older than this are purged
+             nightly. -->
+        <record id="param_sudi_sync_notice_retention_days" model="ir.config_parameter">
+            <field name="key">sudi_sync.notice_retention_days</field>
+            <field name="value">30</field>
+        </record>
     </data>
 </odoo>

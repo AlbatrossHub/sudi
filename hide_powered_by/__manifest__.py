@@ -1,6 +1,6 @@
 {
     'name': 'Remove Powered by Odoo from Website & Add Custom Text',
-    'version': '19.0.1.0.0',
+    'version': '20.0.1.0.0',
     'summary': 'FREE: Hide or customize the "Powered by Odoo" footer message with rich HTML.',
     'description': '''
 

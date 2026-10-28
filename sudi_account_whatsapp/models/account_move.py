@@ -10,7 +10,7 @@ class AccountMove(models.Model):
         """Trigger WhatsApp composer wizard for account.move with pre-filled dynamic message body."""
         self.ensure_one()
         partner = self.partner_id
-        phone = getattr(partner, 'phone', False) or getattr(partner, 'mobile', False)
+        phone = partner.phone or False  # res.partner.mobile no longer exists (since 19)
         if not partner or not phone:
             raise UserError(
                 _("Customer '%s' does not have a valid phone number. "

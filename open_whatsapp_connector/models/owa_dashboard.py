@@ -24,7 +24,7 @@ class OwaDashboard(models.AbstractModel):
         """Best-effort /health probe of the DEFAULT sidecar URL. Used only on a
         fresh install (no accounts) so the dashboard can reflect a running
         (e.g. systemd-managed) sidecar. Returns False on any error."""
-        url = self.env['ir.config_parameter'].sudo().get_param(
+        url = self.env['ir.config_parameter'].sudo().get_str(
             'open_whatsapp_connector.default_sidecar_url') or 'http://localhost:3100'
         try:
             import requests
@@ -140,28 +140,25 @@ class OwaDashboard(models.AbstractModel):
             self._default_sidecar_online() if not qr_accounts else False)
 
         # ── Status distribution (doughnut) ─────────────────────────────────
-        status_groups = Message.read_group(
-            range_domain, ['state'], ['state'],
-        )
-        status_counts = {g['state']: g['state_count'] for g in status_groups}
+        status_groups = Message._read_group(range_domain, ['state'], ['__count'])
+        status_counts = {state: count for state, count in status_groups}
 
         # ── Messages per day (line) ─────────────────────────────────────────
-        per_day_out = Message.read_group(
+        per_day_out = Message._read_group(
             range_domain + [('message_type', '=', 'outbound')],
-            ['create_date'], ['create_date:day'],
+            ['create_date:day'], ['__count'],
         )
-        per_day_in = Message.read_group(
+        per_day_in = Message._read_group(
             range_domain + [('message_type', '=', 'inbound')],
-            ['create_date'], ['create_date:day'],
+            ['create_date:day'], ['__count'],
         )
 
         def _day_series(groups):
             out = {}
-            for g in groups:
-                key = g.get('create_date:day') or g.get('__range', {}).get('create_date:day', {}).get('from')
-                if not key:
+            for day, count in groups:
+                if not day:
                     continue
-                out[str(key)[:10]] = g['create_date_count']
+                out[str(day)[:10]] = count
             return out
 
         messages_per_day = {
@@ -170,16 +167,16 @@ class OwaDashboard(models.AbstractModel):
         }
 
         # ── Per-account bar ─────────────────────────────────────────────────
-        per_account = Message.read_group(
-            range_domain, ['wa_account_id'], ['wa_account_id'],
+        per_account = Message._read_group(
+            range_domain, ['wa_account_id'], ['__count'],
         )
         messages_per_account = [
             {
-                'account_id': g['wa_account_id'][0] if g.get('wa_account_id') else False,
-                'account_name': g['wa_account_id'][1] if g.get('wa_account_id') else 'Unknown',
-                'count': g['wa_account_id_count'],
+                'account_id': account.id if account else False,
+                'account_name': account.display_name if account else 'Unknown',
+                'count': count,
             }
-            for g in per_account
+            for account, count in per_account
         ]
 
         # ── Top partners by message volume (last 30d, capped at 10) ────────
@@ -193,39 +190,38 @@ class OwaDashboard(models.AbstractModel):
             if acc.phone_number
         }
         self_digits.discard('')
-        partner_groups = Channel.read_group(
+        partner_groups = Channel._read_group(
             [('channel_type', '=', 'whatsapp'), ('whatsapp_partner_id', '!=', False)],
-            ['whatsapp_partner_id'], ['whatsapp_partner_id'],
-            limit=20, orderby='whatsapp_partner_id_count desc',
+            ['whatsapp_partner_id'], ['__count'],
+            limit=20, order='__count DESC',
         )
         top_partners = []
-        Partner = self.env['res.partner'].sudo()
-        for g in partner_groups:
-            partner = Partner.browse(g['whatsapp_partner_id'][0])
+        for partner, count in partner_groups:
+            partner = partner.sudo()
             p_digits = ''.join(c for c in (partner.phone or '') if c.isdigit())
             if p_digits and p_digits in self_digits:
                 continue
             top_partners.append({
-                'partner_id': g['whatsapp_partner_id'][0],
-                'name': g['whatsapp_partner_id'][1],
-                'channel_count': g['whatsapp_partner_id_count'],
+                'partner_id': partner.id,
+                'name': partner.display_name,
+                'channel_count': count,
             })
             if len(top_partners) >= 10:
                 break
 
         # ── Top failure reasons ─────────────────────────────────────────────
-        failure_groups = Message.read_group(
+        failure_groups = Message._read_group(
             [('state', 'in', ['error', 'bounced']),
              ('create_date', '>=', last_7d)] + account_domain,
-            ['failure_type'], ['failure_type'],
-            limit=10, orderby='failure_type_count desc',
+            ['failure_type'], ['__count'],
+            limit=10, order='__count DESC',
         )
         top_failure_reasons = [
             {
-                'failure_type': g['failure_type'] or 'unknown',
-                'count': g['failure_type_count'],
+                'failure_type': failure_type or 'unknown',
+                'count': count,
             }
-            for g in failure_groups
+            for failure_type, count in failure_groups
         ]
 
         # ── Recent failures table (last 10) ────────────────────────────────

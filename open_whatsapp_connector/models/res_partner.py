@@ -297,7 +297,7 @@ class ResPartner(models.Model):
         # wizard/job) is direct user intent and must not be vetoed by the
         # passive auto-create-on-inbound toggle — those callers set
         # ``owa_force_contact_create`` in context.
-        auto_create = self.env['ir.config_parameter'].sudo().get_param(
+        auto_create = self.env['ir.config_parameter'].sudo().get_str(
             'open_whatsapp_connector.auto_create_contacts', 'true'
         )
         if (auto_create.lower() in ('true', '1', 'yes')

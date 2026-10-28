@@ -16,8 +16,8 @@ from . import diagnostics_registry
 
 
 def _sidecar_path(account):
-    return account.env['ir.config_parameter'].sudo().get_param(
-        'open_whatsapp_connector.sidecar_path', '')
+    return account.env['ir.config_parameter'].sudo().get_str(
+        'open_whatsapp_connector.sidecar_path')
 
 
 @diagnostics_registry.register_diagnostic("setup.node")

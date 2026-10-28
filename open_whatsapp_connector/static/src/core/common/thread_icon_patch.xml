@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates>
+    <!-- v20 mail.ThreadIcon has no o-mail-ThreadIcon wrapper element any more: the class lives
+         in a t-set and the body is a branch chain with a <t name="extra"/> hook. The WhatsApp
+         branch hooks in after it; no stock branch matches channel_type 'whatsapp'. -->
     <t t-name="open_whatsapp_connector.ThreadIcon" t-inherit="mail.ThreadIcon" t-inherit-mode="extension">
-        <xpath expr="//*[hasclass('o-mail-ThreadIcon')]" position="inside">
-            <t t-if="props.thread.channel_type === 'whatsapp' and props.thread.owa_account_id">
+        <xpath expr="//t[@name='extra']" position="after">
+            <t t-if="this.channel?.channel_type === 'whatsapp' and this.channel?.owa_account_id">
                 <t name="whatsapp">
                     <t name="whatsapp_static">
-                        <div class="fa fa-whatsapp text-success position-relative" title="WhatsApp">
-                            <span t-if="props.thread.owaOnline"
+                        <div class="oi text-success position-relative" data-icon="oi_whatsapp" t-att="attr" title="WhatsApp">
+                            <span t-if="this.channel.owaOnline"
                                   class="owa-online-dot"
-                                  t-att-title="props.thread.owaTyping ? 'Typing…' : 'Online'"/>
+                                  t-att-title="this.channel.owaTyping ? 'Typing…' : 'Online'"/>
                             <span t-else=""
                                   class="owa-offline-dot"
                                   title="Offline"/>

@@ -2,7 +2,8 @@
 
 Receipts, delivery orders and invoices are deliberately **not** here: the
 customer app's job right now is to get a photograph of a handwritten slip into
-the office, and nothing else.
+the office, together with the services the customer wants done, and nothing
+else.
 
 This is the customer's offline intent, so it carries the same machinery as the
 field ones: an ``Idempotency-Key`` captured with the tap, an ``occurred_at``
@@ -13,16 +14,19 @@ from typing import Annotated
 
 from odoo.exceptions import UserError
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Response, status
 
 from .. import intents
 from ..dependencies import Caller, customer_caller
 from ..errors import validation
+from ..etags import conditional
 from ..schemas import (
     AddressSuggestion,
     JangadSubmitInput,
     JangadSubmitResult,
+    ServiceInfo,
 )
+from .catalog_router import active_job_types
 
 router = APIRouter(tags=["jangad"])
 
@@ -63,6 +67,30 @@ def list_addresses(
     return [AddressSuggestion(**suggestion) for suggestion in suggestions]
 
 
+@router.get(
+    "/services",
+    response_model=list[ServiceInfo],
+    summary="The services a customer can ask for: the dashboard",
+    responses={status.HTTP_304_NOT_MODIFIED: {"description": "Nothing has changed"}},
+)
+def list_services(
+    caller_obj: Annotated[Caller, Depends(customer_caller)],
+    response: Response,
+    if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
+):
+    """No prices: what a service costs is between the customer and the office."""
+    payload = [
+        {
+            "id": job_type.id,
+            "name": job_type.name,
+            "unit": job_type._sudi_unit(),
+            "description": job_type.invoice_description or None,
+        }
+        for job_type in active_job_types(caller_obj.env)
+    ]
+    return conditional(response, payload, if_none_match)
+
+
 @router.post(
     "/jangad",
     response_model=JangadSubmitResult,
@@ -97,6 +125,8 @@ def submit_jangad(
             pickup_address_id=data.pickup_address_id or False,
             manual_pickup_address=(data.manual_pickup_address or "").strip(),
             extra_pages=pages[1:],
+            services=[service.model_dump() for service in data.services],
+            source="customer_app",
         )
     except UserError as error:
         raise validation(str(error)) from error

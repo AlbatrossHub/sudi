@@ -341,9 +341,14 @@ class SudiDiamondJangadController(Controller):
         pickup_address_mode=False,
         manual_pickup_address=False,
     ):
+        # The page is open to any signed-in account: a customer posting their
+        # own jangad, or a member of the office posting one at the counter.
+        user = request.env.user
         return request.env["stock.picking"].sudo().sudi_create_public_jangad_receipt(
             phone,
             base64.b64encode(image_data),
             pickup_address_id=pickup_address_id,
             manual_pickup_address=manual_pickup_address,
+            source="customer_web" if user.share else "office",
+            posted_by=None if user.share else user,
         )

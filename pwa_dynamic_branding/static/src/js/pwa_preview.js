@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, onMounted } from "@odoo/owl";
+import { Component, proxy, onMounted, t, useProps } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 
 /**
@@ -9,15 +9,15 @@ import { registry } from "@web/core/registry";
  */
 export class PWAPreview extends Component {
       static template = "pwa_dynamic_branding.PWAPreview";
-      static props = {
-            appName: { type: String, optional: true },
-            themeColor: { type: String, optional: true },
-            backgroundColor: { type: String, optional: true },
-            iconUrl: { type: String, optional: true },
-      };
+      props = useProps({
+            appName: t.string().optional(),
+            themeColor: t.string().optional(),
+            backgroundColor: t.string().optional(),
+            iconUrl: t.string().optional(),
+      });
 
       setup() {
-            this.state = useState({
+            this.state = proxy({
                   appName: this.props.appName || "Odoo",
                   themeColor: this.props.themeColor || "#714B67",
                   backgroundColor: this.props.backgroundColor || "#714B67",
@@ -48,14 +48,14 @@ export class PWAPreview extends Component {
  */
 export class PWAColorPicker extends Component {
       static template = "pwa_dynamic_branding.PWAColorPicker";
-      static props = {
-            value: { type: String },
-            onChange: { type: Function },
-            label: { type: String, optional: true },
-      };
+      props = useProps({
+            value: t.string(),
+            onChange: t.function(),
+            label: t.string().optional(),
+      });
 
       setup() {
-            this.state = useState({
+            this.state = proxy({
                   color: this.props.value || "#714B67",
                   showPicker: false,
             });

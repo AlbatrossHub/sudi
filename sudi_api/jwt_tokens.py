@@ -46,7 +46,7 @@ def _params(env):
 
 
 def get_secret(env) -> str:
-    secret = _params(env).get_param(PARAM_SECRET)
+    secret = _params(env).get_str(PARAM_SECRET)
     if not secret:
         # Never fall back to a default: an unsigned-in-practice API is worse
         # than a broken one.
@@ -58,14 +58,11 @@ def get_secret(env) -> str:
 
 
 def get_issuer(env) -> str:
-    return _params(env).get_param(PARAM_ISSUER, DEFAULT_ISSUER)
+    return _params(env).get_str(PARAM_ISSUER, DEFAULT_ISSUER)
 
 
 def _int_param(env, key, default) -> int:
-    try:
-        value = int(_params(env).get_param(key, default))
-    except (TypeError, ValueError):
-        return default
+    value = _params(env).get_int(key, default)
     return value if value > 0 else default
 
 

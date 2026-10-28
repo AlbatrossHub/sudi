@@ -14,11 +14,23 @@ Why a middleware and not an exception handler: the OCA ``fastapi`` addon calls
 ``_clear_fastapi_exception_handlers`` on the whole mounted app tree, deliberately,
 to hand error rendering back to Odoo. Any handler registered here would be
 removed. Middlewares are not touched, so that is where this lives.
+
+**A refusal rolls back.** Turning an exception into a response means no
+exception reaches the HTTP layer, and the HTTP layer commits whatever has no
+exception attached. So the middleware rolls the transaction back itself before
+it answers; without that, an intent refused halfway committed its first half --
+an idempotency key reserved with no answer behind it (every retry then saw
+``LOCKED`` for ever), uploads marked used by an intent that never happened, a
+customer renamed by a registration that was refused. The one exception is
+opted into per error (``rollback=False``): the OTP refusals, whose bookkeeping
+-- the attempt counter, the failed-send record -- *is* the refusal.
 """
 
 import logging
 
 from odoo.exceptions import AccessError, UserError, ValidationError
+
+from odoo.addons.fastapi.context import odoo_env_ctx
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -56,7 +68,7 @@ class SudiApiError(Exception):
     """A failure the client is expected to handle, in the standard envelope."""
 
     def __init__(self, status_code, code, message, resync=None, detail=None,
-                 headers=None, retryable=None):
+                 headers=None, retryable=None, rollback=True):
         super().__init__(message)
         self.status_code = status_code
         self.code = code
@@ -65,6 +77,9 @@ class SudiApiError(Exception):
         self.detail = detail or {}
         self.headers = headers or {}
         self.retryable = (code in RETRYABLE) if retryable is None else retryable
+        # Whether the work done before the refusal is undone. Almost always:
+        # see the module docstring for the one reason not to.
+        self.rollback = rollback
         # Odoo logs any exception without this at ERROR with a full traceback.
         # An expected 4xx should cost one line, not a hundred.
         self.loglevel = logging.INFO
@@ -139,19 +154,45 @@ def _jsonable_errors(error):
     return safe
 
 
+def _rollback(error):
+    """Undo the request's work before a refusal is answered.
+
+    The env is the request's own, from the context variable the OCA dispatcher
+    sets around the app. Rolling back here is safe because the route has
+    finished: the exception is on its way out. In a test the cursor is a
+    ``TestCursor``, whose rollback returns to the savepoint it took at the
+    start of the request, so a test's own fixtures survive.
+    """
+    if not getattr(error, "rollback", True):
+        return
+    env = odoo_env_ctx.get(None)
+    if env is None:
+        return
+    try:
+        env.cr.rollback()
+    except Exception:
+        # Answering the client matters more than this; the HTTP layer rolls
+        # back anyway if the transaction is broken.
+        _logger.exception("Could not roll back a refused request")
+
+
 class SudiErrorMiddleware(BaseHTTPMiddleware):
-    """Renders every failure as the envelope above."""
+    """Renders every failure as the envelope above, after rolling it back."""
 
     async def dispatch(self, request, call_next):
+        # Every branch rolls back first. An unexpected exception is not caught
+        # at all: it reaches the HTTP layer, which rolls back and answers 500.
         try:
             return await call_next(request)
         except SudiApiError as error:
+            _rollback(error)
             return JSONResponse(
                 status_code=error.status_code,
                 content=error.envelope,
                 headers=error.headers or None,
             )
         except RequestValidationError as error:
+            _rollback(error)
             # A malformed body is the client's bug, so it must never be retried
             # blindly; the errors are passed through for the developer.
             return JSONResponse(
@@ -164,6 +205,7 @@ class SudiErrorMiddleware(BaseHTTPMiddleware):
                 ).envelope,
             )
         except (UserError, ValidationError) as error:
+            _rollback(error)
             # An ORM refusal the route did not anticipate. Never retryable:
             # the same request would be refused again for the same reason.
             return JSONResponse(
@@ -174,6 +216,7 @@ class SudiErrorMiddleware(BaseHTTPMiddleware):
                 ).envelope,
             )
         except AccessError as error:
+            _rollback(error)
             return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
                 content=SudiApiError(
@@ -182,6 +225,7 @@ class SudiErrorMiddleware(BaseHTTPMiddleware):
                 ).envelope,
             )
         except StarletteHTTPException as error:
+            _rollback(error)
             # Anything raised by FastAPI itself, e.g. an unknown route.
             code = CODE_AUTH if error.status_code in (401, 403) else CODE_VALIDATION
             if error.status_code == status.HTTP_404_NOT_FOUND:

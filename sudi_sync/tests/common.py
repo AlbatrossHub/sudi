@@ -62,7 +62,7 @@ class SudiSyncCase(SudiJobWorkCase):
             self.addCleanup(setattr, Picking, name, original)
 
     def _set_param(self, key, value):
-        self.env["ir.config_parameter"].sudo().set_param(key, value)
+        self.env["ir.config_parameter"].sudo().set_str(key, value)
 
     def _sync_flush(self):
         """Commit-time behaviour, without committing."""

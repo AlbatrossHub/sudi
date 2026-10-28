@@ -182,7 +182,7 @@ class OwaQuickReply(models.Model):
             if self.header_type == 'text':
                 header['text'] = self.header_text or ''
             elif self.header_attachment_id:
-                header['media_base64'] = self.header_attachment_id.datas.decode() if self.header_attachment_id.datas else ''
+                header['media_base64'] = self.header_attachment_id.raw.to_base64() if self.header_attachment_id.raw else ''
                 header['mimetype'] = self.header_attachment_id.mimetype or 'application/octet-stream'
                 header['filename'] = self.header_attachment_id.name or 'file'
             data['header'] = header

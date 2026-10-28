@@ -8,7 +8,7 @@
                     style="font-variant-numeric: tabular-nums; min-width: 2.8em;"
                     title="Playback speed"
                     t-on-click.stop="() => this.cyclePlaybackSpeed()">
-                <t t-esc="state.playbackSpeed + '×'"/>
+                <t t-out="this.state.playbackSpeed + '×'"/>
             </button>
         </xpath>
     </t>

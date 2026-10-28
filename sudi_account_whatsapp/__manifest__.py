@@ -2,7 +2,7 @@
 {
     'name': 'Sudi Account WhatsApp Integration',
     'summary': 'Send invoices directly via WhatsApp from account.move form view',
-    'version': '19.0.1.0.0',
+    'version': '20.0.1.0.0',
     'category': 'Accounting/Accounting',
     'author': 'Sudi',
     'license': 'LGPL-3',

@@ -10,6 +10,10 @@ A device is first-class rather than implicit because three things need it:
   a question someone will ask on a bad day.
 """
 
+from datetime import timedelta
+
+import psycopg2
+
 from odoo import api, fields, models
 from odoo.exceptions import AccessError
 from odoo.tools.translate import _
@@ -111,12 +115,44 @@ class SudiApiDevice(models.Model):
         })
         return self.sudo().create(vals)
 
+    # "Last seen" is support information, not an audit trail: minutes are enough.
+    TOUCH_THROTTLE = timedelta(minutes=5)
+
     def _sudi_touch(self, cursor=None):
-        """Record that the device called in, and how far it got."""
-        vals = {"last_seen_at": fields.Datetime.now()}
-        if cursor is not None:
-            vals["sync_cursor"] = int(cursor)
-        self.sudo().write(vals)
+        """Record that the device called in, and how far it got.
+
+        Every pull and every /auth/me lands here, and one phone sends those in
+        parallel; an ORM write on the shared row made the second transaction
+        fail with a serialization error (logged as ERROR, the whole request
+        retried -- seen on the M31). So: skip a fresh stamp, and take the row
+        with SKIP LOCKED in a savepoint that gives up quietly -- the request
+        that holds the row is stamping the same device anyway.
+        """
+        now = fields.Datetime.now()
+        for device in self.sudo():
+            if (
+                cursor is None
+                and device.last_seen_at
+                and now - device.last_seen_at < self.TOUCH_THROTTLE
+            ):
+                continue
+            # A pending ORM write to these columns would be flushed after the raw
+            # UPDATE below and silently undo it.
+            device.flush_recordset(["last_seen_at", "sync_cursor"])
+            try:
+                with self.env.cr.savepoint(flush=False):
+                    self.env.cr.execute(
+                        """UPDATE sudi_api_device
+                              SET last_seen_at = %s,
+                                  sync_cursor = COALESCE(%s, sync_cursor)
+                            WHERE id = (SELECT id FROM sudi_api_device
+                                         WHERE id = %s FOR NO KEY UPDATE SKIP LOCKED)""",
+                        (now, int(cursor) if cursor is not None else None, device.id),
+                        log_exceptions=False,
+                    )
+            except (psycopg2.errors.SerializationFailure, psycopg2.errors.LockNotAvailable):
+                continue
+            device.invalidate_recordset(["last_seen_at", "sync_cursor"])
 
     def action_revoke(self):
         """Kill every token on this handset. The user's others keep working."""

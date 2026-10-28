@@ -1,9 +1,11 @@
 /** @odoo-module **/
 
-import { Component, useEffect, xml } from "@odoo/owl";
+import { Component, usePlugin, xml, useProps } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { useLayoutEffect } from "@web/owl2/utils";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
+import { ActionPlugin } from "@web/webclient/actions/action_plugin";
 
 /**
  * Invisible, ALWAYS-MOUNTED widget on the WhatsApp account form that auto-opens
@@ -21,16 +23,16 @@ import { standardFieldProps } from "@web/views/fields/standard_field_props";
  */
 export class OwaImportPromptWidget extends Component {
     static template = xml`<span class="o_owa_import_prompt" style="display:none"/>`;
-    static props = { ...standardFieldProps };
+    props = useProps({ ...standardFieldProps });
 
     setup() {
         this.orm = useService("orm");
-        this.action = useService("action");
+        this.action = usePlugin(ActionPlugin);
         this._opening = false;
         // Runs once after mount (covers opening the form when it is already
         // connected + flagged) and again whenever either value changes (covers
         // the live connecting -> connected transition while the form is open).
-        useEffect(
+        useLayoutEffect(
             () => {
                 this._maybePrompt();
             },

@@ -55,10 +55,7 @@ class SudiSyncChange(models.Model):
     # ------------------------------------------------------------------
     @api.model
     def _sudi_int_param(self, key, default):
-        try:
-            value = int(self.env["ir.config_parameter"].sudo().get_param(key, default))
-        except (TypeError, ValueError):
-            return default
+        value = self.env["ir.config_parameter"].sudo().get_int(key, default)
         return value if value >= 0 else default
 
     @api.model
@@ -189,8 +186,8 @@ class SudiSyncChange(models.Model):
             "DELETE FROM sudi_sync_change WHERE id <= %s", (highest,)
         )
         deleted = self.env.cr.rowcount
-        self.env["ir.config_parameter"].sudo().set_param(
-            PARAM_PRUNED_THROUGH, str(highest)
+        self.env["ir.config_parameter"].sudo().set_int(
+            PARAM_PRUNED_THROUGH, highest
         )
         _logger.info(
             "sudi.sync.change: pruned %s rows up to id %s (older than %s days)",

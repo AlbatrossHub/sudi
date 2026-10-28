@@ -1,6 +1,7 @@
-import { Component, onWillStart, onWillUnmount, useEffect, useRef } from "@odoo/owl";
+import { Component, onWillStart, onWillUnmount, signal, t, useProps } from "@odoo/owl";
 import { loadBundle } from "@web/core/assets";
 import { humanNumber } from "@web/core/utils/numbers";
+import { useLayoutEffect } from "@web/owl2/utils";
 
 /**
  * Quantity trend for the analytical dashboard.
@@ -11,18 +12,18 @@ import { humanNumber } from "@web/core/utils/numbers";
  */
 export class SudiTrendChart extends Component {
     static template = "sudi_diamond_dashboard.SudiTrendChart";
-    static props = {
-        labels: { type: Array },
-        values: { type: Array },
-        unit: { type: String },
-        formatValue: { type: Function },
-    };
+    props = useProps({
+        labels: t.array(),
+        values: t.array(),
+        unit: t.string(),
+        formatValue: t.function(),
+    });
 
     setup() {
-        this.canvasRef = useRef("canvas");
+        this.canvasRef = signal.ref();
         this.chart = null;
         onWillStart(() => loadBundle("web.chartjs_lib"));
-        useEffect(() => this.renderChart());
+        useLayoutEffect(() => this.renderChart());
         onWillUnmount(() => this.destroyChart());
     }
 
@@ -57,7 +58,7 @@ export class SudiTrendChart extends Component {
     }
 
     renderChart() {
-        const canvas = this.canvasRef.el;
+        const canvas = this.canvasRef();
         if (!canvas || typeof Chart === "undefined") {
             return;
         }

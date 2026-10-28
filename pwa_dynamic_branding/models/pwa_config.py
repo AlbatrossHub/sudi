@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Aura Odoo Tech. See LICENSE file for full copyright and licensing details.
 
-import base64
+from odoo.tools import BinaryBytes
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
 from odoo.tools.image import image_process
@@ -410,13 +410,13 @@ class PWAConfig(models.Model):
             raise ValidationError(_('Please upload a 512x512 icon first to generate other sizes.'))
         
         # Generate 192x192 from 512x512
-        icon_data = base64.b64decode(self.icon_512)
+        icon_data = self.icon_512.content  # Binary fields hold BinaryValue in Odoo 20
         icon_192_data = image_process(icon_data, size=(192, 192))
-        self.icon_192 = base64.b64encode(icon_192_data)
+        self.icon_192 = BinaryBytes(icon_192_data)
         
         # Generate Apple touch icon (180x180)
         apple_icon_data = image_process(icon_data, size=(180, 180))
-        self.apple_touch_icon = base64.b64encode(apple_icon_data)
+        self.apple_touch_icon = BinaryBytes(apple_icon_data)
         
         return {
             'type': 'ir.actions.client',

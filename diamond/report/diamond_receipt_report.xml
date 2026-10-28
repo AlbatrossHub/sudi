@@ -5,7 +5,6 @@
         <field name="model">stock.picking</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">diamond.report_diamond_job_work_document</field>
-        <field name="report_file">diamond.report_diamond_job_work_document</field>
         <field name="binding_model_id" ref="stock.model_stock_picking"/>
         <field name="binding_type">report</field>
     </record>

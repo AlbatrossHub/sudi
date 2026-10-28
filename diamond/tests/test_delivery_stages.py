@@ -25,7 +25,7 @@ class TestSudiDeliveryStages(SudiJobWorkCase):
         # off rather than inherit whatever the last run left behind.
         params = cls.env["ir.config_parameter"].sudo()
         for requirement in ("receiver_name", "signature", "photo"):
-            params.set_param(f"sudi_diamond.pod_require_{requirement}", "0")
+            params.set_str(f"sudi_diamond.pod_require_{requirement}", "0")
 
     def _patch_dispatch(self):
         """Capture the dispatch notification instead of sending WhatsApp."""

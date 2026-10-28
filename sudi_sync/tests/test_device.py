@@ -1,3 +1,6 @@
+from datetime import timedelta
+
+from odoo import fields
 from odoo.exceptions import AccessError
 
 from .common import SudiSyncCase
@@ -81,6 +84,24 @@ class TestSudiApiDevice(SudiSyncCase):
         device._sudi_touch(cursor=4321)
         self.assertEqual(device.sync_cursor, 4321)
         self.assertTrue(device.last_seen_at)
+
+    def test_a_fresh_stamp_is_not_rewritten(self):
+        # Every request touches the device; rewriting a stamp that is minutes
+        # old only made a phone's parallel requests collide on this row.
+        device = self._sudi_register()
+        stamp = fields.Datetime.now() - timedelta(minutes=1)
+        device.sudo().write({"last_seen_at": stamp})
+        device._sudi_touch()
+        self.assertEqual(device.last_seen_at, stamp)
+        device.sudo().write({"last_seen_at": stamp - timedelta(minutes=10)})
+        device._sudi_touch()
+        self.assertGreater(device.last_seen_at, stamp)
+
+    def test_a_new_cursor_is_always_recorded(self):
+        device = self._sudi_register()
+        device._sudi_touch(cursor=7)
+        device._sudi_touch(cursor=8)
+        self.assertEqual(device.sync_cursor, 8)
 
     def test_invalidating_a_user_revokes_every_device(self):
         first = self._sudi_register(device_uid="phone-1")

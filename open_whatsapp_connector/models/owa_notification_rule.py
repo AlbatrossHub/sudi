@@ -88,7 +88,7 @@ class OwaNotificationRule(models.Model):
     # must cheaply skip models that have no notification rules. Cache the set of
     # model names that carry an active rule; invalidate on rule CRUD.
     @api.model
-    @tools.ormcache()
+    @api.ormcache()
     def _owa_models_with_rules(self):
         rules = self.sudo().search([('active', '=', True)])
         return tuple(sorted({m for m in rules.mapped('model_name') if m}))
@@ -96,18 +96,18 @@ class OwaNotificationRule(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         recs = super().create(vals_list)
-        self.env.registry.clear_cache()
+        self.env.transaction.invalidate_ormcache()
         return recs
 
     def write(self, vals):
         res = super().write(vals)
         if {'active', 'model_id', 'model_name', 'trigger_field_id',
                 'trigger_value'} & set(vals):
-            self.env.registry.clear_cache()
+            self.env.transaction.invalidate_ormcache()
         return res
 
     def unlink(self):
-        self.env.registry.clear_cache()
+        self.env.transaction.invalidate_ormcache()
         return super().unlink()
 
     def _get_phone_from_record(self, record):

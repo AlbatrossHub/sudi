@@ -51,15 +51,24 @@ def _otp_failure(error):
     should do. An undeliverable code is a 502, because telling a customer to
     wait for a message that was never sent is the one answer that wastes their
     afternoon.
+
+    The refusal is *not* rolled back. Its bookkeeping is the point of it: the
+    attempt counter that locks a code after five wrong guesses, the expiry
+    stamped on a dead code, the failed-send record support reads. Rolling those
+    back with the request would hand a brute-forcer unlimited guesses.
     """
     code = getattr(error, "sudi_code", "OTP_INVALID")
     if isinstance(error, SudiOtpRateLimited):
         return SudiApiError(
-            status.HTTP_429_TOO_MANY_REQUESTS, code, str(error), retryable=True
+            status.HTTP_429_TOO_MANY_REQUESTS, code, str(error), retryable=True,
+            rollback=False,
         )
     if isinstance(error, SudiOtpUndeliverable):
-        return SudiApiError(status.HTTP_502_BAD_GATEWAY, code, str(error), retryable=True)
-    return SudiApiError(HTTP_422, code, str(error))
+        return SudiApiError(
+            status.HTTP_502_BAD_GATEWAY, code, str(error), retryable=True,
+            rollback=False,
+        )
+    return SudiApiError(HTTP_422, code, str(error), rollback=False)
 
 
 def _users_for(env: Environment, partner):
@@ -183,7 +192,7 @@ def register(
         partner.write(vals)
     else:
         partner = Partner.create({
-            **vals, "is_company": False, "company_type": "person",
+            **vals,
         })
 
     if data.vat:

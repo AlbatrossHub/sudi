@@ -4,3 +4,5 @@ from . import test_sync
 from . import test_intents
 from . import test_customer
 from . import test_jangad
+from . import test_v2_field
+from . import test_v2_customer

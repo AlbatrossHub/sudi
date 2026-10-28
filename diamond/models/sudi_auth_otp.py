@@ -34,6 +34,9 @@ PARAM_COOLDOWN = "sudi_auth.otp_resend_cooldown_seconds"
 PARAM_MAX_PER_HOUR = "sudi_auth.otp_max_per_hour"
 PARAM_RETENTION_DAYS = "sudi_auth.otp_retention_days"
 PARAM_LOG_CODES = "sudi_auth.otp_log_codes"
+# Development databases only (the ETL blanks the WhatsApp account on every copy): the code
+# goes to the server log and nothing is sent. Never set on a database customers use.
+PARAM_DEV_NO_SEND = "sudi_auth.otp_dev_no_send"
 
 # The body template is shared with web_auth_otp_login on purpose: a customer
 # who uses both the PWA and the app should get the same message.
@@ -131,12 +134,7 @@ class SudiAuthOtp(models.Model):
     @api.model
     def _sudi_param(self, key):
         default = DEFAULTS[key]
-        try:
-            value = int(
-                self.env["ir.config_parameter"].sudo().get_param(key, default)
-            )
-        except (TypeError, ValueError):
-            return default
+        value = self.env["ir.config_parameter"].sudo().get_int(key, default)
         return value if value > 0 else default
 
     # ------------------------------------------------------------------
@@ -205,13 +203,22 @@ class SudiAuthOtp(models.Model):
     def _sudi_deliver(self, code):
         """Send the code over WhatsApp, recording whether the channel took it."""
         self.ensure_one()
-        template = self.env["ir.config_parameter"].sudo().get_param(
+        template = self.env["ir.config_parameter"].sudo().get_str(
             PARAM_BODY_TEMPLATE, "*{{otp}}* is your verification code."
         )
         body = template.replace("{{otp}}", code)
-        if self.env["ir.config_parameter"].sudo().get_param(PARAM_LOG_CODES) in (
-            "1", "True", "true",
-        ):
+        ICP = self.env["ir.config_parameter"].sudo()
+        if ICP.get_str(PARAM_DEV_NO_SEND) in ("1", "True", "true"):
+            _logger.warning(
+                "OTP for %s is %s (development mode: logged, not sent)",
+                self.identifier, code,
+            )
+            self.sudo().write({
+                "delivery_state": "sent",
+                "delivery_error": "Development mode: written to the server log, not sent.",
+            })
+            return True
+        if ICP.get_str(PARAM_LOG_CODES) in ("1", "True", "true"):
             # Development only, and off by default.
             _logger.warning("OTP for %s is %s", self.identifier, code)
 

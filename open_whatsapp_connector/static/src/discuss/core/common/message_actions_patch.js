@@ -10,7 +10,7 @@ import { _t } from "@web/core/l10n/translation";
 
 messageActionsRegistry.add("owa-edit-message", {
     condition: ({ message }) => Boolean(message?.owaEditable),
-    icon: "fa fa-pencil",
+    icon: "edit",
     name: _t("Edit"),
     sequence: 15,
     onSelected: ({ message, owner, store }) => {

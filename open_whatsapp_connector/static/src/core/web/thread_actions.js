@@ -25,7 +25,7 @@ registerThreadAction("owa-view-contact", {
             res_id: thread.whatsapp_partner_id.id,
         });
     },
-    icon: "fa fa-fw fa-address-book",
+    icon: "contact_page",
     name: _t("View Contact"),
     sequenceGroup: 1,
 });
@@ -44,7 +44,7 @@ registerThreadAction("owa-assign-to-me", {
         store.env.services.notification.add(
             _t("Conversation assigned to you."), { type: "success" });
     },
-    icon: "fa fa-fw fa-user-plus",
+    icon: "person_add",
     name: _t("Assign to me"),
     sequenceGroup: 1,
 });

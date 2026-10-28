@@ -1,19 +1,21 @@
 /** @odoo-module **/
 
-import { Component, useState, onMounted } from "@odoo/owl";
+import { Component, onMounted, proxy, usePlugin, useProps } from "@odoo/owl";
+import { NotificationPlugin } from "@web/core/notifications/notification_plugin";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
+import { ActionPlugin, standardActionServiceProps } from "@web/webclient/actions/action_plugin";
 
 export class OwaCustomer360 extends Component {
     static template = "open_whatsapp_connector.OwaCustomer360";
-    static props = ["*"];
+    props = useProps({ ...standardActionServiceProps });
 
     setup() {
         this.orm = useService("orm");
-        this.action = useService("action");
-        this.notification = useService("notification");
-        this.state = useState({
+        this.action = usePlugin(ActionPlugin);
+        this.notification = usePlugin(NotificationPlugin);
+        this.state = proxy({
             loading: true,
             partner: null,
             events: [],

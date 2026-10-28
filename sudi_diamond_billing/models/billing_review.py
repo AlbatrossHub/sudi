@@ -42,7 +42,7 @@ class SudiDiamondBillingReview(models.AbstractModel):
     # Access & helpers
     # ------------------------------------------------------------------
     @api.model
-    def _check_access(self):
+    def _sudi_check_review_access(self):
         if not self.env.user.has_group(self.REVIEW_GROUP):
             raise AccessError(_("Only Billing Reviewers can use the Billing Review."))
 
@@ -156,7 +156,7 @@ class SudiDiamondBillingReview(models.AbstractModel):
     # ------------------------------------------------------------------
     @api.model
     def get_review_data(self, partner_id=None, date_from=None, date_to=None, status="due", search=None, group_by="customer"):
-        self._check_access()
+        self._sudi_check_review_access()
         Picking = self.env["stock.picking"]
 
         domain = self._base_domain()
@@ -291,7 +291,7 @@ class SudiDiamondBillingReview(models.AbstractModel):
 
     @api.model
     def get_delivery_lines(self, picking_id):
-        self._check_access()
+        self._sudi_check_review_access()
         delivery = self.env["stock.picking"].browse(int(picking_id))
         delivery.check_access("read")
         source_labels = {"partner": ("Customer price", "cust"), "job_type": ("Job type price", "job"), "manual": ("Manual", "man")}
@@ -331,7 +331,7 @@ class SudiDiamondBillingReview(models.AbstractModel):
 
     @api.model
     def get_history(self, partner_id=None, limit=200):
-        self._check_access()
+        self._sudi_check_review_access()
         domain = [("company_id", "in", self.env.companies.ids)]
         if partner_id:
             domain.append(("partner_id", "=", int(partner_id)))
@@ -372,7 +372,7 @@ class SudiDiamondBillingReview(models.AbstractModel):
     # ------------------------------------------------------------------
     @api.model
     def set_line_price(self, move_id, price_unit):
-        self._check_access()
+        self._sudi_check_review_access()
         move = self.env["stock.move"].browse(int(move_id))
         if not move.sudi_billing_line_id:
             raise UserError(_("This delivery line has no billing line on its receipt; recompute the receipt's billing details first."))
@@ -382,7 +382,7 @@ class SudiDiamondBillingReview(models.AbstractModel):
     @api.model
     def reset_prices(self, picking_ids):
         """Drop manual overrides and re-sync from the customer price list."""
-        self._check_access()
+        self._sudi_check_review_access()
         deliveries = self.env["stock.picking"].browse(picking_ids)
         receipts = deliveries.sudi_origin_receipt_id
         receipts.sudi_billing_line_ids.filtered(lambda line: line.active and line.manual_price).sudi_reset_manual_price()
@@ -391,7 +391,7 @@ class SudiDiamondBillingReview(models.AbstractModel):
 
     @api.model
     def set_settlement_mode(self, picking_ids, mode):
-        self._check_access()
+        self._sudi_check_review_access()
         if mode not in ("invoice", "reference"):
             raise UserError(_("Unknown settlement mode."))
         deliveries = self.env["stock.picking"].browse(picking_ids)
@@ -400,7 +400,7 @@ class SudiDiamondBillingReview(models.AbstractModel):
 
     @api.model
     def set_returned_without_work(self, move_ids, value):
-        self._check_access()
+        self._sudi_check_review_access()
         moves = self.env["stock.move"].browse(move_ids)
         if any(move._sudi_is_settled() for move in moves):
             raise UserError(_("Settled delivery lines cannot be changed."))
@@ -409,13 +409,13 @@ class SudiDiamondBillingReview(models.AbstractModel):
 
     @api.model
     def get_due_delivery_ids(self):
-        self._check_access()
+        self._sudi_check_review_access()
         return self._monthly_due().ids
 
     @api.model
     def get_settlement_preview(self, picking_ids):
         """Per customer: how many deliveries and how much go to an invoice / a reference statement."""
-        self._check_access()
+        self._sudi_check_review_access()
         deliveries = self.env["stock.picking"].browse(picking_ids).filtered(
             lambda picking: picking.sudi_billing_status in self.OPEN_STATUSES
         )
@@ -437,7 +437,7 @@ class SudiDiamondBillingReview(models.AbstractModel):
 
     @api.model
     def settle(self, picking_ids, date=None):
-        self._check_access()
+        self._sudi_check_review_access()
         deliveries = self.env["stock.picking"].browse(picking_ids)
         if not deliveries:
             raise UserError(_("Select at least one delivery."))
@@ -460,7 +460,7 @@ class SudiDiamondBillingReview(models.AbstractModel):
 
     @api.model
     def get_open_action(self, model, res_id):
-        self._check_access()
+        self._sudi_check_review_access()
         if model == "account.move":
             action = self.env["ir.actions.act_window"]._for_xml_id("diamond.action_sudi_diamond_invoices")
         elif model == "stock.picking":

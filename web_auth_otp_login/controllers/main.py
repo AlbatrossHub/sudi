@@ -4,10 +4,29 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 
+import secrets
+
 from odoo import http, fields, _, SUPERUSER_ID
 from odoo.http import request
+from odoo.http.session import authenticate as session_authenticate
 from odoo.exceptions import UserError
 from odoo.addons.web.controllers.home import ensure_db
+
+from ..models.res_users import OTP_LOGIN_NONCE_KEY, OTP_LOGIN_NONCE_LOGIN_KEY
+
+
+def authenticate_verified_otp_user(user):
+    """Log the current HTTP session in as ``user``.
+
+    Only call this right after a WhatsApp OTP has been verified. It goes
+    through the regular credential flow (``whatsapp_otp`` type), so login
+    throttling, last-login logging and MFA all apply.
+    """
+    nonce = secrets.token_urlsafe(32)
+    request.session[OTP_LOGIN_NONCE_KEY] = nonce
+    request.session[OTP_LOGIN_NONCE_LOGIN_KEY] = user.login
+    credential = {'type': 'whatsapp_otp', 'login': user.login, 'token': nonce}
+    return session_authenticate(request.session, request.env, credential)
 
 _logger = logging.getLogger(__name__)
 
@@ -70,7 +89,6 @@ class WebAuthOtpController(http.Controller):
         request.session['otp_time'] = fields.Datetime.to_string(fields.Datetime.now())
         request.session['otp_user_id'] = user.id if user else False
         request.session['otp_partner_id'] = partner.id
-        request.session.touch()
 
         # Find connected WhatsApp account in open_whatsapp_connector
         wa_account = request.env['owa.account'].with_user(SUPERUSER_ID).search([
@@ -81,7 +99,7 @@ class WebAuthOtpController(http.Controller):
             return {'success': False, 'error': _('WhatsApp sending failed: No WhatsApp account configured or connected in Open WhatsApp Connector.')}
 
         # Build message body from configurable template (Settings > Technical > Parameters)
-        body_template = request.env['ir.config_parameter'].sudo().get_param(
+        body_template = request.env['ir.config_parameter'].sudo().get_str(
             'web_auth_otp_login.message_body_template',
             default=_("*{{otp}}* is your verification code. For your security, do not share this code."),
         )
@@ -176,16 +194,8 @@ class WebAuthOtpController(http.Controller):
         if not user.active:
             return {'success': False, 'error': _('User account is deactivated.')}
 
-        # Initialize Odoo session authentication
-        request.session.uid = user.id
-        request.session.login = user.login
-        request.session.db = request.env.registry.db_name
-        request.session.context = dict(user.env['res.users'].context_get())
-        
-        # Generate session token and trigger soft rotation
-        request.env.registry.clear_cache()
-        request.session.session_token = user._compute_session_token(request.session.sid)
-        request.session.should_rotate = True
+        # Authenticate the session through the regular credential flow
+        authenticate_verified_otp_user(user)
 
         # Link session cart to the logged-in user
         sale_order_id = request.session.get('sale_order_id')
@@ -206,7 +216,6 @@ class WebAuthOtpController(http.Controller):
         request.session.pop('otp_time', None)
         request.session.pop('otp_user_id', None)
         request.session.pop('otp_partner_id', None)
-        request.session.touch()
 
         # Determine target redirect
         redirect_url = redirect or request.params.get('redirect') or '/jangad'

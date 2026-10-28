@@ -2,11 +2,11 @@
 <odoo>
     <!-- GST Onboarding Page/Popup Template -->
     <template id="gst_onboarding_page" name="GST Onboarding">
-        <t t-call="website.layout">
-            <t t-set="head">
-                <t t-out="head"/>
-                <t t-call="diamond.jangad_pwa_head"/>
-            </t>
+        <t t-set="head">
+            <t t-out="head"/>
+            <t t-call="diamond.jangad_pwa_head"/>
+        </t>
+        <t t-call="website.layout" head="head">
             <div id="wrap" class="oe_structure">
                 <section class="container py-5">
                     <div class="row justify-content-center">
@@ -65,11 +65,11 @@
 
     <!-- New Customer Registration Form (WhatsApp OTP Flow) Template -->
     <template id="otp_new_customer_form" name="Customer Registration">
-        <t t-call="website.layout">
-            <t t-set="head">
-                <t t-out="head"/>
-                <t t-call="diamond.jangad_pwa_head"/>
-            </t>
+        <t t-set="head">
+            <t t-out="head"/>
+            <t t-call="diamond.jangad_pwa_head"/>
+        </t>
+        <t t-call="website.layout" head="head">
             <div id="wrap" class="oe_structure">
                 <section class="container py-5">
                     <div class="row justify-content-center">

@@ -2,13 +2,14 @@
 <odoo>
   <template id="web_brand_promotion_message_custom" inherit_id="web.brand_promotion_message">
     <xpath expr="//t[@t-out=&quot;final_message % (odoo_logo, _message and ('- ' + _message) or '')&quot;]" position="replace">
-      <t t-if="not request.env['ir.config_parameter'].sudo().get_param('hide_powered_by.show_powered_by')">
+      <t t-if="not request.env['ir.config_parameter'].sudo().get_bool('hide_powered_by.show_powered_by')">
         <!-- Hide 'Powered by Odoo' -->
       </t>
       <t t-else="">
-        <t t-raw="request.env['ir.config_parameter'].sudo().get_param('hide_powered_by.powered_by_html')"/>
+        <!-- Odoo 20: t-raw is gone and get_param is removed; the helper
+             returns a Markup so t-out renders the stored HTML unescaped. -->
+        <t t-out="request.env['res.config.settings'].sudo()._get_powered_by_markup()"/>
       </t>
     </xpath>
   </template>
 </odoo>
-

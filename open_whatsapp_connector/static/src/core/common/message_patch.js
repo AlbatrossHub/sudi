@@ -13,14 +13,14 @@ patch(Message.prototype, {
         const id = Number(ev.target.dataset.oeId);
         if (ev.target.closest(".o_whatsapp_channel_redirect")) {
             ev.preventDefault();
-            let thread = await this.store.Thread.getOrFetch({ model: "discuss.channel", id });
-            if (!thread?.hasSelfAsMember) {
-                await this.env.services.orm.call("discuss.channel", "add_members", [[id]], {
-                    partner_ids: [this.store.self.id],
-                });
-                thread = await this.store.Thread.getOrFetch({ model: "discuss.channel", id });
+            let channel = await this.store["discuss.channel"].getOrFetch(id);
+            if (!channel?.hasSelfAsMember) {
+                // Odoo 20: add_members became private; join through the
+                // dedicated store route instead.
+                await channel?.joinRpc();
+                channel = await this.store["discuss.channel"].getOrFetch(id);
             }
-            thread.open();
+            channel.open();
             return;
         }
         super.onClick(ev);

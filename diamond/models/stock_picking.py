@@ -282,6 +282,40 @@ class StockPicking(models.Model):
         string="Involved Departments",
         tracking=True,
     )
+    # What the customer asked for when the jangad was posted, before anything
+    # was counted. The office enters item lines *from* these; they are never
+    # item lines themselves.
+    sudi_service_request_ids = fields.One2many(
+        "sudi.diamond.service.request",
+        "picking_id",
+        string="Requested Services",
+        copy=False,
+    )
+    sudi_has_open_service_requests = fields.Boolean(
+        compute="_compute_sudi_has_open_service_requests",
+        help="A requested service has not been entered as an item line yet.",
+    )
+    # No default on purpose: a default would stamp every historical receipt
+    # with a source nobody recorded.
+    sudi_jangad_source = fields.Selection(
+        [
+            ("customer_app", "Customer app"),
+            ("customer_web", "Customer web page"),
+            ("on_behalf", "Posted by staff for the customer"),
+            ("office", "Office"),
+        ],
+        string="Jangad Source",
+        copy=False,
+        readonly=True,
+        help="Where the jangad was posted from.",
+    )
+    sudi_posted_by_id = fields.Many2one(
+        "res.users",
+        string="Posted By",
+        copy=False,
+        readonly=True,
+        help="The member of staff who posted this jangad for the customer.",
+    )
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -327,7 +361,14 @@ class StockPicking(models.Model):
             and picking.state not in ("cancel", "done")
         )
         if receipts:
-            receipts.with_context(sudi_skip_billing_sync=True)._sudi_sync_billing_details()
+            # sudo: keeping the billing details in step with the item table is
+            # bookkeeping, not something the person saving the table does. It
+            # reads the customer's price list, which a stock user -- the office
+            # validator, the very person who fills this table -- may not read,
+            # and without it saving item lines failed with an AccessError on a
+            # model they never asked for. The billing lines it writes stay
+            # invisible to them either way.
+            receipts.sudo().with_context(sudi_skip_billing_sync=True)._sudi_sync_billing_details()
 
     @api.model
     def _sudi_get_pickup_notify_users(self):
@@ -503,6 +544,13 @@ class StockPicking(models.Model):
         base_url = self.get_base_url().rstrip("/")
         return f"{base_url}/web#id={self.id}&model={self._name}&view_type=form"
 
+    @api.depends("sudi_service_request_ids.move_id")
+    def _compute_sudi_has_open_service_requests(self):
+        for picking in self:
+            picking.sudi_has_open_service_requests = any(
+                not request.move_id for request in picking.sudi_service_request_ids
+            )
+
     @api.depends("sudi_jangad_attachment_ids", "sudi_jangad_image")
     def _compute_sudi_jangad_page_count(self):
         for picking in self:
@@ -534,7 +582,7 @@ class StockPicking(models.Model):
             {
                 "name": f"jangad_{self.name or self.id}_{offset + index + 1}.jpg",
                 "type": "binary",
-                "datas": datas,
+                "raw": base64.b64decode(datas),
                 "res_model": self._name,
                 "res_id": self.id,
                 "mimetype": "image/jpeg",
@@ -559,7 +607,7 @@ class StockPicking(models.Model):
         first_page = self.env["ir.attachment"].sudo().create({
             "name": f"jangad_{self.name}.jpg",
             "type": "binary",
-            "datas": self.sudi_jangad_image,
+            "raw": self.sudi_jangad_image.content,
             "res_model": self._name,
             "res_id": self.id,
             "mimetype": "image/jpeg",
@@ -589,7 +637,7 @@ class StockPicking(models.Model):
             attachment = self.env["ir.attachment"].sudo().create({
                 "name": attachment_name,
                 "type": "binary",
-                "datas": base64.b64encode(pdf_content),
+                "raw": pdf_content,
                 "res_model": self._name,
                 "res_id": self.id,
                 "mimetype": "application/pdf",
@@ -1198,8 +1246,99 @@ class StockPicking(models.Model):
             raise UserError(_("Department transfer is only available on diamond job-work receipts in progress."))
         if not job_type:
             raise UserError(_("Select the department to transfer to."))
-        self.write({"sudi_current_department_id": job_type.id})
+        vals = {"sudi_current_department_id": job_type.id}
+        # Every department the parcel passes through, not only where it is now:
+        # the one it leaves too, because the first department is usually set by
+        # hand on the form and would otherwise never be recorded.
+        passed_through = (
+            self.sudi_current_department_id | job_type
+        ) - self.sudi_involved_department_ids
+        if passed_through:
+            vals["sudi_involved_department_ids"] = [
+                Command.link(department.id) for department in passed_through
+            ]
+        self.write(vals)
         return True
+
+    def _sudi_log_time(self, job_type, hours, description=None, date=None):
+        """Book time spent on a job-work receipt by hand, for ``env.user``.
+
+        The timer's sibling, for the hour that was worked and never timed. Same
+        constraints as the timer -- a receipt in progress, a job type to book
+        against, an employee behind the user -- so a manual entry and a timed
+        one land identically in the timesheets.
+        """
+        self.ensure_one()
+        self._sudi_check_job_work_access()
+        if (
+            not self.sudi_is_diamond_job_work
+            or self.picking_type_code != "incoming"
+            or self.state != "assigned"
+        ):
+            raise UserError(_("Time can only be logged on diamond job-work receipts in progress."))
+        if not job_type:
+            raise UserError(_("Choose which job type this time is for."))
+        if not hours or hours <= 0 or hours > 24:
+            raise UserError(_("Enter the time spent: more than zero and at most 24 hours."))
+        employee = self.env["hr.employee"].sudo().search([
+            ("user_id", "=", self.env.uid),
+            ("company_id", "in", [False, self.company_id.id]),
+        ], limit=1)
+        if not employee:
+            raise UserError(_(
+                "Your account has no employee record, so time cannot be booked. "
+                "Ask the office to link one."
+            ))
+        project = self.env["account.analytic.line"]._sudi_get_timesheet_project()
+        return self.env["account.analytic.line"].create({
+            "sudi_picking_id": self.id,
+            "sudi_job_type_id": job_type.id,
+            "project_id": project.id,
+            "date": date or fields.Date.context_today(self),
+            "name": (description or "").strip() or "/",
+            "unit_amount": hours,
+            "user_id": self.env.uid,
+            "employee_id": employee.id,
+        })
+
+    def _sudi_job_work_ready_problems(self):
+        """Everything that stops this receipt being marked READY, as a list.
+
+        The checks job work itself would make later (a customer, and a product
+        and a job type on every line) plus the two the office is asked to make
+        now: at least one line, and a piece count on every line, since that
+        count is the line's demand. All of them at once and not the first, so
+        a phone can show the office the whole list in one go.
+        """
+        self.ensure_one()
+        problems = []
+        if not self.partner_id:
+            problems.append({
+                "move_id": None, "sr": None, "field": "partner_id",
+                "message": _("This receipt has no customer."),
+            })
+        lines = self.move_ids.filtered(lambda move: move.state != "cancel")
+        if not lines:
+            problems.append({
+                "move_id": None, "sr": None, "field": "lines",
+                "message": _("Add at least one item line."),
+            })
+        for move in lines.sorted(key=lambda move: (move.sudi_sr or 0, move.id)):
+            def problem(field, message, move=move):
+                problems.append({
+                    "move_id": move.id, "sr": move.sudi_sr or None,
+                    "field": field, "message": message,
+                })
+            label = move.sudi_sr or move.id
+            if not move.product_id:
+                problem("product", _("Line %s has no product.", label))
+            if not move.sudi_job_type_id:
+                problem("job_type_id", _("Line %s needs a job type.", label))
+            if move.sudi_pcs_qty <= 0:
+                problem("pcs", _("Line %s needs a piece count above zero.", label))
+            if move.sudi_carats < 0:
+                problem("carats", _("Line %s cannot have negative carats.", label))
+        return problems
 
     def action_sudi_transfer_department(self):
         self.ensure_one()
@@ -1232,30 +1371,21 @@ class StockPicking(models.Model):
         if self.sudi_display_timesheet_timer and self.user_timer_id:
             timesheet = self._get_record_with_timer_running()
             if timesheet:
-                return {
-                    "name": _("Confirm Time Spent"),
-                    "type": "ir.actions.act_window",
-                    "res_model": "hr.timesheet.stop.timer.confirmation.wizard",
-                    "context": {
-                        "default_timesheet_id": timesheet.id,
-                        "dialog_size": "medium",
-                    },
-                    "views": [[
-                        self.env.ref("timesheet_grid.hr_timesheet_stop_timer_confirmation_wizard_view_form").id,
-                        "form",
-                    ]],
-                    "target": "new",
-                }
+                # Odoo 20: timesheet_grid dropped the stop-timer confirmation
+                # wizard (hr.timesheet.stop.timer.confirmation.wizard), so the
+                # web flow now banks the measured time directly, exactly like
+                # the mobile flow always did.
+                self._sudi_stop_timer()
+                return True
             return super().action_timer_stop()
         return False
 
     def _sudi_stop_timer(self):
         """Stop the receipt timer and bank the measured time.
 
-        The web flow returns ``hr.timesheet.stop.timer.confirmation.wizard`` so
-        the user can adjust the figure before it is saved. A phone has no
-        wizard, and an operator has nothing to adjust against on the road, so
-        the elapsed time is banked as measured. Returns the minutes.
+        Banks the measured time on the timesheet line and returns the
+        minutes. Both the web and the phone flow use this since Odoo 20
+        removed the stop-timer confirmation wizard.
         """
         self.ensure_one()
         self._sudi_check_job_work_access()
@@ -1390,10 +1520,22 @@ class StockPicking(models.Model):
         })
 
     @api.model
-    def _sudi_resolve_public_pickup_address(self, phone, pickup_address_id=False, manual_pickup_address=False):
+    def _sudi_resolve_public_pickup_address(
+        self, phone, pickup_address_id=False, manual_pickup_address=False, partner=None,
+    ):
+        """``(customer, pickup address record, pickup address text)``.
+
+        ``partner`` pins the customer when the caller already knows who it is
+        -- a member of staff picking from the directory -- instead of looking
+        them up by phone, which finds only the *first* customer with that
+        number when two share one.
+        """
         Partner = self.env["res.partner"].sudo()
         manual_pickup_address = (manual_pickup_address or "").strip()
-        commercial_partner = self._sudi_find_partner_by_phone(phone)
+        commercial_partner = (
+            partner.sudo().commercial_partner_id if partner
+            else self._sudi_find_partner_by_phone(phone)
+        )
         pickup_address = self.env["res.partner"]
 
         if pickup_address_id:
@@ -1412,7 +1554,10 @@ class StockPicking(models.Model):
             if pickup_address.id not in valid_address_ids:
                 raise UserError(_("The selected pickup address does not match the entered phone number."))
         elif manual_pickup_address:
-            commercial_partner = self._sudi_get_or_create_public_jangad_partner(phone)
+            commercial_partner = (
+                commercial_partner if partner
+                else self._sudi_get_or_create_public_jangad_partner(phone)
+            )
             pickup_address = self._sudi_create_manual_pickup_address(
                 commercial_partner,
                 phone,
@@ -1453,6 +1598,40 @@ class StockPicking(models.Model):
         return picking_type, source_location, destination_location
 
     @api.model
+    def _sudi_prepare_service_requests(self, services):
+        """Validated ``sudi.diamond.service.request`` values for ``services``.
+
+        ``services`` is a list of ``{job_type_id, quantity, remarks}`` as a
+        customer or an operator sends it. Refused as a whole, before anything
+        is created, if one names a service that does not exist or is no longer
+        offered: a receipt half-built from a stale catalogue is worse than an
+        error the app can show.
+        """
+        if not services:
+            return []
+        JobType = self.env["sudi.diamond.job.type"].sudo().with_context(active_test=False)
+        wanted = {int(service.get("job_type_id") or 0) for service in services}
+        job_types = {job_type.id: job_type for job_type in JobType.browse(wanted).exists()}
+        vals_list = []
+        for index, service in enumerate(services, start=1):
+            job_type = job_types.get(int(service.get("job_type_id") or 0))
+            if not job_type or not job_type.active:
+                raise UserError(_(
+                    "Requested service %s is not offered any more. Refresh the "
+                    "list of services and choose again.", index,
+                ))
+            quantity = float(service.get("quantity") or 0.0)
+            if quantity < 0:
+                raise UserError(_("Requested service %s has a negative quantity.", index))
+            vals_list.append({
+                "sequence": index * 10,
+                "job_type_id": job_type.id,
+                "quantity": quantity,
+                "remarks": (service.get("remarks") or "").strip() or False,
+            })
+        return vals_list
+
+    @api.model
     def sudi_create_public_jangad_receipt(
         self,
         phone,
@@ -1460,18 +1639,31 @@ class StockPicking(models.Model):
         pickup_address_id=False,
         manual_pickup_address=False,
         extra_pages=None,
+        services=None,
+        source=None,
+        posted_by=None,
+        partner=None,
     ):
         """Create a receipt from a customer upload.
 
         ``jangad_image`` is page 1 and keeps its original meaning; ``extra_pages``
         are the remaining sheets of a multi-page jangad, attached after creation
         so the notification that ``create`` fires still carries page 1.
+
+        ``services`` are what the customer asked for (``{job_type_id,
+        quantity, remarks}``), created in the same transaction; ``source`` and
+        ``posted_by`` record where the jangad came from and, for one posted by
+        staff on a customer's behalf, who posted it. ``partner`` pins the
+        customer instead of resolving them from ``phone``. Every existing
+        caller passes none of these and is unchanged.
         """
         picking_type, source_location, destination_location = self._sudi_get_public_receipt_defaults()
+        service_vals = self._sudi_prepare_service_requests(services)
         partner, pickup_address, pickup_address_text = self._sudi_resolve_public_pickup_address(
             phone,
             pickup_address_id=pickup_address_id,
             manual_pickup_address=manual_pickup_address,
+            partner=partner,
         )
         vals = {
             "picking_type_id": picking_type.id,
@@ -1487,12 +1679,83 @@ class StockPicking(models.Model):
             vals["partner_id"] = partner.id
         if pickup_address:
             vals["sudi_pickup_address_id"] = pickup_address.id
+        if service_vals:
+            vals["sudi_service_request_ids"] = [Command.create(service) for service in service_vals]
+        if source:
+            vals["sudi_jangad_source"] = source
+        if posted_by:
+            vals["sudi_posted_by_id"] = posted_by.id
         receipt = self.sudo().create(vals)
         if extra_pages:
             receipt.with_context(
                 sudi_skip_pickup_scheduled_notify=True
             )._sudi_add_jangad_pages(extra_pages)
         return receipt
+
+    def _sudi_add_lines_from_requests(self):
+        """One item line per requested service that has none yet.
+
+        The office's shortcut: the customer already said "120 pcs of laser
+        inscription", so the line starts from that instead of being typed
+        again. The quantity goes to pieces or to carats according to how the
+        service is billed (pieces for a manual basis too, since pieces are the
+        line's demand), and the office corrects the counts from there.
+
+        Only on a collected receipt that is not yet ready for job work: before
+        that the lines are locked because nothing has been counted, after it
+        they belong to job work. Returns the new lines.
+        """
+        Move = self.env["stock.move"]
+        created = Move
+        product = self.env.ref("diamond.product_customer_diamond_parcel")
+        for receipt in self:
+            if (
+                not receipt.sudi_is_diamond_job_work
+                or receipt.picking_type_code != "incoming"
+                or receipt.state != "draft"
+            ):
+                raise UserError(_(
+                    "Entries can be added from requested services only on a "
+                    "collected receipt that is not yet ready for job work."
+                ))
+            requests = receipt.sudi_service_request_ids.filtered(
+                lambda request: not request.move_id
+            ).sorted(key=lambda request: (request.sequence, request.id))
+            if not requests:
+                continue
+            moves = Move.create([
+                {
+                    "picking_id": receipt.id,
+                    "product_id": product.id,
+                    "uom_id": product.uom_id.id,
+                    "location_id": receipt.location_id.id,
+                    "location_dest_id": receipt.location_dest_id.id,
+                    "company_id": receipt.company_id.id,
+                    "partner_id": receipt.partner_id.id,
+                    "sudi_job_type_id": request.job_type_id.id,
+                    "sudi_pcs_qty": (
+                        request.quantity
+                        if request.job_type_id.invoice_basis != "carats" else 0.0
+                    ),
+                    "sudi_carats": (
+                        request.quantity
+                        if request.job_type_id.invoice_basis == "carats" else 0.0
+                    ),
+                    "sudi_remarks": request.remarks or False,
+                }
+                for request in requests
+            ])
+            for request, move in zip(requests, moves):
+                request.move_id = move
+            created |= moves
+        # The billing details follow the item table; the form gets this from
+        # its own save, a direct create has to ask.
+        self._sudi_sync_billing_details_on_save()
+        return created
+
+    def action_sudi_add_lines_from_requests(self):
+        self._sudi_add_lines_from_requests()
+        return True
 
     @api.onchange(
         "partner_id",
@@ -1520,8 +1783,7 @@ class StockPicking(models.Model):
             start=1,
         ):
             quantity = move._sudi_get_invoice_quantity()
-            rounding = move.product_uom.rounding if move.product_uom else 0.01
-            if float_is_zero(quantity, precision_rounding=rounding):
+            if move.uom_id.is_zero(quantity) if move.uom_id else float_is_zero(quantity, precision_digits=2):
                 continue
             job_type = move.sudi_job_type_id
             price_unit, price_source = job_type._sudi_get_price_for_partner_with_source(partner, self.company_id)
@@ -1707,13 +1969,13 @@ class StockPicking(models.Model):
             move_commands = []
             for move in receipt.move_ids.filtered(lambda m: m.state == "done"):
                 quantity = move.quantity or move.product_uom_qty
-                if float_is_zero(quantity, precision_rounding=move.product_uom.rounding):
+                if move.uom_id.is_zero(quantity):
                     continue
                 move_commands.append(Command.create({
                     "description_picking": move.description_picking or move.product_id.display_name,
                     "product_id": move.product_id.id,
                     "product_uom_qty": quantity,
-                    "product_uom": move.product_uom.id,
+                    "uom_id": move.uom_id.id,
                     "location_id": source_location.id,
                     "location_dest_id": destination_location.id,
                     "partner_id": receipt.partner_id.id,
@@ -1788,7 +2050,7 @@ class StockPicking(models.Model):
 
     def _sudi_pod_is_required(self, requirement):
         """Whether this part of the proof of delivery is mandatory."""
-        value = self.env["ir.config_parameter"].sudo().get_param(
+        value = self.env["ir.config_parameter"].sudo().get_str(
             SUDI_POD_PARAMS[requirement], "0"
         )
         return str(value).strip().lower() in ("1", "true", "yes")
@@ -1833,7 +2095,7 @@ class StockPicking(models.Model):
                     {
                         "name": f"delivery_{delivery.name or delivery.id}_{offset + index + 1}.jpg",
                         "type": "binary",
-                        "datas": datas,
+                        "raw": base64.b64decode(datas),
                         "res_model": delivery._name,
                         "res_id": delivery.id,
                         "mimetype": "image/jpeg",
@@ -1879,7 +2141,7 @@ class StockPicking(models.Model):
                 "sudi_pickup_datetime": delivered_at,
             })
         for move in self.move_ids.filtered(lambda stock_move: stock_move.state not in ("done", "cancel")):
-            if float_is_zero(move.quantity, precision_rounding=move.product_uom.rounding):
+            if move.uom_id.is_zero(move.quantity):
                 move.quantity = move.product_uom_qty
             move.picked = True
         result = self.button_validate()
@@ -2031,8 +2293,7 @@ class StockPicking(models.Model):
         groups = {}
         order = []
         for move in chargeable.sorted(key=lambda move: (move.sudi_job_type_id.sequence, move.sudi_job_type_id.id, move.sudi_price_unit)):
-            rounding = move.product_uom.rounding if move.product_uom else 0.01
-            if float_is_zero(move.sudi_billable_qty, precision_rounding=rounding):
+            if move.uom_id.is_zero(move.sudi_billable_qty) if move.uom_id else float_is_zero(move.sudi_billable_qty, precision_digits=2):
                 continue
             key = (move.sudi_job_type_id.id, move.sudi_price_unit)
             if key not in groups:

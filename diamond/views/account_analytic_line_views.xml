@@ -29,11 +29,13 @@
         <field name="model">account.analytic.line</field>
         <field name="inherit_id" ref="hr_timesheet.hr_timesheet_line_search"/>
         <field name="arch" type="xml">
-            <xpath expr="//group[@name='groupby']" position="before">
+            <!-- Odoo 20: the search view has no <group name="groupby"> anymore;
+                 anchor on the fields block and the group_date filter instead. -->
+            <xpath expr="//field[@name='task_id']" position="after">
                 <field name="sudi_picking_id"/>
                 <field name="sudi_job_type_id"/>
             </xpath>
-            <xpath expr="//group[@name='groupby']" position="inside">
+            <xpath expr="//filter[@name='group_date']" position="after">
                 <filter string="Receipt" name="groupby_sudi_picking" domain="[]" context="{'group_by': 'sudi_picking_id'}"/>
                 <filter string="Job Type" name="groupby_sudi_job_type" domain="[]" context="{'group_by': 'sudi_job_type_id'}"/>
             </xpath>

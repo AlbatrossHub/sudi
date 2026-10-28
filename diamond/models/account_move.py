@@ -179,7 +179,7 @@ class AccountMove(models.Model):
         return self.env["ir.attachment"].sudo().create({
             "name": "Invoice_%s.pdf" % (self.name or "draft").replace("/", "_"),
             "type": "binary",
-            "datas": base64.b64encode(pdf_content),
+            "raw": pdf_content,
             "res_model": self._name,
             "res_id": self.id,
             "mimetype": "application/pdf",

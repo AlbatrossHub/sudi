@@ -8,10 +8,10 @@ _logger = logging.getLogger(__name__)
 
 def post_init_hook(env):
     params = env["ir.config_parameter"].sudo()
-    if not params.get_param(PARAM_SECRET):
+    if not params.get_str(PARAM_SECRET):
         # Per-database secret. Rotating it invalidates every live token, on
         # every device, at once.
-        params.set_param(PARAM_SECRET, secrets.token_urlsafe(64))
+        params.set_str(PARAM_SECRET, secrets.token_urlsafe(64))
         _logger.info("Generated a new JWT signing secret (%s)", PARAM_SECRET)
 
     for xmlid in ("fastapi_endpoint_sudi_field", "fastapi_endpoint_sudi_customer"):

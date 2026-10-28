@@ -308,11 +308,11 @@ Format your response as JSON:
         
         # Also update system parameters
         IrConfigParam = self.env['ir.config_parameter'].sudo()
-        IrConfigParam.set_param('pwa.theme_color', self.generated_theme_color)
-        IrConfigParam.set_param('pwa.background_color', self.generated_background_color)
-        IrConfigParam.set_param('pwa.primary_color', self.generated_primary_color)
-        IrConfigParam.set_param('pwa.secondary_color', self.generated_secondary_color)
-        IrConfigParam.set_param('pwa.accent_color', self.generated_accent_color)
+        IrConfigParam.set_str('pwa.theme_color', self.generated_theme_color)
+        IrConfigParam.set_str('pwa.background_color', self.generated_background_color)
+        IrConfigParam.set_str('pwa.primary_color', self.generated_primary_color)
+        IrConfigParam.set_str('pwa.secondary_color', self.generated_secondary_color)
+        IrConfigParam.set_str('pwa.accent_color', self.generated_accent_color)
         
         self.state = 'applied'
         
@@ -457,12 +457,12 @@ class PWAAIBrandingWizard(models.TransientModel):
         
         # Update system parameters
         IrConfigParam = self.env['ir.config_parameter'].sudo()
-        IrConfigParam.set_param('pwa.theme_color', self.preview_theme_color)
-        IrConfigParam.set_param('pwa.background_color', self.preview_background_color)
-        IrConfigParam.set_param('pwa.primary_color', self.preview_primary_color)
-        IrConfigParam.set_param('pwa.secondary_color', self.preview_secondary_color)
-        IrConfigParam.set_param('pwa.accent_color', self.preview_accent_color)
-        IrConfigParam.set_param('pwa.ai_brand_prompt', self.brand_description)
+        IrConfigParam.set_str('pwa.theme_color', self.preview_theme_color)
+        IrConfigParam.set_str('pwa.background_color', self.preview_background_color)
+        IrConfigParam.set_str('pwa.primary_color', self.preview_primary_color)
+        IrConfigParam.set_str('pwa.secondary_color', self.preview_secondary_color)
+        IrConfigParam.set_str('pwa.accent_color', self.preview_accent_color)
+        IrConfigParam.set_str('pwa.ai_brand_prompt', self.brand_description)
         
         return {
             'type': 'ir.actions.client',

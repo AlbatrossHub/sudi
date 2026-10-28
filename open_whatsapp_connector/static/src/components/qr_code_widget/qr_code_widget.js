@@ -1,19 +1,21 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, onWillUnmount } from "@odoo/owl";
+import { BusPlugin } from "@bus/services/bus_plugin";
+import { Component, onWillStart, onWillUnmount, proxy, usePlugin, useProps } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
+import { ActionPlugin } from "@web/webclient/actions/action_plugin";
 
 export class QrCodeWidget extends Component {
     static template = "open_whatsapp_connector.QrCodeWidget";
-    static props = { ...standardFieldProps };
+    props = useProps({ ...standardFieldProps });
 
     setup() {
         this.orm = useService("orm");
-        this.busService = useService("bus_service");
-        this.action = useService("action");
-        this.state = useState({
+        this.busService = usePlugin(BusPlugin);
+        this.action = usePlugin(ActionPlugin);
+        this.state = proxy({
             polling: false,
         });
         this._pollInterval = null;

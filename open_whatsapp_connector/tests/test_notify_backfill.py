@@ -13,7 +13,7 @@ class TestNotifyBackfill(OwaTestCase):
         })
 
     def test_add_notify_user_backfills_existing_channels(self):
-        self.env['ir.config_parameter'].sudo().set_param(
+        self.env['ir.config_parameter'].sudo().set_str(
             'open_whatsapp_connector.chat_visibility', 'shared')
         ch = self._make_channel('+15551230000')
         agent = self.env['res.users'].create({
@@ -23,7 +23,7 @@ class TestNotifyBackfill(OwaTestCase):
         self.assertIn(agent.partner_id, ch.channel_member_ids.partner_id)
 
     def test_backfill_skipped_in_own_agent_mode(self):
-        self.env['ir.config_parameter'].sudo().set_param(
+        self.env['ir.config_parameter'].sudo().set_str(
             'open_whatsapp_connector.chat_visibility', 'own_agent')
         ch = self._make_channel('+15551230001')
         agent = self.env['res.users'].create({
@@ -32,7 +32,7 @@ class TestNotifyBackfill(OwaTestCase):
         self.assertNotIn(agent.partner_id, ch.channel_member_ids.partner_id)
 
     def test_inbound_on_old_channel_tops_up_members(self):
-        self.env['ir.config_parameter'].sudo().set_param(
+        self.env['ir.config_parameter'].sudo().set_str(
             'open_whatsapp_connector.chat_visibility', 'shared')
         ch = self._make_channel('+15551239999')
         ch.channel_member_ids = [(5, 0, 0)]  # clear members

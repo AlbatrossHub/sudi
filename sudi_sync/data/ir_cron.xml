@@ -22,5 +22,16 @@
             <field name="nextcall" eval="(datetime.now().replace(hour=2, minute=0, second=0) + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')"/>
             <field name="active" eval="True"/>
         </record>
+
+        <record id="ir_cron_sudi_app_notice_prune" model="ir.cron">
+            <field name="name">Sudi Sync: purge old app notices</field>
+            <field name="model_id" ref="model_sudi_app_notice"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_prune()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(datetime.now().replace(hour=2, minute=30, second=0) + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="active" eval="True"/>
+        </record>
     </data>
 </odoo>

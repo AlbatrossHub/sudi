@@ -70,14 +70,14 @@ class OwaAccount(models.Model):
     # Sidecar connection
     sidecar_url = fields.Char(
         string="Sidecar URL",
-        default=lambda self: self.env['ir.config_parameter'].sudo().get_param(
+        default=lambda self: self.env['ir.config_parameter'].sudo().get_str(
             'open_whatsapp_connector.default_sidecar_url') or 'http://localhost:3100',
         required=True,
         help="URL of the Node.js sidecar service. New accounts inherit the "
              "Default Sidecar URL configured in Settings.")
     sidecar_api_key = fields.Char(
         string="API Key", groups='open_whatsapp_connector.group_owa_admin',
-        default=lambda self: self.env['ir.config_parameter'].sudo().get_param(
+        default=lambda self: self.env['ir.config_parameter'].sudo().get_str(
             'open_whatsapp_connector.default_api_key') or False,
         help="Shared API key for authenticating with the sidecar service. New "
              "accounts inherit the Default API Key configured in Settings.")
@@ -184,8 +184,8 @@ class OwaAccount(models.Model):
              "Only one account can be the default.")
 
     def _compute_is_default(self):
-        default_id = int(self.env['ir.config_parameter'].sudo().get_param(
-            'open_whatsapp_connector.default_account_id') or 0)
+        default_id = self.env['ir.config_parameter'].sudo().get_int(
+            'open_whatsapp_connector.default_account_id')
         for rec in self:
             rec.is_default = rec.id == default_id
 
@@ -194,9 +194,9 @@ class OwaAccount(models.Model):
         key = 'open_whatsapp_connector.default_account_id'
         for rec in self:
             if rec.is_default:
-                ICP.set_param(key, str(rec.id))
-            elif int(ICP.get_param(key) or 0) == rec.id:
-                ICP.set_param(key, '')
+                ICP.set_int(key, rec.id)
+            elif ICP.get_int(key) == rec.id:
+                ICP.set_int(key, None)
         # The flag is a non-stored compute off a global parameter: moving the
         # default to another account must drop every record's cached value,
         # or the previous default keeps showing as checked.
@@ -271,7 +271,7 @@ class OwaAccount(models.Model):
         # callback_url pattern so both transports behave identically on multi-DB
         # deployments. web.base.url already carries the https scheme Meta requires.
         db_name = quote(self.env.cr.dbname or '')
-        base = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        base = self.env['ir.config_parameter'].sudo().get_str('web.base.url')
         for acc in self:
             acc.cloud_callback_url = (
                 (base or '')
@@ -313,7 +313,7 @@ class OwaAccount(models.Model):
                 if team.user_id.id != self.env.uid:
                     vals['user_id'] = self.env.uid
                 vals['approval_state'] = 'pending'
-        own_team = self.env['ir.config_parameter'].sudo().get_param(
+        own_team = self.env['ir.config_parameter'].sudo().get_str(
             'open_whatsapp_connector.account_visibility', 'shared') == 'own_team'
         if not is_admin and own_team:
             # v19 idiom: finish a self-service (non-admin) create with elevated
@@ -773,7 +773,7 @@ class OwaAccount(models.Model):
         user = self.env.user
         if user.has_group('open_whatsapp_connector.group_owa_admin'):
             return
-        own_team = self.env['ir.config_parameter'].sudo().get_param(
+        own_team = self.env['ir.config_parameter'].sudo().get_str(
             'open_whatsapp_connector.account_visibility', 'shared') == 'own_team'
         if not own_team:
             raise AccessError(_(
@@ -793,7 +793,7 @@ class OwaAccount(models.Model):
         agent. Never raises — purely a visibility flag."""
         is_admin = self.env.su or self.env.user.has_group(
             'open_whatsapp_connector.group_owa_admin')
-        own_team = self.env['ir.config_parameter'].sudo().get_param(
+        own_team = self.env['ir.config_parameter'].sudo().get_str(
             'open_whatsapp_connector.account_visibility', 'shared') == 'own_team'
         user = self.env.user
         for acc in self:
@@ -951,8 +951,8 @@ class OwaAccount(models.Model):
         or a disconnected one: the configured Default WhatsApp Account if it is
         connected, else the first connected account. (#delete-reassign)"""
         ICP = self.env['ir.config_parameter'].sudo()
-        default_id = int(ICP.get_param(
-            'open_whatsapp_connector.default_account_id') or 0)
+        default_id = ICP.get_int(
+            'open_whatsapp_connector.default_account_id')
         default_acct = self.browse(default_id).exists() if default_id else self.browse()
         if default_acct and default_acct.session_state == 'connected':
             return default_acct
@@ -964,7 +964,7 @@ class OwaAccount(models.Model):
         (never removes). No-op unless visibility is 'shared' — in 'own_agent'
         mode channels are intentionally isolated to their assignee, so broadly
         adding the pool would de-isolate them. (#S4-1)(#allowed-group)"""
-        if self.env['ir.config_parameter'].sudo().get_param(
+        if self.env['ir.config_parameter'].sudo().get_str(
                 'open_whatsapp_connector.chat_visibility', 'shared') != 'shared':
             return
         Channel = self.env['discuss.channel'].sudo()
@@ -981,7 +981,7 @@ class OwaAccount(models.Model):
                 if missing:
                     channel.channel_member_ids = [
                         Command.create({'partner_id': p.id}) for p in missing]
-                    channel._broadcast(missing.ids)
+                    channel._broadcast(missing.main_user_id)
 
     def action_owa_resync_members(self):
         """Manual "Resync Members" button: push the current access pool (Users
@@ -1015,8 +1015,8 @@ class OwaAccount(models.Model):
         Channel = self.env['discuss.channel'].sudo()
         Message = self.env['owa.message'].sudo()
         ICP = self.env['ir.config_parameter'].sudo()
-        default_id = int(ICP.get_param(
-            'open_whatsapp_connector.default_account_id') or 0)
+        default_id = ICP.get_int(
+            'open_whatsapp_connector.default_account_id')
         # A Default account can't be deleted while its "Default Account" checkbox
         # is ticked: it is the reassign/fallback target for orphaned chats, and
         # deleting it would leave `default_account_id` pointing at a dead row.
@@ -1175,7 +1175,7 @@ class OwaAccount(models.Model):
         yet approved — its messages must not be sent or received. No effect in
         'shared' mode (approval_state ignored)."""
         self.ensure_one()
-        own_team = self.env['ir.config_parameter'].sudo().get_param(
+        own_team = self.env['ir.config_parameter'].sudo().get_str(
             'open_whatsapp_connector.account_visibility', 'shared') == 'own_team'
         return bool(own_team and self.approval_state != 'approved')
 
@@ -1423,11 +1423,11 @@ class OwaAccount(models.Model):
         Secret is never exposed to the client."""
         ICP = self.env['ir.config_parameter'].sudo()
         return {
-            'app_id': ICP.get_param(
-                'open_whatsapp_connector.meta_app_id', ''),
-            'config_id': ICP.get_param(
-                'open_whatsapp_connector.meta_config_id', ''),
-            'version': ICP.get_param(
+            'app_id': ICP.get_str(
+                'open_whatsapp_connector.meta_app_id'),
+            'config_id': ICP.get_str(
+                'open_whatsapp_connector.meta_config_id'),
+            'version': ICP.get_str(
                 'open_whatsapp_connector.meta_api_version', 'v23.0'),
         }
 
@@ -1574,8 +1574,8 @@ class OwaAccount(models.Model):
         if is_sidecar_running(self.sidecar_url):
             return
         ICP = self.env['ir.config_parameter'].sudo()
-        auto_start = ICP.get_param('open_whatsapp_connector.sidecar_auto_start', 'False')
-        sidecar_path = ICP.get_param('open_whatsapp_connector.sidecar_path', '')
+        auto_start = ICP.get_str('open_whatsapp_connector.sidecar_auto_start', 'False')
+        sidecar_path = ICP.get_str('open_whatsapp_connector.sidecar_path')
         # Case-insensitive: the UI stores 'True' but a hand-edited system
         # parameter ('true'/'1') must behave identically.
         if str(auto_start).strip().lower() in ('true', '1', 'yes') and sidecar_path:
@@ -1817,7 +1817,7 @@ class OwaAccount(models.Model):
         current = status_resp.get('status') or ''
         if current not in ('qr_pending', 'connecting'):
             self._ensure_sidecar_running()
-            base_url = self.env['ir.config_parameter'].sudo().get_param(
+            base_url = self.env['ir.config_parameter'].sudo().get_str(
                 'web.base.url', 'http://localhost:8069')
             api.create_session(
                 odoo_base_url=base_url,
@@ -1911,7 +1911,7 @@ class OwaAccount(models.Model):
         if is_sidecar_running(self.sidecar_url):
             return self._notify_and_reload(_("Sidecar is already running."), 'warning')
         ICP = self.env['ir.config_parameter'].sudo()
-        sidecar_path = ICP.get_param('open_whatsapp_connector.sidecar_path', '')
+        sidecar_path = ICP.get_str('open_whatsapp_connector.sidecar_path')
         if not sidecar_path:
             raise UserError(_(
                 "Sidecar path not configured. Go to Settings > Open WhatsApp Connector."))
@@ -2224,7 +2224,7 @@ class OwaAccount(models.Model):
                              or f"{msg_type or 'file'}_{media['id']}")
                     attachment = self.env['ir.attachment'].sudo().create({
                         'name': fname,
-                        'datas': base64.b64encode(content),
+                        'raw': content,
                         'mimetype': mime or media.get('mime')
                         or 'application/octet-stream',
                         'res_model': 'discuss.channel',

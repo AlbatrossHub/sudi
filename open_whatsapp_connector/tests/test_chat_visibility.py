@@ -80,9 +80,9 @@ class TestChatVisibility(OwaTestCase):
         """The rules are ALWAYS active; behaviour is driven by the
         chat_visibility parameter their domain reads. Set it and clear the
         ir.rule domain cache so it takes effect immediately (as set_values does)."""
-        self.env['ir.config_parameter'].sudo().set_param(
+        self.env['ir.config_parameter'].sudo().set_str(
             'open_whatsapp_connector.chat_visibility', mode)
-        self.env.registry.clear_cache()
+        self.env.transaction.invalidate_ormcache()
 
     def _member_rows(self, user, channel):
         return self.env['discuss.channel.member'].with_user(user).search(
@@ -138,7 +138,7 @@ class TestChatVisibility(OwaTestCase):
         for xmlid in (RULE_XMLID, MEMBER_RULE_XMLID, ADMIN_RULE_XMLID):
             self.assertTrue(self.env.ref(xmlid).active, xmlid)
         self.assertEqual(
-            self.env['ir.config_parameter'].sudo().get_param(
+            self.env['ir.config_parameter'].sudo().get_str(
                 'open_whatsapp_connector.chat_visibility', 'shared'),
             'shared')
 
@@ -212,7 +212,7 @@ class TestChatVisibility(OwaTestCase):
         self.env['res.config.settings'].create(
             {'owa_chat_visibility': 'own_agent'}).set_values()
         self.assertEqual(
-            self.env['ir.config_parameter'].sudo().get_param(
+            self.env['ir.config_parameter'].sudo().get_str(
                 'open_whatsapp_connector.chat_visibility'), 'own_agent')
         self.assertFalse(self._visible(self.agent_a, self.ch_b))
         self.env['res.config.settings'].create(
@@ -241,13 +241,13 @@ class TestChatVisibility(OwaTestCase):
     def test_autostamp_only_in_restricted_mode(self):
         with self.mock_sidecar():
             # Shared (default): _get_whatsapp_channel leaves assignee empty.
-            self.env['ir.config_parameter'].sudo().set_param(
+            self.env['ir.config_parameter'].sudo().set_str(
                 'open_whatsapp_connector.chat_visibility', 'shared')
             ch_shared = self.Channel._get_owa_whatsapp_channel(
                 '+15551119001', self.account, create_if_not_found=True)
             self.assertFalse(ch_shared.assignee_id)
             # Restricted: a new inbound conversation is auto-assigned an owner.
-            self.env['ir.config_parameter'].sudo().set_param(
+            self.env['ir.config_parameter'].sudo().set_str(
                 'open_whatsapp_connector.chat_visibility', 'own_agent')
             ch_owned = self.Channel._get_owa_whatsapp_channel(
                 '+15551119002', self.account, create_if_not_found=True)

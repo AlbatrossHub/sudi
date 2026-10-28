@@ -1,0 +1,122 @@
+id,name,model_id,group_id/id,operation,domain
+access_sudi_diamond_job_type_user,sudi.diamond.job.type.user,sudi.diamond.job.type,stock.group_stock_user,cru,
+access_sudi_diamond_job_type_manager,sudi.diamond.job.type.manager,sudi.diamond.job.type,stock.group_stock_manager,crud,
+access_sudi_internal_diamond_job_type,sudi.internal.diamond.job.type,sudi.diamond.job.type,diamond.group_sudi_pickup_app,r,
+access_sudi_job_work_diamond_job_type,sudi.job.work.diamond.job.type,sudi.diamond.job.type,diamond.group_sudi_job_work_user,r,
+access_sudi_diamond_partner_service_price_user,sudi.diamond.partner.service.price.user,sudi.diamond.partner.service.price,account.group_account_invoice,crud,
+access_sudi_diamond_billing_line_account,sudi.diamond.billing.line.account,sudi.diamond.billing.line,account.group_account_invoice,r,
+access_sudi_diamond_billing_line_stock_manager,sudi.diamond.billing.line.stock.manager,sudi.diamond.billing.line,stock.group_stock_manager,crud,
+access_sudi_diamond_billing_line_reviewer,sudi.diamond.billing.line.reviewer,sudi.diamond.billing.line,diamond.group_sudi_billing_reviewer,ru,
+rule_sudi_operator_active_deliveries,Sudi operator: active deliveries,stock.picking,diamond.group_sudi_pickup_delivery_operator,ru,"[
+                ('sudi_is_diamond_job_work', '=', True),
+                ('picking_type_id.code', '=', 'outgoing'),
+                ('sudi_origin_receipt_id', '!=', False),
+                ('state', '!=', 'done'),
+            ]"
+rule_sudi_operator_today_done_deliveries,Sudi operator: today's done deliveries,stock.picking,diamond.group_sudi_pickup_delivery_operator,ru,"[
+                ('sudi_is_diamond_job_work', '=', True),
+                ('picking_type_id.code', '=', 'outgoing'),
+                ('sudi_origin_receipt_id', '!=', False),
+                ('state', '=', 'done'),
+                '|',
+                    ('date_done', '=', False),
+                    '&',
+                        ('date_done', '>=', user._sudi_operator_today_start_utc()),
+                        ('date_done', '<', user._sudi_operator_tomorrow_start_utc()),
+            ]"
+rule_sudi_operator_own_pickups_today,Sudi operator: receipts I collected today,stock.picking,diamond.group_sudi_pickup_delivery_operator,ru,"[
+                ('sudi_is_diamond_job_work', '=', True),
+                ('picking_type_id.code', '=', 'incoming'),
+                ('sudi_pickup_user_id', '=', user.id),
+                ('sudi_pickup_datetime', '>=', user._sudi_operator_today_start_utc()),
+                ('sudi_pickup_datetime', '<', user._sudi_operator_tomorrow_start_utc()),
+            ]"
+rule_sudi_operator_pickup_pending_receipts,Sudi operator: pending pickup receipts,stock.picking,diamond.group_sudi_pickup_app,ru,"[
+                ('sudi_is_diamond_job_work', '=', True),
+                ('picking_type_id.code', '=', 'incoming'),
+                ('state', '=', 'sudi_pickup_pending'),
+            ]"
+rule_sudi_operator_assigned_receipts,Sudi operator: assigned job work receipts,stock.picking,diamond.group_sudi_job_work_user,ru,"[
+                ('sudi_is_diamond_job_work', '=', True),
+                ('picking_type_id.code', '=', 'incoming'),
+                ('state', '=', 'assigned'),
+            ]"
+rule_sudi_operator_active_delivery_moves,Sudi operator: active delivery moves,stock.move,diamond.group_sudi_pickup_delivery_operator,ru,"[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'outgoing'),
+                ('picking_id.sudi_origin_receipt_id', '!=', False),
+                ('picking_id.state', '!=', 'done'),
+            ]"
+rule_sudi_operator_today_done_delivery_moves,Sudi operator: today's done delivery moves,stock.move,diamond.group_sudi_pickup_delivery_operator,ru,"[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'outgoing'),
+                ('picking_id.sudi_origin_receipt_id', '!=', False),
+                ('picking_id.state', '=', 'done'),
+                '|',
+                    ('picking_id.date_done', '=', False),
+                    '&',
+                        ('picking_id.date_done', '>=', user._sudi_operator_today_start_utc()),
+                        ('picking_id.date_done', '<', user._sudi_operator_tomorrow_start_utc()),
+            ]"
+rule_sudi_operator_own_pickup_moves_today,Sudi operator: moves of receipts I collected today,stock.move,diamond.group_sudi_pickup_delivery_operator,ru,"[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'incoming'),
+                ('picking_id.sudi_pickup_user_id', '=', user.id),
+                ('picking_id.sudi_pickup_datetime', '>=', user._sudi_operator_today_start_utc()),
+                ('picking_id.sudi_pickup_datetime', '<', user._sudi_operator_tomorrow_start_utc()),
+            ]"
+rule_sudi_operator_pending_receipt_moves,Sudi operator: pending pickup receipt moves,stock.move,diamond.group_sudi_pickup_app,ru,"[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'incoming'),
+                ('picking_id.state', '=', 'sudi_pickup_pending'),
+            ]"
+rule_sudi_operator_assigned_receipt_moves,Sudi operator: assigned job work receipt moves,stock.move,diamond.group_sudi_job_work_user,ru,"[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'incoming'),
+                ('picking_id.state', '=', 'assigned'),
+            ]"
+rule_sudi_operator_pending_receipt_move_lines,Sudi operator: pending pickup receipt move lines,stock.move.line,diamond.group_sudi_pickup_delivery_operator,crud,"[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'incoming'),
+                ('picking_id.state', '=', 'sudi_pickup_pending'),
+            ]"
+rule_sudi_operator_active_delivery_move_lines,Sudi operator: active delivery move lines,stock.move.line,diamond.group_sudi_pickup_delivery_operator,crud,"[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'outgoing'),
+                ('picking_id.sudi_origin_receipt_id', '!=', False),
+                ('picking_id.state', '!=', 'done'),
+            ]"
+rule_sudi_operator_today_done_delivery_move_lines,Sudi operator: today's done delivery move lines,stock.move.line,diamond.group_sudi_pickup_delivery_operator,crud,"[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'outgoing'),
+                ('picking_id.sudi_origin_receipt_id', '!=', False),
+                ('picking_id.state', '=', 'done'),
+                '|',
+                    ('picking_id.date_done', '=', False),
+                    '&',
+                        ('picking_id.date_done', '>=', user._sudi_operator_today_start_utc()),
+                        ('picking_id.date_done', '<', user._sudi_operator_tomorrow_start_utc()),
+            ]"
+rule_sudi_operator_own_pickup_move_lines_today,Sudi operator: move lines of receipts I collected today,stock.move.line,diamond.group_sudi_pickup_delivery_operator,crud,"[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'incoming'),
+                ('picking_id.sudi_pickup_user_id', '=', user.id),
+                ('picking_id.sudi_pickup_datetime', '>=', user._sudi_operator_today_start_utc()),
+                ('picking_id.sudi_pickup_datetime', '<', user._sudi_operator_tomorrow_start_utc()),
+            ]"
+rule_sudi_operator_assigned_receipt_move_lines,Sudi operator: assigned job work receipt move lines,stock.move.line,diamond.group_sudi_job_work_user,crud,"[
+                ('picking_id.sudi_is_diamond_job_work', '=', True),
+                ('picking_id.picking_type_id.code', '=', 'incoming'),
+                ('picking_id.state', '=', 'assigned'),
+            ]"
+access_sudi_department_transfer_wizard,sudi.department.transfer.wizard,sudi.diamond.department.transfer.wizard,diamond.group_sudi_job_work_user,cru,
+access_sudi_pickup_confirmation_wizard,sudi.pickup.confirmation.wizard,sudi.pickup.confirmation.wizard,diamond.group_sudi_pickup_app,crud,
+access_sudi_diamond_billing_log_reviewer,sudi.diamond.billing.log.reviewer,sudi.diamond.billing.log,diamond.group_sudi_billing_reviewer,r,
+access_sudi_diamond_billing_log_system,sudi.diamond.billing.log.system,sudi.diamond.billing.log,base.group_system,rd,
+access_sudi_diamond_reference_statement_ledger,sudi.diamond.reference.statement.ledger,sudi.diamond.reference.statement,diamond.group_sudi_reference_ledger,crud,
+access_sudi_diamond_reference_line_ledger,sudi.diamond.reference.line.ledger,sudi.diamond.reference.line,diamond.group_sudi_reference_ledger,crud,
+access_sudi_auth_otp_system,sudi.auth.otp.system,sudi.auth.otp,base.group_system,rd,
+access_sudi_service_request_stock_user,sudi.diamond.service.request.stock.user,sudi.diamond.service.request,stock.group_stock_user,crud,
+access_sudi_service_request_office,sudi.diamond.service.request.office,sudi.diamond.service.request,diamond.group_sudi_office_validator,crud,
+access_sudi_service_request_pickup,sudi.diamond.service.request.pickup,sudi.diamond.service.request,diamond.group_sudi_pickup_app,r,
+access_sudi_service_request_job_work,sudi.diamond.service.request.job.work,sudi.diamond.service.request,diamond.group_sudi_job_work_user,r,

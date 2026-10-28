@@ -1,5 +1,6 @@
 from . import whatsapp_mixin
 from . import job_type
+from . import service_request
 from . import department_transfer_wizard
 from . import pickup_confirmation_wizard
 from . import res_partner

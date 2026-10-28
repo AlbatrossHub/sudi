@@ -270,7 +270,7 @@ class OwaMessageEditWizard(models.TransientModel):
                 channel = self.env['discuss.channel'].browse(mail_msg.res_id)
                 if channel.exists():
                     Store(bus_channel=channel).add(
-                        mail_msg, {"body": new_html}).bus_send()
+                        mail_msg, {"body": new_html})
         return {
             'type': 'ir.actions.client', 'tag': 'display_notification',
             'params': {

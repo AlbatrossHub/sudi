@@ -2,13 +2,14 @@ import { Composer } from "@mail/core/common/composer";
 import { _t } from "@web/core/l10n/translation";
 import { patch } from "@web/core/utils/patch";
 
-import { onWillDestroy, useEffect } from "@odoo/owl";
+import { onWillDestroy } from "@odoo/owl";
+import { useLayoutEffect } from "@web/owl2/utils";
 
 patch(Composer.prototype, {
     setup() {
         super.setup();
         this.composerDisableCheckTimeout = null;
-        useEffect(
+        useLayoutEffect(
             () => {
                 clearTimeout(this.composerDisableCheckTimeout);
                 this.checkComposerDisabled();

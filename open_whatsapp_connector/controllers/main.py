@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 class OwaWebhook(http.Controller):
 
     @http.route('/open_whatsapp_connector/webhook/incoming', methods=['POST'],
-                type='json', auth='public', csrf=False)
+                type='jsonrpc', auth='public', csrf=False)
     def webhook_incoming(self, **kwargs):
         """Receive incoming WhatsApp messages from the WhatsApp sidecar."""
         # For type='json' controllers, Odoo unpacks jsonrpc params into kwargs
@@ -198,7 +198,7 @@ class OwaWebhook(http.Controller):
             # which Discuss renders as "This message has been removed".
             attachment = request.env['ir.attachment'].sudo().create({
                 'name': filename,
-                'datas': b64,
+                'raw': base64.b64decode(b64),
                 'mimetype': mimetype,
                 'res_model': 'mail.compose.message',
                 'res_id': 0,
@@ -405,7 +405,7 @@ class OwaWebhook(http.Controller):
         return False
 
     @http.route('/open_whatsapp_connector/webhook/call', methods=['POST'],
-                type='json', auth='public', csrf=False)
+                type='jsonrpc', auth='public', csrf=False)
     def webhook_call(self, **kwargs):
         """Phase 21: receive incoming WhatsApp call events from the
         WhatsApp sidecar (`sock.ev.on('call')`).
@@ -452,7 +452,7 @@ class OwaWebhook(http.Controller):
         return {'status': 'ok'}
 
     @http.route('/open_whatsapp_connector/webhook/story', methods=['POST'],
-                type='json', auth='public', csrf=False)
+                type='jsonrpc', auth='public', csrf=False)
     def webhook_story(self, **kwargs):
         """Receive a contact's WhatsApp Status (Story) captured by the sidecar
         — only when the account opted in via ``capture_contact_statuses``.
@@ -486,7 +486,7 @@ class OwaWebhook(http.Controller):
 
     # ── Phase B1: WhatsApp group metadata changes ────────────────────────
     @http.route('/open_whatsapp_connector/webhook/group_meta', methods=['POST'],
-                type='json', auth='public', csrf=False)
+                type='jsonrpc', auth='public', csrf=False)
     def webhook_group_meta(self, **kwargs):
         """Receive groups.upsert / groups.update events from the sidecar so
         Discuss WhatsApp group channels show live names/descriptions."""
@@ -512,7 +512,7 @@ class OwaWebhook(http.Controller):
 
     # ── Phase B2: WhatsApp group participants change ─────────────────────
     @http.route('/open_whatsapp_connector/webhook/group_participants', methods=['POST'],
-                type='json', auth='public', csrf=False)
+                type='jsonrpc', auth='public', csrf=False)
     def webhook_group_participants(self, **kwargs):
         """Receive group-participants.update events. Posts a chatter line on
         the group's discuss.channel and persists an audit row."""
@@ -538,7 +538,7 @@ class OwaWebhook(http.Controller):
 
     # ── Phase B3: WhatsApp presence (online / typing) ─────────────────────
     @http.route('/open_whatsapp_connector/webhook/presence', methods=['POST'],
-                type='json', auth='public', csrf=False)
+                type='jsonrpc', auth='public', csrf=False)
     def webhook_presence(self, **kwargs):
         """Receive presence.update events. Surfaces 'is typing' / 'online' on
         the linked Discuss WhatsApp channel via the bus, but only when the
@@ -562,7 +562,7 @@ class OwaWebhook(http.Controller):
         return {'status': 'ok'}
 
     @http.route('/open_whatsapp_connector/webhook/status', methods=['POST'],
-                type='json', auth='public', csrf=False)
+                type='jsonrpc', auth='public', csrf=False)
     def webhook_status(self, **kwargs):
         """Receive delivery status updates from the WhatsApp sidecar."""
         secret = kwargs.get('secret')
@@ -596,7 +596,7 @@ class OwaWebhook(http.Controller):
         return {'status': 'ok'}
 
     @http.route('/open_whatsapp_connector/webhook/connection', methods=['POST'],
-                type='json', auth='public', csrf=False)
+                type='jsonrpc', auth='public', csrf=False)
     def webhook_connection(self, **kwargs):
         """Push-based connection-state updates from the sidecar.
 

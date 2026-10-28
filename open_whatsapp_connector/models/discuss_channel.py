@@ -296,7 +296,7 @@ class DiscussChannel(models.Model):
             return super()._get_notify_valid_parameters() | {'owa_inbound_msg_uid', 'owa_sender_jid'}
         return super()._get_notify_valid_parameters()
 
-    def _notify_thread(self, message, msg_vals=False, **kwargs):
+    def _notify_thread(self, message, **kwargs):
         parent_msg_id = kwargs.pop('parent_msg_id', False)
         if kwargs.get('owa_inbound_msg_uid') and self.channel_type == 'whatsapp':
             self.env['owa.message'].create({
@@ -311,9 +311,9 @@ class DiscussChannel(models.Model):
             })
             if parent_msg_id:
                 self.env['owa.message'].browse(parent_msg_id).state = 'replied'
-        return super()._notify_thread(message, msg_vals=msg_vals, **kwargs)
+        return super()._notify_thread(message, **kwargs)
 
-    def message_post(self, *args, body='', attachment_ids=None,
+    def message_post(self, *, body='', attachment_ids=None,
                      message_type='notification', parent_id=False,
                      quick_reply_id=False, **kwargs):
         # Own-device sync: when set, record the created outbound owa.message as
@@ -337,7 +337,7 @@ class DiscussChannel(models.Model):
 
         if message_type != 'whatsapp_message' or self.channel_type != 'whatsapp':
             message = super().message_post(
-                *args, body=body, attachment_ids=attachment_ids,
+                body=body, attachment_ids=attachment_ids,
                 message_type=message_type, parent_id=parent_id, **kwargs
             )
             if valid_parent_id:
@@ -377,12 +377,12 @@ class DiscussChannel(models.Model):
             audio_attachments = attachment_records.filtered(lambda x: x.mimetype in AUDIO_TYPES)
             if audio_attachments:
                 body_message = super().message_post(
-                    *args, message_type=message_type, body=body,
+                    message_type=message_type, body=body,
                     attachment_ids=(attachment_records - audio_attachments).ids,
                     parent_id=parent_id, **kwargs,
                 )
                 audio_message = super().message_post(
-                    *args, message_type=message_type,
+                    message_type=message_type,
                     attachment_ids=audio_attachments.ids,
                     parent_id=parent_id, **kwargs,
                 )
@@ -390,7 +390,7 @@ class DiscussChannel(models.Model):
 
         if not messages:
             messages = super().message_post(
-                *args, body=body, message_type=message_type,
+                body=body, message_type=message_type,
                 attachment_ids=attachment_ids, parent_id=parent_id, **kwargs,
             )
 
@@ -438,7 +438,7 @@ class DiscussChannel(models.Model):
         # Track last inbound message for valid_until computation
         if messages.author_id == self.whatsapp_partner_id:
             self.last_wa_mail_message_id = messages[-1]
-            Store(bus_channel=self).add(self, "whatsapp_channel_valid_until").bus_send()
+            Store(bus_channel=self).add(self, "whatsapp_channel_valid_until")
 
         if owa_message_vals:
             queued = self.env['owa.message'].create(owa_message_vals)
@@ -536,7 +536,7 @@ class DiscussChannel(models.Model):
         to their assignee. Cheap: only writes when there is a real gap. (#S4-2)"""
         if not channel or not account:
             return
-        if self.env['ir.config_parameter'].sudo().get_param(
+        if self.env['ir.config_parameter'].sudo().get_str(
                 'open_whatsapp_connector.chat_visibility', 'shared') != 'shared':
             return
         partners = account._owa_access_partners()
@@ -544,7 +544,7 @@ class DiscussChannel(models.Model):
         if missing:
             channel.sudo().channel_member_ids = [
                 Command.create({'partner_id': p.id}) for p in missing]
-            channel._broadcast(missing.ids)
+            channel._broadcast(missing.main_user_id)
 
     def _get_owa_whatsapp_channel(self, whatsapp_number, wa_account_id,
                                   sender_name=False, create_if_not_found=False,
@@ -603,7 +603,7 @@ class DiscussChannel(models.Model):
             # empty channel) and we save a write round-trip. In the default
             # 'shared' mode assignee_id stays empty -> zero behaviour change.
             auto_agent = self.env['res.users']
-            if self.env['ir.config_parameter'].sudo().get_param(
+            if self.env['ir.config_parameter'].sudo().get_str(
                     'open_whatsapp_connector.chat_visibility', 'shared') == 'own_agent':
                 auto_agent = (responsible_partners[:1].user_ids[:1]
                               or wa_account_id.notify_user_ids[:1])
@@ -654,7 +654,7 @@ class DiscussChannel(models.Model):
                 # Allowed Group members) so every agent sees the chat. Own_agent
                 # mode -> keep the original notify-user behaviour (the read rule
                 # isolates it to the auto-assigned agent). (#allowed-group)
-                shared = self.env['ir.config_parameter'].sudo().get_param(
+                shared = self.env['ir.config_parameter'].sudo().get_str(
                     'open_whatsapp_connector.chat_visibility', 'shared') != 'own_agent'
                 pool = (wa_account_id._owa_access_partners() if shared
                         else wa_account_id.notify_user_ids.partner_id)
@@ -664,7 +664,7 @@ class DiscussChannel(models.Model):
                 [Command.clear()]
                 + [Command.create({'partner_id': p.id}) for p in partners_to_notify]
             )
-            channel._broadcast(partners_to_notify.ids)
+            channel._broadcast(partners_to_notify.main_user_id)
         elif channel:
             self._owa_topup_notify_members(channel, wa_account_id)
 
@@ -728,7 +728,7 @@ class DiscussChannel(models.Model):
                 and not self.env.user.has_group(
                     'open_whatsapp_connector.group_owa_admin')
                 and any(c.channel_type == 'whatsapp' for c in self)
-                and self.env['ir.config_parameter'].sudo().get_param(
+                and self.env['ir.config_parameter'].sudo().get_str(
                     'open_whatsapp_connector.chat_visibility', 'shared') == 'own_agent'
                 and vals.get('assignee_id') != self.env.uid):
             raise AccessError(_(
@@ -778,8 +778,12 @@ class DiscussChannel(models.Model):
                         Command.create({'partner_id': assignee_partner.id})]
         return res
 
-    def _action_unfollow(self, partner=None, guest=None, post_leave_message=True):
-        if (partner and self.channel_type == "whatsapp"
+    def action_unfollow(self):
+        # Odoo 20 port: _action_unfollow()/execute_command_leave() are gone;
+        # the leave flow is action_unfollow() (current user). Same guard:
+        # the channel owner cannot leave a WhatsApp channel, only delete it.
+        partner = self.env.user.partner_id
+        if (self.channel_type == "whatsapp"
                 and next(
                     (m.partner_id for m in self.channel_member_ids if not m.partner_id.partner_share),
                     self.env["res.partner"]
@@ -787,24 +791,18 @@ class DiscussChannel(models.Model):
             msg = _("You can't leave this channel. As the owner, you can only delete it.")
             partner._bus_send_transient_message(self, msg)
             return
-        super()._action_unfollow(partner, guest, post_leave_message)
+        return super().action_unfollow()
 
-    def _to_store_defaults(self, target):
-        return super()._to_store_defaults(target) + [
-            Store.Attr("whatsapp_channel_valid_until", predicate=is_whatsapp_channel),
-            Store.One("whatsapp_partner_id", [], predicate=is_whatsapp_channel),
-            Store.One("owa_account_id", ["name"], predicate=is_whatsapp_channel, sudo=True),
-            Store.Attr("whatsapp_kind", predicate=is_whatsapp_channel),
-        ]
+    def _store_channel_fields(self, res):
+        # Odoo 20 port: _to_store_defaults() became _store_channel_fields().
+        super()._store_channel_fields(res)
+        res.attr("whatsapp_channel_valid_until", predicate=is_whatsapp_channel)
+        res.one("whatsapp_partner_id", [], predicate=is_whatsapp_channel)
+        res.one("owa_account_id", ["name"], predicate=is_whatsapp_channel, sudo=True)
+        res.attr("whatsapp_kind", predicate=is_whatsapp_channel)
 
     def _types_allowing_seen_infos(self):
         return super()._types_allowing_seen_infos() + ["whatsapp"]
-
-    def execute_command_leave(self, **kwargs):
-        if self.channel_type == 'whatsapp':
-            self.action_unfollow()
-        else:
-            super().execute_command_leave(**kwargs)
 
     # ─── Phase 22A: triage helpers ───────────────────────────────────────
 

@@ -2,47 +2,47 @@
 <templates xml:space="preserve">
     <t t-name="diamond.JangadImageViewerField">
         <div class="o_field_jangad_image_viewer position-relative d-inline-block">
-            <div t-ref="viewerContainer"
+            <div t-ref="this.containerRef"
                  class="o_jangad_viewer_container overflow-hidden position-relative rounded border bg-light"
-                 t-on-mouseenter="onMouseEnter"
-                 t-on-mouseleave="onMouseLeave"
-                 t-on-mousemove="onMouseMove"
-                 t-on-mousedown="onMouseDown"
-                 t-on-touchstart="onTouchStart"
-                 t-on-touchmove="onTouchMove"
-                 t-on-touchend="onTouchEnd">
+                 t-on-mouseenter="this.onMouseEnter"
+                 t-on-mouseleave="this.onMouseLeave"
+                 t-on-mousemove="this.onMouseMove"
+                 t-on-mousedown="this.onMouseDown"
+                 t-on-touchstart="this.onTouchStart"
+                 t-on-touchmove="this.onTouchMove"
+                 t-on-touchend="this.onTouchEnd">
 
                 <!-- Image Element -->
-                <img t-ref="viewerImg"
-                     t-att-src="getUrl(props.name)"
-                     t-att-alt="imgAlt"
-                     t-att-class="imgClass + ' o_jangad_img_target'"
-                     t-att-style="transformStyle"
-                     t-on-error="onLoadFailed"/>
+                <img t-ref="this.imgRef"
+                     t-att-src="this.getUrl(this.props.name)"
+                     t-att-alt="this.imgAlt"
+                     t-att-class="this.imgClass + ' o_jangad_img_target'"
+                     t-att-style="this.transformStyle"
+                     t-on-error="this.onLoadFailed"/>
 
                 <!-- Desktop Magnifier Lens Overlay -->
-                <t t-if="viewerState.isHovering &amp;&amp; props.record.data[props.name]">
+                <t t-if="this.viewerState.isHovering &amp;&amp; this.props.record.data[this.props.name]">
                     <div class="o_jangad_zoom_lens position-absolute rounded-circle shadow-lg"
-                         t-att-style="'left: ' + viewerState.lensX + 'px; top: ' + viewerState.lensY + 'px; width: 120px; height: 120px; border: 2px solid #fff; background-image: url(' + getUrl(props.name) + '); background-repeat: no-repeat; background-size: ' + (containerRef.el ? containerRef.el.getBoundingClientRect().width * 2.5 : 500) + 'px auto; background-position: ' + viewerState.lensBgX + 'px ' + viewerState.lensBgY + 'px;'"/>
+                         t-att-style="'left: ' + this.viewerState.lensX + 'px; top: ' + this.viewerState.lensY + 'px; width: 120px; height: 120px; border: 2px solid #fff; background-image: url(' + this.getUrl(this.props.name) + '); background-repeat: no-repeat; background-size: ' + (this.containerRef.el ? this.containerRef.el.getBoundingClientRect().width * 2.5 : 500) + 'px auto; background-position: ' + this.viewerState.lensBgX + 'px ' + this.viewerState.lensBgY + 'px;'"/>
                 </t>
 
                 <!-- Floating Toolbar Controls -->
-                <t t-if="props.record.data[props.name]">
+                <t t-if="this.props.record.data[this.props.name]">
                     <div class="o_jangad_toolbar position-absolute bottom-0 start-50 translate-middle-x mb-2 d-flex gap-1 p-1 bg-dark bg-opacity-75 rounded-pill shadow z-2">
-                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="rotateCounterClockwise" title="Rotate Left (-90°)">
-                            <i class="fa fa-rotate-left"/>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="this.rotateCounterClockwise" title="Rotate Left (-90°)">
+                            <i class="oi" data-icon="undo"/>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="rotateClockwise" title="Rotate Right (+90°)">
-                            <i class="fa fa-rotate-right"/>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="this.rotateClockwise" title="Rotate Right (+90°)">
+                            <i class="oi" data-icon="redo"/>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="zoomOut" title="Zoom Out (-)">
-                            <i class="fa fa-search-minus"/>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="this.zoomOut" title="Zoom Out (-)">
+                            <i class="oi" data-icon="zoom_out"/>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="zoomIn" title="Zoom In (+)">
-                            <i class="fa fa-search-plus"/>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="this.zoomIn" title="Zoom In (+)">
+                            <i class="oi" data-icon="zoom_in"/>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="resetView" title="Reset View">
-                            <i class="fa fa-undo"/>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" t-on-click="this.resetView" title="Reset View">
+                            <i class="oi" data-icon="undo"/>
                         </button>
                     </div>
                 </t>
@@ -53,26 +53,26 @@
                  exist in Odoo 19 (the record property is isInEdition), so the block
                  was always false and nobody could attach a Jangad from the backend.
                  Core gates on props.readonly alone; do the same. -->
-            <t t-if="!props.readonly">
+            <t t-if="!this.props.readonly">
                 <div class="o_field_image_controls mt-1 d-flex gap-1 justify-content-center">
                     <FileUploader
-                        acceptedFileExtensions="props.acceptedFileExtensions"
-                        onUploaded.bind="onFileUploaded">
+                        acceptedFileExtensions="this.props.acceptedFileExtensions"
+                        onUploaded.bind="this.onFileUploaded">
                         <t t-set-slot="toggler">
-                            <button t-if="!hasJangad"
+                            <button t-if="!this.hasJangad"
                                     type="button"
                                     class="btn btn-sm btn-primary o_select_file_button"
                                     title="Upload Jangad">
-                                <i class="fa fa-upload me-1"/>Upload Jangad
+                                <i class="oi me-1" data-icon="upload"/>Upload Jangad
                             </button>
                             <button t-else=""
                                     type="button"
-                                    class="btn btn-sm btn-secondary fa fa-pencil o_select_file_button"
+                                    class="oi btn btn-sm btn-secondary o_select_file_button" data-icon="edit"
                                     title="Replace Jangad"/>
                         </t>
                     </FileUploader>
-                    <t t-if="hasJangad">
-                        <button type="button" class="btn btn-sm btn-danger fa fa-trash-o o_clear_file_button" t-on-click="onFileRemove" title="Clear"/>
+                    <t t-if="this.hasJangad">
+                        <button type="button" class="oi btn btn-sm btn-danger o_clear_file_button" data-icon="delete" t-on-click="this.onFileRemove" title="Clear"/>
                     </t>
                 </div>
             </t>
@@ -80,39 +80,39 @@
             <!-- Floating viewer: keeps the Jangad readable while the job table is
                  filled in. Fixed over the chatter column once the inline viewer
                  scrolls off the top. -->
-            <t t-if="showFloatingViewer">
-                <div class="o_jangad_float shadow-lg rounded border" t-att-style="floatStyle">
+            <t t-if="this.showFloatingViewer">
+                <div class="o_jangad_float shadow-lg rounded border" t-att-style="this.floatStyle">
                     <div class="o_jangad_float_head d-flex align-items-center gap-1 px-2 py-1">
-                        <i class="fa fa-picture-o"/>
+                        <i class="oi" data-icon="image"/>
                         <span class="flex-grow-1 fw-bold">Jangad</span>
-                        <button type="button" class="btn btn-sm p-0 px-1" t-on-click="scrollToInlineViewer" title="Back to the Jangad field">
-                            <i class="fa fa-arrow-up"/>
+                        <button type="button" class="btn btn-sm p-0 px-1" t-on-click="this.scrollToInlineViewer" title="Back to the Jangad field">
+                            <i class="oi" data-icon="arrow_upward"/>
                         </button>
-                        <button type="button" class="btn btn-sm p-0 px-1" t-on-click="dismissFloatingViewer" title="Hide until I scroll back up">
-                            <i class="fa fa-times"/>
+                        <button type="button" class="btn btn-sm p-0 px-1" t-on-click="this.dismissFloatingViewer" title="Hide until I scroll back up">
+                            <i class="oi" data-icon="close"/>
                         </button>
                     </div>
                     <div class="o_jangad_float_body">
-                        <img t-att-src="getUrl(props.name)"
-                             t-att-alt="imgAlt"
-                             t-att-style="floatImgStyle"
-                             t-on-error="onLoadFailed"/>
+                        <img t-att-src="this.getUrl(this.props.name)"
+                             t-att-alt="this.imgAlt"
+                             t-att-style="this.floatImgStyle"
+                             t-on-error="this.onLoadFailed"/>
                     </div>
                     <div class="o_jangad_float_toolbar d-flex justify-content-center gap-1 p-1">
-                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="rotateCounterClockwise" title="Rotate Left (-90°)">
-                            <i class="fa fa-rotate-left"/>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="this.rotateCounterClockwise" title="Rotate Left (-90°)">
+                            <i class="oi" data-icon="undo"/>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="rotateClockwise" title="Rotate Right (+90°)">
-                            <i class="fa fa-rotate-right"/>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="this.rotateClockwise" title="Rotate Right (+90°)">
+                            <i class="oi" data-icon="redo"/>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="zoomOut" title="Zoom Out (-)">
-                            <i class="fa fa-search-minus"/>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="this.zoomOut" title="Zoom Out (-)">
+                            <i class="oi" data-icon="zoom_out"/>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="zoomIn" title="Zoom In (+)">
-                            <i class="fa fa-search-plus"/>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="this.zoomIn" title="Zoom In (+)">
+                            <i class="oi" data-icon="zoom_in"/>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="resetView" title="Reset View">
-                            <i class="fa fa-undo"/>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" t-on-click="this.resetView" title="Reset View">
+                            <i class="oi" data-icon="undo"/>
                         </button>
                     </div>
                 </div>

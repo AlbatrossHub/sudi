@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- For support: "did the bell ring for Jaya when WH/IN/00042 was marked
+         ready?" Notices are raised by the system, never typed. -->
+    <record id="view_sudi_app_notice_list" model="ir.ui.view">
+        <field name="name">sudi.app.notice.list</field>
+        <field name="model">sudi.app.notice</field>
+        <field name="arch" type="xml">
+            <list string="App Notices" create="0" edit="0">
+                <field name="create_date" string="Raised"/>
+                <field name="user_id"/>
+                <field name="kind"/>
+                <field name="title"/>
+                <field name="picking_id"/>
+                <field name="read_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sudi_app_notice_search" model="ir.ui.view">
+        <field name="name">sudi.app.notice.search</field>
+        <field name="model">sudi.app.notice</field>
+        <field name="arch" type="xml">
+            <search string="App Notices">
+                <field name="user_id"/>
+                <field name="picking_id"/>
+                <filter string="Unread" name="unread" domain="[('read_at', '=', False)]"/>
+                <group>
+                    <filter string="Person" name="group_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Kind" name="group_kind" context="{'group_by': 'kind'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_sudi_app_notice" model="ir.actions.act_window">
+        <field name="name">App Notices</field>
+        <field name="res_model">sudi.app.notice</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'create': False}</field>
+    </record>
+</odoo>

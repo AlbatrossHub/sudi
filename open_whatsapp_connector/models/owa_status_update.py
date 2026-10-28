@@ -53,10 +53,10 @@ class OwaStatusUpdate(models.Model):
     expires_at = fields.Datetime(index=True)
     viewed = fields.Boolean(default=False)
 
-    _sql_constraints = [
-        ('wa_msg_uniq', 'unique(wa_account_id, wa_message_id)',
-         'This status update was already captured.'),
-    ]
+    _wa_msg_uniq = models.Constraint(
+        'unique(wa_account_id, wa_message_id)',
+        "This status update was already captured.",
+    )
 
     @api.depends('sender_name', 'contact_number', 'media_type', 'body_text')
     def _compute_name(self):
@@ -161,7 +161,7 @@ class OwaStatusUpdate(models.Model):
         if b64 and media_type in ('image', 'video'):
             attachment = self.env['ir.attachment'].sudo().create({
                 'name': 'status.%s' % media_type,
-                'datas': b64,
+                'raw': base64.b64decode(b64),
                 'mimetype': payload.get('mimetype') or (
                     'image/jpeg' if media_type == 'image' else 'video/mp4'),
                 'res_model': 'owa.status.update',

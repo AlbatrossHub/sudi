@@ -324,7 +324,7 @@ class ResConfigSettings(models.TransientModel):
             'pwa.scope': '/odoo',
         }
         for key, value in defaults.items():
-            IrConfigParam.set_param(key, value)
+            IrConfigParam.set_str(key, value)
         
         return {
             'type': 'ir.actions.client',
@@ -365,16 +365,16 @@ class ResConfigSettings(models.TransientModel):
         IrConfigParam = self.env['ir.config_parameter'].sudo()
         
         res.update({
-            'pwa_app_name': IrConfigParam.get_param('pwa.app_name', 'Odoo'),
-            'pwa_app_short_name': IrConfigParam.get_param('pwa.app_short_name', 'Odoo'),
-            'pwa_theme_color': IrConfigParam.get_param('pwa.theme_color', '#714B67'),
-            'pwa_background_color': IrConfigParam.get_param('pwa.background_color', '#714B67'),
-            'pwa_display_mode': IrConfigParam.get_param('pwa.display_mode', 'standalone'),
-            'pwa_orientation': IrConfigParam.get_param('pwa.orientation', 'any'),
-            'pwa_start_url': IrConfigParam.get_param('pwa.start_url', '/odoo'),
-            'pwa_scope': IrConfigParam.get_param('pwa.scope', '/odoo'),
-            'pwa_enable_offline': IrConfigParam.get_param('pwa.enable_offline', 'True') == 'True',
-            'pwa_enable_portal': IrConfigParam.get_param('pwa.enable_portal', 'False') == 'True',
+            'pwa_app_name': IrConfigParam.get_str('pwa.app_name', 'Odoo'),
+            'pwa_app_short_name': IrConfigParam.get_str('pwa.app_short_name', 'Odoo'),
+            'pwa_theme_color': IrConfigParam.get_str('pwa.theme_color', '#714B67'),
+            'pwa_background_color': IrConfigParam.get_str('pwa.background_color', '#714B67'),
+            'pwa_display_mode': IrConfigParam.get_str('pwa.display_mode', 'standalone'),
+            'pwa_orientation': IrConfigParam.get_str('pwa.orientation', 'any'),
+            'pwa_start_url': IrConfigParam.get_str('pwa.start_url', '/odoo'),
+            'pwa_scope': IrConfigParam.get_str('pwa.scope', '/odoo'),
+            'pwa_enable_offline': IrConfigParam.get_str('pwa.enable_offline', 'True') == 'True',
+            'pwa_enable_portal': IrConfigParam.get_str('pwa.enable_portal', 'False') == 'True',
         })
         return res
 

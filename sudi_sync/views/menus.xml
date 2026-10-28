@@ -26,4 +26,11 @@
               action="action_sudi_upload"
               sequence="30"
               groups="base.group_system"/>
+
+    <menuitem id="menu_sudi_app_notice"
+              name="App Notices"
+              parent="menu_sudi_sync_root"
+              action="action_sudi_app_notice"
+              sequence="40"
+              groups="base.group_system"/>
 </odoo>

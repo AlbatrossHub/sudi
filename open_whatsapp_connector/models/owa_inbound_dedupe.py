@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+from psycopg2.errors import SerializationFailure
+
 from odoo import api, fields, models
 
 
@@ -35,13 +37,25 @@ class OwaInboundDedupe(models.Model):
         """
         if not msg_uid:
             return True
-        self.env.cr.execute("""
-            INSERT INTO owa_inbound_dedupe (msg_uid, account_id, create_date, write_date)
-            VALUES (%s, %s, NOW() AT TIME ZONE 'UTC', NOW() AT TIME ZONE 'UTC')
-            ON CONFLICT (msg_uid, account_id) DO NOTHING
-            RETURNING id
-        """, [msg_uid, account_id or None])
-        return bool(self.env.cr.fetchone())
+        # Under Odoo's REPEATABLE READ isolation, ON CONFLICT against a row
+        # inserted by a concurrent transaction that has since committed raises
+        # SerializationFailure instead of DO NOTHING. Typical case: the outbound
+        # send pre-claims its msg_uid while the sidecar's fromMe echo of the
+        # same message hits the webhook on another worker. That error can only
+        # mean the key was already claimed, so it is a duplicate; the savepoint
+        # keeps the caller's transaction usable (and stops the send request
+        # from being retried, which would re-send the WhatsApp message).
+        try:
+            with self.env.cr.savepoint(flush=False):
+                self.env.cr.execute("""
+                    INSERT INTO owa_inbound_dedupe (msg_uid, account_id, create_date, write_date)
+                    VALUES (%s, %s, NOW() AT TIME ZONE 'UTC', NOW() AT TIME ZONE 'UTC')
+                    ON CONFLICT (msg_uid, account_id) DO NOTHING
+                    RETURNING id
+                """, [msg_uid, account_id or None])
+                return bool(self.env.cr.fetchone())
+        except SerializationFailure:
+            return False
 
     @api.model
     def _cron_gc(self):

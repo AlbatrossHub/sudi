@@ -38,6 +38,10 @@ class DiscussChannelMember(models.Model):
         )
         members_to_unpin.unpin_dt = datetime.now()
         for member in members_to_unpin:
-            Store(bus_channel=member._bus_channel()).add(
-                member.channel_id, {"close_chat_window": True}
-            ).bus_send()
+            # Odoo 20: _bus_channel() became _bus_channels() (plural) on the
+            # persona, and Store sends automatically (no bus_send()).
+            persona = member.partner_id or member.guest_id
+            for bus_channel in persona._bus_channels():
+                Store(bus_channel=bus_channel).add(
+                    member.channel_id, {"close_chat_window": True}
+                )

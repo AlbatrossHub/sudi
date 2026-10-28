@@ -1,5 +1,7 @@
 """Pydantic v2 request and response models for the Sudi mobile API."""
 
+from datetime import date as Date, datetime
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -12,6 +14,16 @@ class HealthInfo(BaseModel):
     status: str
     api: str
     odoo_version: str
+
+
+class ServerTime(BaseModel):
+    server_time: datetime = Field(
+        ...,
+        description="The server's clock, aware UTC. Pin the app's trusted "
+                    "clock to it (counted forward by the phone's uptime) and "
+                    "stamp every occurred_at from that, so a phone with a "
+                    "wrong date cannot misdate an offline event.",
+    )
 
 
 class DeviceInput(BaseModel):
@@ -132,6 +144,11 @@ class Ref(BaseModel):
 
 
 class ItemLine(BaseModel):
+    move_id: int | None = Field(
+        default=None,
+        description="The line's own id. Key an editable table on it, and send "
+                    "it back in PUT /receipts/{id}/lines to keep the line.",
+    )
     sr: int
     product: str | None = None
     size: str | None = None
@@ -144,6 +161,29 @@ class ItemLine(BaseModel):
 class TimerInfo(BaseModel):
     running: bool
     started_at: str | None = None
+
+
+class ServiceLine(BaseModel):
+    """A service the customer asked for when the jangad was posted.
+
+    A request, not an item: nothing has been counted yet. The office enters
+    item lines from these, after which ``move_id`` names the line.
+    """
+
+    id: int
+    job_type: Ref | None = None
+    quantity: float
+    unit: str = Field(
+        ...,
+        description="`pcs`, `ct`, or empty for a service billed by hand.",
+        examples=["pcs", "ct", ""],
+    )
+    remarks: str | None = None
+    move_id: int | None = Field(
+        default=None,
+        description="The item line entered from this request; null while it "
+                    "is still to enter.",
+    )
 
 
 class PickupDoc(BaseModel):
@@ -172,6 +212,30 @@ class PickupDoc(BaseModel):
     collected_at: str | None = None
     collected_by: Ref | None = None
     jangad_pages: int
+    services: list[ServiceLine] = Field(
+        default_factory=list,
+        description="What the customer asked for. Empty for a jangad posted "
+                    "without choosing services.",
+    )
+
+
+class OfficeDoc(PickupDoc):
+    """A collected jangad awaiting validation: scope `office`.
+
+    The pickup document plus the item table being built and where the jangad
+    came from. Leaves the scope once it is marked READY.
+    """
+
+    items: list[ItemLine] = Field(default_factory=list)
+    jangad_source: str | None = Field(
+        default=None,
+        description="`customer_app`, `customer_web`, `on_behalf` or `office`; "
+                    "null for a receipt from before sources were recorded.",
+    )
+    posted_by: Ref | None = Field(
+        default=None,
+        description="The member of staff who posted it for the customer.",
+    )
 
 
 class DeliveryDoc(BaseModel):
@@ -203,6 +267,12 @@ class JobWorkDoc(BaseModel):
     timer: TimerInfo
     jangad_pages: int
     items: list[ItemLine] = Field(default_factory=list)
+    services: list[ServiceLine] = Field(default_factory=list)
+    my_hours: float = Field(
+        default=0.0,
+        description="Hours the caller has booked on this receipt; total_hours "
+                    "is everybody's. Excludes a timer still running.",
+    )
 
 
 class PickupDelta(BaseModel):
@@ -225,12 +295,18 @@ class JobWorkDelta(BaseModel):
     gone: list[int] = Field(default_factory=list)
 
 
+class OfficeDelta(BaseModel):
+    upserts: list[OfficeDoc] = Field(default_factory=list)
+    gone: list[int] = Field(default_factory=list)
+
+
 class SyncScopes(BaseModel):
     """Only the scopes the caller's roles entitle them to appear."""
 
     pickup: PickupDelta | None = None
     delivery: DeliveryDelta | None = None
     jobwork: JobWorkDelta | None = None
+    office: OfficeDelta | None = None
 
 
 class SyncPullResult(BaseModel):
@@ -505,6 +581,36 @@ class AddressSuggestion(BaseModel):
     is_default: bool
 
 
+class ServiceInfo(BaseModel):
+    """One service on the customer's dashboard."""
+
+    id: int
+    name: str
+    unit: str = Field(..., description="`pcs`, `ct`, or empty.", examples=["pcs"])
+    description: str | None = None
+
+
+class ServiceRequestInput(BaseModel):
+    """One service picked on the dashboard, with how much and a remark."""
+
+    job_type_id: int = Field(..., gt=0, description="From GET /services.")
+    quantity: float = Field(
+        default=0.0, ge=0,
+        description="In the service's unit. Zero is allowed: the customer may "
+                    "not know the count, and the office counts anyway.",
+    )
+    remarks: str | None = Field(default=None, max_length=256)
+
+
+def _check_one_address(model):
+    typed = bool((model.manual_pickup_address or "").strip())
+    if bool(model.pickup_address_id) == typed:
+        raise ValueError(
+            "Give either pickup_address_id or manual_pickup_address."
+        )
+    return model
+
+
 class JangadSubmitInput(IntentEnvelope):
     upload_ids: list[str] = Field(
         ..., min_length=1, max_length=20,
@@ -518,15 +624,15 @@ class JangadSubmitInput(IntentEnvelope):
         description="A new address, typed. Give this or pickup_address_id, "
                     "not both and not neither.",
     )
+    services: list[ServiceRequestInput] = Field(
+        default_factory=list, max_length=50,
+        description="The services picked on the dashboard, in the order "
+                    "picked. Optional: a jangad alone is still accepted.",
+    )
 
     @model_validator(mode="after")
     def _exactly_one_address(self):
-        typed = bool((self.manual_pickup_address or "").strip())
-        if bool(self.pickup_address_id) == typed:
-            raise ValueError(
-                "Give either pickup_address_id or manual_pickup_address."
-            )
-        return self
+        return _check_one_address(self)
 
 
 class JangadSubmitResult(BaseModel):
@@ -538,3 +644,225 @@ class JangadSubmitResult(BaseModel):
         description="When the customer captured it, not when it reached the "
                     "server — the two differ whenever it was submitted offline.",
     )
+
+
+# ---------------------------------------------------------------------------
+# Staff app, v2: catalogue, posting on a customer's behalf, manual time, the
+# office, and the bell. See docs/MOBILE_V2_PERSONAS_PLAN.md section 5.
+# ---------------------------------------------------------------------------
+
+class JobTypeInfo(BaseModel):
+    """A service, which is also a department of the workshop."""
+
+    id: int
+    name: str
+    unit: str = Field(..., description="`pcs`, `ct`, or empty.", examples=["pcs"])
+    sequence: int
+
+
+class CustomerAddress(BaseModel):
+    id: int = Field(..., description="Send as pickup_address_id.")
+    label: str
+    address: str
+    is_default: bool
+
+
+class CustomerEntry(BaseModel):
+    """One customer in the posting-on-behalf directory."""
+
+    id: int = Field(..., description="Send as customer.partner_id.")
+    name: str
+    phone: str = Field(..., description="Ten digits, as the pickup flow uses it.")
+    gst_state: str = Field(..., examples=["present", "skipped", "missing"])
+    addresses: list[CustomerAddress] = Field(default_factory=list)
+
+
+class OnBehalfCustomer(BaseModel):
+    """Who the jangad is for: a directory entry, or a number typed in."""
+
+    partner_id: int | None = Field(default=None, description="From GET /customers.")
+    phone: str | None = Field(
+        default=None, min_length=6, max_length=20,
+        description="A customer not in the directory yet. Ten digits once "
+                    "spaces and the country code are dropped.",
+    )
+    name: str | None = Field(
+        default=None, max_length=120,
+        description="With a phone the server does not know: the customer "
+                    "record is created under this name.",
+    )
+
+    @model_validator(mode="after")
+    def _exactly_one_customer(self):
+        if bool(self.partner_id) == bool((self.phone or "").strip()):
+            raise ValueError("Give either partner_id or phone.")
+        return self
+
+
+class OnBehalfJangadInput(IntentEnvelope):
+    customer: OnBehalfCustomer
+    pickup_address_id: int | None = Field(
+        default=None, description="One of the customer's addresses from GET /customers."
+    )
+    manual_pickup_address: str | None = Field(
+        default=None,
+        description="A new address, typed. Give this or pickup_address_id, "
+                    "not both and not neither.",
+    )
+    services: list[ServiceRequestInput] = Field(default_factory=list, max_length=50)
+    upload_ids: list[str] = Field(
+        ..., min_length=1, max_length=20,
+        description="The jangad's pages, staged with POST /uploads, in page order.",
+    )
+    note: str | None = Field(
+        default=None, max_length=1000, description="Shown to the office."
+    )
+
+    @model_validator(mode="after")
+    def _exactly_one_address(self):
+        return _check_one_address(self)
+
+
+class OnBehalfJangadResult(BaseModel):
+    picking_id: int = Field(
+        ...,
+        description="Use it straight away for the pickup: POST "
+                    "/pickups/{picking_id}/confirm, in the same outbox chain.",
+    )
+    reference: str
+    pickup: PickupDoc | None = Field(
+        default=None,
+        description="The receipt as the pickup list shows it. Null only for "
+                    "an account without the pickup role.",
+    )
+
+
+class TimeLogInput(IntentEnvelope):
+    job_type_id: int = Field(..., gt=0, description="What the time was spent on.")
+    hours: float = Field(..., gt=0, le=24, examples=[1.5])
+    description: str | None = Field(default=None, max_length=500)
+    date: Date | None = Field(
+        default=None,
+        description="The day worked. Defaults to the day of occurred_at; may "
+                    "not be later than it, nor more than 31 days before it.",
+    )
+
+
+class TimeEntry(BaseModel):
+    id: int
+    date: str
+    picking: Ref
+    job_type: Ref | None = None
+    hours: float
+    description: str | None = None
+    running: bool = Field(
+        ..., description="A timer is running on it; hours exclude the running part."
+    )
+
+
+class TimeLogResult(BaseModel):
+    code: str = Field(..., examples=["OK"])
+    entry: TimeEntry
+    jobwork: JobWorkDoc
+
+
+class DayHours(BaseModel):
+    date: str
+    hours: float
+
+
+class JobTypeHours(BaseModel):
+    job_type: Ref | None = None
+    hours: float
+
+
+class ProductivityResult(BaseModel):
+    date_from: str
+    date_to: str
+    total_hours: float
+    by_day: list[DayHours] = Field(
+        default_factory=list, description="Every day of the range, zeros included."
+    )
+    by_job_type: list[JobTypeHours] = Field(
+        default_factory=list, description="Most hours first."
+    )
+    entries: list[TimeEntry] = Field(default_factory=list, description="Newest first.")
+
+
+class NoticeInfo(BaseModel):
+    id: int
+    kind: str = Field(
+        ...,
+        examples=["pickup_new", "office_validate", "jobwork_ready",
+                  "department_transfer", "delivery_ready"],
+    )
+    title: str
+    body: str | None = None
+    picking_id: int | None = None
+    scope: str | None = Field(
+        default=None, description="The worklist to open when it is tapped."
+    )
+    created_at: str
+    read: bool
+
+
+class NoticeList(BaseModel):
+    notices: list[NoticeInfo] = Field(default_factory=list, description="Newest first.")
+    last_id: int = Field(..., description="Send back as `after` on the next poll.")
+    unread: int = Field(..., description="All of the caller's unread notices.")
+    has_more: bool = Field(
+        default=False,
+        description="More notices above last_id than fitted: poll again now.",
+    )
+
+
+class NoticeReadInput(BaseModel):
+    ids: list[int] = Field(default_factory=list, max_length=500)
+    up_to: int | None = Field(
+        default=None, ge=0, description="Everything up to and including this id."
+    )
+
+    @model_validator(mode="after")
+    def _ids_or_up_to(self):
+        if bool(self.ids) == (self.up_to is not None):
+            raise ValueError("Give either ids or up_to.")
+        return self
+
+
+class NoticeReadResult(BaseModel):
+    marked: int
+    unread: int
+
+
+class OfficeLineInput(BaseModel):
+    """One row of the item table, as the office leaves it."""
+
+    move_id: int | None = Field(
+        default=None,
+        description="An existing line to keep and update. Omit for a new one.",
+    )
+    size: str | None = Field(default=None, max_length=64)
+    pcs: float = Field(default=0.0, ge=0)
+    carats: float = Field(default=0.0, ge=0)
+    job_type_id: int | None = Field(
+        default=None, description="May stay empty in a draft; READY needs it."
+    )
+    remarks: str | None = Field(default=None, max_length=256)
+    request_id: int | None = Field(
+        default=None,
+        description="The requested service this line was entered from.",
+    )
+
+
+class OfficeLinesInput(BaseModel):
+    lines: list[OfficeLineInput] = Field(
+        default_factory=list, max_length=500,
+        description="The whole table, in order: rows left out are removed, "
+                    "and Sr follows the order given.",
+    )
+
+
+class OfficeReadyResult(BaseModel):
+    code: str = Field(..., examples=["OK", "ALREADY_DONE"])
+    state: str = Field(..., examples=["assigned"])
+    reference: str

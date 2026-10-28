@@ -45,7 +45,7 @@ class ResConfigSettings(models.TransientModel):
 
     # NOTE: intentionally NOT a `config_parameter` Boolean. Odoo stores a
     # boolean *False* config parameter as the ABSENCE of the row
-    # (ir.config_parameter.set_param(key, False) unlinks it), so a
+    # (writing a False boolean parameter unlinks its row), so a
     # default-True config_parameter boolean can never be turned off — on
     # reload get_values falls back to the True default. We persist an explicit
     # 'true'/'false' string in get_values()/set_values() instead. (#F-autocreate)
@@ -99,22 +99,11 @@ class ResConfigSettings(models.TransientModel):
              "livechat, regular channels) is never affected. WhatsApp "
              "Administrators always see every conversation.")
 
-    # Record-rule + ACL XML ids toggled by the visibility setting. Kept in
-    # one place so set_values() and any future maintenance stay in sync.
-    _OWA_VISIBILITY_RULE_XMLIDS = (
-        'open_whatsapp_connector.owa_campaign_user_rule',
-        'open_whatsapp_connector.owa_campaign_admin_all_rule',
-        'open_whatsapp_connector.owa_contact_list_user_rule',
-        'open_whatsapp_connector.owa_contact_list_admin_all_rule',
-        'open_whatsapp_connector.owa_contact_list_member_user_rule',
-        'open_whatsapp_connector.owa_contact_list_member_admin_all_rule',
-        'open_whatsapp_connector.owa_broadcast_group_user_rule',
-        'open_whatsapp_connector.owa_broadcast_group_admin_all_rule',
-        'open_whatsapp_connector.owa_standing_order_user_rule',
-        'open_whatsapp_connector.owa_standing_order_admin_all_rule',
-        'open_whatsapp_connector.owa_status_broadcast_user_rule',
-        'open_whatsapp_connector.owa_status_broadcast_admin_all_rule',
-    )
+    # ir.access XML ids toggled by the visibility setting (Odoo 20 port:
+    # the v19 rule+ACL pairs are now single domained ir.access grants).
+    # Kept in one place so set_values() and future maintenance stay in sync.
+    #
+    # Activated in 'own_team' mode: user CRUD limited to own + team.
     _OWA_VISIBILITY_ACL_XMLIDS = (
         'open_whatsapp_connector.access_owa_campaign_user_manage',
         'open_whatsapp_connector.access_owa_contact_list_user_manage',
@@ -123,13 +112,24 @@ class ResConfigSettings(models.TransientModel):
         'open_whatsapp_connector.access_owa_standing_order_user_manage',
         'open_whatsapp_connector.access_owa_status_broadcast_user_manage',
     )
+    # Deactivated in 'own_team' mode: the shared-mode "everyone" rows from
+    # ir.access.csv (grants OR together, so leaving them active would keep
+    # every internal user at company-wide visibility). Admin rows stay.
+    _OWA_VISIBILITY_SHARED_XMLIDS = (
+        'open_whatsapp_connector.access_owa_campaign_user',
+        'open_whatsapp_connector.access_owa_contact_list_user',
+        'open_whatsapp_connector.access_owa_contact_list_member_user',
+        'open_whatsapp_connector.access_owa_broadcast_group_user',
+        'open_whatsapp_connector.access_owa_standing_order_user',
+        'open_whatsapp_connector.access_owa_status_broadcast_user',
+    )
 
     # Per-agent WhatsApp conversation isolation is enforced by ALWAYS-active
-    # discuss.channel / discuss.channel.member rules whose domain reads the
-    # `open_whatsapp_connector.chat_visibility` parameter (see
-    # security/ir_rules.xml). set_values() only writes the parameter + clears
-    # the ir.rule cache — there is no `active` flag to toggle, which keeps the
-    # feature immune to module-upgrade (-u) rule reloads.
+    # discuss.channel / discuss.channel.member ir.access records whose domain
+    # reads the `open_whatsapp_connector.chat_visibility` parameter (see
+    # security/ir_rules.xml). set_values() only writes the parameter +
+    # invalidates the ormcache — there is no `active` flag to toggle, which
+    # keeps the feature immune to module-upgrade (-u) reloads.
 
     # ------------------------------------------------------------------
     # Per-account self-service / visibility toggle
@@ -174,7 +174,7 @@ class ResConfigSettings(models.TransientModel):
         # `== 'true'` would misread that as OFF and the UI would silently disagree
         # with the still-active behaviour. A missing parameter defaults to ON so
         # fresh installs keep auto-create. (#F-autocreate)
-        res['owa_auto_create_contacts'] = self.env['ir.config_parameter'].sudo().get_param(
+        res['owa_auto_create_contacts'] = self.env['ir.config_parameter'].sudo().get_str(
             'open_whatsapp_connector.auto_create_contacts', 'true'
         ).strip().lower() in ('true', '1', 'yes')
         return res
@@ -183,17 +183,20 @@ class ResConfigSettings(models.TransientModel):
         super().set_values()
         # Persist auto-create as an explicit string so OFF survives a reload
         # (a boolean-False config param would be deleted -> reverts to default).
-        self.env['ir.config_parameter'].sudo().set_param(
+        self.env['ir.config_parameter'].sudo().set_str(
             'open_whatsapp_connector.auto_create_contacts',
             'true' if self.owa_auto_create_contacts else 'false')
-        # Reflect the chosen visibility mode by activating/deactivating the
-        # shipped-inactive record rules + user-CRUD ACLs.
+        # Reflect the chosen visibility mode: activate the domained user
+        # grants, deactivate the shared "everyone" grants (and vice versa).
         restrict = self.owa_marketing_visibility == 'own_team'
-        for xmlid in (self._OWA_VISIBILITY_RULE_XMLIDS
-                      + self._OWA_VISIBILITY_ACL_XMLIDS):
+        for xmlid in self._OWA_VISIBILITY_ACL_XMLIDS:
             rec = self.env.ref(xmlid, raise_if_not_found=False)
             if rec and rec.active != restrict:
                 rec.sudo().active = restrict
+        for xmlid in self._OWA_VISIBILITY_SHARED_XMLIDS:
+            rec = self.env.ref(xmlid, raise_if_not_found=False)
+            if rec and rec.active == restrict:
+                rec.sudo().active = not restrict
 
         # Per-agent WhatsApp conversation isolation is enforced by ALWAYS-active
         # record rules whose domain reads the `chat_visibility` parameter (set
@@ -210,7 +213,7 @@ class ResConfigSettings(models.TransientModel):
             if acct_manage.active != want:
                 acct_manage.sudo().active = want
 
-        self.env.registry.clear_cache()
+        self.env.transaction.invalidate_ormcache()
 
     def action_owa_enable_recommended(self):
         """One-click: (re)seed the starter rules for the apps you have

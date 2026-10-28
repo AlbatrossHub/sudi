@@ -6,7 +6,7 @@
     'price': 39.00,
     'currency': 'USD',
     'license': 'OPL-1',
-    'version': '19.0.95.0.0',
+    'version': '20.0.95.0.0',
     'images': [
         'static/description/open_whatsapp_demo.gif',
         'static/description/banner.png',
@@ -104,7 +104,6 @@ Compliance & polish (v19.0.26+)
     'data': [
         'security/res_groups.xml',
         'security/ir_rules.xml',
-        'security/ir.model.access.csv',
         'security/ir_model_access_marketing.xml',
         'security/ir_model_access_account.xml',
         'data/ir_cron_data.xml',
@@ -166,12 +165,13 @@ Compliance & polish (v19.0.26+)
         'views/owa_menus.xml',
         'views/owa_status_views.xml',
         'views/owa_cloud_template_views.xml',
+        'security/ir.access.csv',
     ],
     'assets': {
         'web.assets_backend': [
             'open_whatsapp_connector/static/src/**/*',
         ],
-        'web.assets_tests': [
+        'web.assets_unit_tests': [
             'open_whatsapp_connector/static/tests/**/*.js',
         ],
     },

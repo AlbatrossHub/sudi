@@ -11,12 +11,12 @@ def _auto_configure_sidecar_path(env):
     ``sidecar/`` directory on install, so QR accounts work without an admin
     hand-typing an absolute path. Never overwrites a value already set."""
     ICP = env['ir.config_parameter'].sudo()
-    if ICP.get_param('open_whatsapp_connector.sidecar_path'):
+    if ICP.get_str('open_whatsapp_connector.sidecar_path'):
         return
     sidecar_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), 'sidecar')
     if os.path.isdir(sidecar_dir):
-        ICP.set_param('open_whatsapp_connector.sidecar_path', sidecar_dir)
+        ICP.set_str('open_whatsapp_connector.sidecar_path', sidecar_dir)
 
 
 def _create_default_notification_rules(env):

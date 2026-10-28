@@ -1,7 +1,8 @@
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onWillStart, proxy, useProps, usePlugin } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
-import { standardActionServiceProps } from "@web/webclient/actions/action_service";
+import { ActionPlugin } from "@web/webclient/actions/action_plugin";
+import { standardActionServiceProps } from "@web/webclient/actions/action_plugin";
 import { useSetupAction } from "@web/search/action_hook";
 import { browser } from "@web/core/browser/browser";
 
@@ -33,11 +34,11 @@ import { SudiTrendChart } from "./trend_chart";
 export class SudiDiamondDashboard extends Component {
     static template = "sudi_diamond_dashboard.SudiDashboard";
     static components = { SudiTrendChart };
-    static props = { ...standardActionServiceProps };
+    props = useProps({ ...standardActionServiceProps });
 
     setup() {
         this.orm = useService("orm");
-        this.actionService = useService("action");
+        this.actionService = usePlugin(ActionPlugin);
 
         this.periods = [
             { key: "day", label: _t("Day") },
@@ -59,7 +60,7 @@ export class SudiDiamondDashboard extends Component {
         // props.state wins when present -- it is the state of the exact view the
         // user navigated away from; storage is the fallback.
         const restored = { ...readStoredFilters(), ...(this.props.state || {}) };
-        this.state = useState({
+        this.state = proxy({
             period: restored.period || "month",
             measure: restored.measure || "pcs",
             dateFrom: restored.dateFrom || "",
