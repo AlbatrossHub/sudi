@@ -6,7 +6,7 @@
         <xpath expr="//*[hasclass('o-mail-Chatter-activity')]" position="before">
             <button t-if="this.state.thread.canSendWhatsapp"
                 class="btn text-nowrap me-1"
-                t-att-class="{'btn-success': this.owaState.thread, 'btn-secondary': !this.owaState.thread, 'my-2': !this.props.compactHeight }"
+                t-att-class="{'btn-success': this.owaState.thread, 'btn-secondary': !this.owaState.thread}"
                 data-hotkey="shift+w"
                 t-on-click="this.toggleWhatsapp"
             >

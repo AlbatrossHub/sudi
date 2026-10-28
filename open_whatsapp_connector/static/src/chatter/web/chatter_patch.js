@@ -42,7 +42,8 @@ patch(Chatter.prototype, {
         } else {
             // New, unsaved record: save it first so it has an id + contact.
             this.onThreadCreated = reveal;
-            this.props.saveRecord?.();
+            // this version's Chatter has no this.props: the form's props live in webChatterProps
+            this.webChatterProps.saveRecord?.();
         }
     },
 });
