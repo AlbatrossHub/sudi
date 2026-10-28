@@ -1,10 +1,10 @@
-import base64
 import json
 from urllib.parse import quote
 
 from odoo import _
 from odoo.exceptions import UserError
 from odoo.http import Controller, request, route
+from odoo.tools.binary import BinaryBytes
 from odoo.tools.misc import file_open
 
 
@@ -346,7 +346,7 @@ class SudiDiamondJangadController(Controller):
         user = request.env.user
         return request.env["stock.picking"].sudo().sudi_create_public_jangad_receipt(
             phone,
-            base64.b64encode(image_data),
+            BinaryBytes(image_data),
             pickup_address_id=pickup_address_id,
             manual_pickup_address=manual_pickup_address,
             source="customer_web" if user.share else "office",

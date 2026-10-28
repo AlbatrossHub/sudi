@@ -356,6 +356,10 @@
             body: formData,
             credentials: "same-origin",
         });
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+            throw new Error(`Upload failed (server error ${response.status}). Please try again or contact the office.`);
+        }
         const data = await response.json();
         if (!response.ok || !data.success) {
             throw new Error(data.error || "Upload failed. Please try again.");

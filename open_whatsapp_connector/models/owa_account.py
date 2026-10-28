@@ -1682,7 +1682,7 @@ class OwaAccount(models.Model):
         if not self.image_1920:
             raise UserError(_(
                 "Set an image on this WhatsApp account first."))
-        raw = base64.b64decode(self.image_1920)
+        raw = self.image_1920.content
         if self.connection_type == 'cloud':
             self._get_cloud_api().update_profile_picture(raw, 'image/jpeg')
         else:
