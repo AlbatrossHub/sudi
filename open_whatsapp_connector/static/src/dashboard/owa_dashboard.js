@@ -329,11 +329,18 @@ export class OwaDashboard extends Component {
                 );
             }
             if (connectSkipped.length) {
+                const reasons = {
+                    needs_qr_scan: _t("open the account and scan its QR code"),
+                    qr_pending: _t("QR code is waiting to be scanned"),
+                    connecting: _t("connecting with the saved login"),
+                    disabled: _t("account is disabled"),
+                    needs_pairing_phone: _t("set the pairing phone first"),
+                };
                 const detail = connectSkipped
-                    .map((s) => `${s.name} (${s.reason})`)
+                    .map((s) => `${s.name} (${reasons[s.reason] || s.reason})`)
                     .join(", ");
                 this.notification.add(
-                    _t("WhatsApp connect skipped: %s", detail),
+                    _t("Not connected yet: %s", detail),
                     { type: "warning" },
                 );
             }

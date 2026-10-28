@@ -180,8 +180,9 @@ class OwaAccount(models.Model):
         inverse='_inverse_is_default',
         help="When a WhatsApp account is deleted, its conversation history is "
              "reassigned to the default account. It is also the fallback "
-             "reply account for conversations that lost their account. "
-             "Only one account can be the default.")
+             "reply account for conversations that lost their account, and "
+             "the number jangad, delivery and invoice notifications and customer "
+             "login codes are sent from. Only one account can be the default.")
 
     def _compute_is_default(self):
         default_id = self.env['ir.config_parameter'].sudo().get_int(
@@ -1613,13 +1614,18 @@ class OwaAccount(models.Model):
                 vals['qr_code_base64'] = False
             if result.get('phone_number'):
                 vals['phone_number'] = result['phone_number']
-            self.write(vals)
+            # Write only what changed: the QR form polls this every 3 s while the
+            # connection webhooks write the same row, and every needless write
+            # is a chance of a serialization clash.
+            vals = {k: v for k, v in vals.items() if (self[k] or False) != (v or False)}
+            if vals:
+                self.write(vals)
         except BaileysError:
             # Sidecar momentarily unreachable: don't collapse an in-progress
             # pairing (qr_pending / connecting) to 'disconnected' — that hides
             # the QR mid-scan and forces a second Connect click. Only drop from
             # a non-pairing state. (#connect_flow)
-            if prev not in ('qr_pending', 'connecting'):
+            if prev not in ('qr_pending', 'connecting', 'disconnected'):
                 self.write({'session_state': 'disconnected'})
 
     def button_disconnect(self):

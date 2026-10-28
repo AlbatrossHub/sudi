@@ -354,59 +354,52 @@ class OwaDashboard(models.AbstractModel):
                 _logger.warning("action_start_sidecars: %s sidecar not responding", name)
                 connect_failed.append({'name': name, 'err': 'sidecar not responding'})
                 continue
-            _logger.info("action_start_sidecars: %s sidecar up, session_state=%s",
-                         name, account.session_state)
+            if account.connection_type and account.connection_type != 'qr':
+                continue
 
-            # The sidecar auto-restores saved WhatsApp sessions the moment
-            # its process starts — it usually reaches 'connected' within a
-            # few seconds without any help from us. Poll for that first so
-            # we don't fire button_connect() into a session that's already
-            # mid-restore (which would tear it down and start over).
+            # Ask the sidecar, read-only. This button must never write the
+            # account row while it waits: the connection webhooks write that
+            # same row, the clash is a serialization failure, and the server
+            # then re-runs the WHOLE button (up to 5 times) - every run used to
+            # reconnect the account and replace the QR the user was scanning.
+            # The connection webhooks keep session_state up to date by themselves.
+            # The sidecar auto-restores saved sessions the moment it starts, so
+            # poll a few seconds for that before deciding anything.
+            api = account._get_baileys_api()
+            status = ''
             deadline = time.time() + 12
             while time.time() < deadline:
                 try:
-                    account.button_refresh_status()
+                    status = api.get_session_status().get('status') or ''
                 except Exception:
-                    pass
-                if account.session_state in (
-                        'connected', 'logged_out', 'qr_pending'):
+                    status = ''
+                if status in ('connected', 'qr_pending', 'logged_out'):
                     break
                 time.sleep(1)
-            _logger.info("action_start_sidecars: %s after auto-restore wait, "
-                         "session_state=%s", name, account.session_state)
-            if account.session_state == 'connected':
+            _logger.info("action_start_sidecars: %s sidecar status=%s", name, status or 'none')
+
+            if status == 'connected':
                 connected.append(name)
                 continue
-
-            # Auto-restore didn't get us there (no saved creds, logged out,
-            # etc.) — fall back to an explicit connect.
+            if status in ('qr_pending', 'connecting'):
+                # Someone is scanning (or the socket is coming up): leave it alone.
+                connect_skipped.append({'name': name, 'reason': status})
+                continue
             if not account.enabled:
                 connect_skipped.append({'name': name, 'reason': 'disabled'})
+                continue
+            if status == 'logged_out' or not account.phone_number:
+                # Needs a QR scan, which only the account form can show:
+                # starting one from here just burns QR codes nobody sees.
+                connect_skipped.append({'name': name, 'reason': 'needs_qr_scan'})
                 continue
             if account.pairing_method == 'code' and not account.pairing_phone:
                 connect_skipped.append({'name': name, 'reason': 'needs_pairing_phone'})
                 continue
+            # Linked before and dropped: reconnect with the saved login, once.
             try:
                 account.button_connect()
-                # button_connect() returns while the socket is still
-                # 'connecting'; poll until it settles so the dashboard
-                # reload right after sees the final state.
-                deadline = time.time() + 12
-                while (account.session_state not in ('connected', 'logged_out')
-                       and time.time() < deadline):
-                    time.sleep(1)
-                    try:
-                        account.button_refresh_status()
-                    except Exception:
-                        break
-                _logger.info("action_start_sidecars: %s after button_connect "
-                             "wait, session_state=%s", name, account.session_state)
-                if account.session_state == 'connected':
-                    connected.append(name)
-                elif account.session_state in ('qr_pending', 'connecting'):
-                    connect_skipped.append({'name': name, 'reason': account.session_state})
-                else:
-                    connect_failed.append({'name': name, 'err': account.session_state or 'unknown'})
+                connect_skipped.append({'name': name, 'reason': 'connecting'})
             except Exception as e:
                 _logger.exception("action_start_sidecars: %s button_connect raised", name)
                 connect_failed.append({'name': name, 'err': str(e)})

@@ -33,16 +33,32 @@ class SudiDiamondWhatsappMixin(models.AbstractModel):
         self.ensure_one()
         return {}
 
-    def _sudi_send_whatsapp_message(self, recipient_phone, body_text, attachment=None, partner=None):
-        """Send a WhatsApp message via open_whatsapp_connector engine."""
+    def _sudi_whatsapp_account(self):
+        """The business number every Sudi message goes out from: the WhatsApp account
+        marked "Default Account", else the first account set up. Never "whichever number
+        happens to be connected" - a test or personal number linked for a while must not
+        start messaging customers and staff from that number."""
+        Account = self.env["owa.account"].sudo()
+        default_id = self.env["ir.config_parameter"].sudo().get_int(
+            "open_whatsapp_connector.default_account_id"
+        )
+        account = Account.browse(default_id).exists().filtered("active") if default_id else Account
+        return account or Account.search([], order="id", limit=1)
+
+    def _sudi_send_whatsapp_message(self, recipient_phone, body_text, attachment=None, partner=None,
+                                    send_now=False):
+        """Queue a WhatsApp message from the business number; returns the owa.message.
+
+        Notifications are queued and the send queue is woken at once, so a jangad, pickup
+        or delivery action never waits 2-5 s for WhatsApp (and the app never hangs on it).
+        ``send_now`` sends inside the request instead: for the login code, which the
+        customer is waiting for and whose failure must be reported straight away.
+        """
         if not recipient_phone:
             _logger.warning("No recipient phone number provided for WhatsApp notification on %s", self.display_name)
             return False
-        
-        wa_account = (
-            self.env['owa.account'].sudo().search([('session_state', '=', 'connected')], limit=1)
-            or self.env['owa.account'].sudo().search([], limit=1)
-        )
+
+        wa_account = self._sudi_whatsapp_account()
         if not wa_account:
             _logger.warning("No WhatsApp account found in open_whatsapp_connector for %s", self.display_name)
             return False
@@ -55,7 +71,7 @@ class SudiDiamondWhatsappMixin(models.AbstractModel):
         }
         if attachment:
             mail_vals['attachment_ids'] = [(6, 0, attachment.ids)]
-        
+
         mail_message = self.env['mail.message'].sudo().create(mail_vals)
 
         msg_vals = {
@@ -69,10 +85,15 @@ class SudiDiamondWhatsappMixin(models.AbstractModel):
             msg_vals['whatsapp_partner_id'] = partner.id
 
         owa_msg = self.env['owa.message'].sudo().create(msg_vals)
-        try:
-            owa_msg._send_message()
-        except Exception:
-            _logger.exception("Failed to send WhatsApp message for %s to %s", self.display_name, recipient_phone)
+        if send_now:
+            try:
+                owa_msg._send_message()
+            except Exception:
+                _logger.exception("Failed to send WhatsApp message for %s to %s", self.display_name, recipient_phone)
+        else:
+            cron = self.env.ref("open_whatsapp_connector.ir_cron_send_owa_queue", raise_if_not_found=False)
+            if cron:
+                cron.sudo()._trigger()
         return owa_msg
 
     def _sudi_render_event_whatsapp_message(self, event):

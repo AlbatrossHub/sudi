@@ -52,7 +52,7 @@ class OwaInboundDedupe(models.Model):
                     VALUES (%s, %s, NOW() AT TIME ZONE 'UTC', NOW() AT TIME ZONE 'UTC')
                     ON CONFLICT (msg_uid, account_id) DO NOTHING
                     RETURNING id
-                """, [msg_uid, account_id or None])
+                """, [msg_uid, account_id or None], log_exceptions=False)  # the clash below is expected, not an error
                 return bool(self.env.cr.fetchone())
         except SerializationFailure:
             return False

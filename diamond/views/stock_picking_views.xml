@@ -37,18 +37,19 @@
                         class="btn-secondary"
                         groups="stock.group_stock_user"
                         invisible="state != 'draft' or not sudi_is_diamond_job_work or picking_type_code != 'incoming' or not sudi_has_open_service_requests"/>
+                <!-- shown only to the groups whose wizard accepts them: anyone else got an Access Error -->
                 <button name="action_sudi_open_confirm_pickup_wizard"
                         string="Confirm Pickup"
                         type="object"
                         icon="fa-check-square-o"
-                        groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
+                        groups="diamond.group_sudi_pickup_app"
                         invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state != 'sudi_pickup_pending'"/>
                 <button name="action_sudi_open_cancel_pickup_wizard"
                         string="Cancel Pickup"
                         type="object"
                         class="btn-secondary btn-dark"
                         icon="fa-times"
-                        groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
+                        groups="diamond.group_sudi_pickup_app"
                         invisible="not sudi_is_diamond_job_work or picking_type_code != 'incoming' or state != 'sudi_pickup_pending'"/>
                 <field name="sudi_display_timesheet_timer" invisible="1"/>
                 <field name="sudi_total_hours_spent" invisible="1"/>
@@ -84,7 +85,7 @@
                         string="Transfer Department"
                         type="object"
                         class="btn-secondary"
-                        groups="diamond.group_sudi_job_work_user,stock.group_stock_user"
+                        groups="diamond.group_sudi_job_work_user"
                         invisible="state != 'assigned' or not sudi_is_diamond_job_work or picking_type_code != 'incoming'"/>
             </xpath>
 
@@ -400,10 +401,12 @@
                 <attribute name="readonly">state in ('sudi_pickup_pending', 'cancel', 'done')</attribute>
             </xpath>
 
-            <xpath expr="//field[@name='move_ids']/list//field[@name='product_id']" position="before">
+            <!-- this version groups product + description in one <column>: anchor on the column, or
+                 every field added here is stacked inside that single cell -->
+            <xpath expr="//field[@name='move_ids']/list/column[field[@name='product_id']]" position="before">
                 <field name="sudi_sr" optional="show"/>
             </xpath>
-            <xpath expr="//field[@name='move_ids']/list//field[@name='description_picking']" position="after">
+            <xpath expr="//field[@name='move_ids']/list/column[field[@name='description_picking']]" position="after">
                 <field name="sudi_size" optional="show"/>
                 <field name="sudi_pcs_qty" optional="show"/>
                 <field name="sudi_carats" optional="show"/>
@@ -489,14 +492,14 @@
                             string="Confirm Pickup"
                             type="object"
                             class="btn-primary"
-                            groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
+                            groups="diamond.group_sudi_pickup_app"
                             invisible="state != 'sudi_pickup_pending'"/>
                     <button name="action_sudi_open_cancel_pickup_wizard"
                             string="Cancel Pickup"
                             type="object"
                             class="btn-secondary btn-dark"
                             icon="fa-times"
-                            groups="diamond.group_sudi_pickup_delivery_operator,stock.group_stock_user"
+                            groups="diamond.group_sudi_pickup_app"
                             invisible="state != 'sudi_pickup_pending'"/>
                     <field name="state" widget="statusbar" statusbar_visible="sudi_pickup_pending,draft,assigned,done"/>
                 </header>
@@ -733,7 +736,7 @@
                             string="Transfer Department"
                             type="object"
                             class="btn-secondary"
-                            groups="diamond.group_sudi_job_work_user,stock.group_stock_user"
+                            groups="diamond.group_sudi_job_work_user"
                             invisible="state != 'assigned'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,assigned,done"/>
                 </header>

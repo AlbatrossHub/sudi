@@ -226,8 +226,11 @@ class SudiAuthOtp(models.Model):
             recipient_phone=self.identifier,
             body_text=body,
             partner=self.partner_id or None,
+            send_now=True,
         )
-        if sent:
+        # A message that could not go out is still a record: look at its state, or the
+        # customer is told "sent" while the business number is not even connected.
+        if sent and getattr(sent, "state", "sent") not in ("error", "bounced", "cancel"):
             self.sudo().delivery_state = "sent"
             return True
         self.sudo().write({

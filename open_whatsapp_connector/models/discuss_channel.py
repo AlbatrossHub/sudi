@@ -438,7 +438,8 @@ class DiscussChannel(models.Model):
         # Track last inbound message for valid_until computation
         if messages.author_id == self.whatsapp_partner_id:
             self.last_wa_mail_message_id = messages[-1]
-            Store(bus_channel=self).add(self, "whatsapp_channel_valid_until")
+            # this version's Store wants a field list; a bare string raised on every customer reply
+            Store(bus_channel=self).add(self, ["whatsapp_channel_valid_until"])
 
         if owa_message_vals:
             queued = self.env['owa.message'].create(owa_message_vals)

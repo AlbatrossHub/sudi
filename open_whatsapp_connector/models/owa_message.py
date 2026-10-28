@@ -450,6 +450,15 @@ class OwaMessage(models.Model):
 
     # ── Phase 1: outbound payload helpers ────────────────────────────────
 
+    def _owa_claim_own_echo(self, msg_uid):
+        """Pre-claim an id this send produced, so WhatsApp's fromMe echo of it is
+        skipped at the inbound webhook. One send can produce several ids (text
+        chunks, album header + every album item, several attachments); claiming
+        only the last one let the others come back as "sent from the phone"
+        copies in the conversation."""
+        if msg_uid:
+            self.env['owa.inbound.dedupe'].sudo().claim(msg_uid, self.wa_account_id.id)
+
     def _send_chunked_text(self, api_client, number, body_text, account):
         """Send text in chunks if longer than account.text_chunk_limit.
         Reply-quoting policy is governed by account.reply_to_mode:
@@ -487,6 +496,7 @@ class OwaMessage(models.Model):
                 reply_to=reply_to if include_reply_to else None,
                 mention_all=mention_all and idx == 0,
             )
+            self._owa_claim_own_echo(last_uid)
         return last_uid
 
     @staticmethod
@@ -586,6 +596,8 @@ class OwaMessage(models.Model):
                 msg_uid = child_ids[-1] if child_ids else (
                     result.get('parent_message_id') or ''
                 )
+                for uid in [result.get('parent_message_id'), *child_ids]:
+                    self._owa_claim_own_echo(uid)
                 used_album = True
             except Exception as exc:
                 _logger.warning(
@@ -599,12 +611,14 @@ class OwaMessage(models.Model):
                 msg_uid = self._send_one_attachment(
                     api_client, number, attachment, caption, account,
                 )
+                self._owa_claim_own_echo(msg_uid)
             return msg_uid
 
         for attachment in rest:
             msg_uid = self._send_one_attachment(
                 api_client, number, attachment, None, account,
             )
+            self._owa_claim_own_echo(msg_uid)
         return msg_uid
 
     def _send_one_attachment(self, api_client, number, attachment, caption, account):
