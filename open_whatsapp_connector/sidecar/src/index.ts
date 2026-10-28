@@ -18,6 +18,9 @@ const API_KEYS = (process.env.API_KEY || "")
   .map((k) => k.trim())
   .filter(Boolean);
 const SESSIONS_DIR = process.env.SESSIONS_DIR || undefined;
+// Interface to listen on. Unset keeps every interface (as before); "127.0.0.1" keeps the
+// sidecar to this machine, which is all an ERP server on the same host needs.
+const HOST = process.env.HOST || undefined;
 
 const app = express();
 app.use(express.json({ limit: "75mb" })); // Large limit for media base64 (50 MB binary ~= 67 MB base64 + overhead)
@@ -43,7 +46,12 @@ app.use(createSendRoutes(manager));
 app.use(createWhatsappRoutes(manager));
 app.use(createHistoryRoutes(manager));
 
-app.listen(PORT, async () => {
-  logger.info({ port: PORT }, "WhatsApp sidecar started");
+const onListening = async () => {
+  logger.info({ port: PORT, host: HOST || "*" }, "WhatsApp sidecar started");
   await manager.restoreSessions();
-});
+};
+if (HOST) {
+  app.listen(PORT, HOST, onListening);
+} else {
+  app.listen(PORT, onListening);
+}

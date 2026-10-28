@@ -74,6 +74,7 @@ API_KEY=your-secret-key npm start
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3100` | HTTP server port |
+| `HOST` | (every interface) | Interface to listen on; `127.0.0.1` keeps the sidecar to the machine it runs on |
 | `API_KEY` | (none) | API key for authentication |
 | `SESSIONS_DIR` | `./sessions` | Where WhatsApp sessions are stored |
 | `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
