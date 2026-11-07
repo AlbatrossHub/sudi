@@ -522,6 +522,10 @@ class StockPicking(models.Model):
             occurred_at=occurred_at, location=location
         )
         self.env["sudi.app.notice"]._sudi_raise("office_validate", self)
+        self._sudi_push_customer(
+            self.env._("Jangad %s picked up"),
+            self.env._("Your parcel is with us. We will tell you when it is on its way back."),
+        )
         return result
 
     def action_confirm(self):
@@ -547,5 +551,52 @@ class StockPicking(models.Model):
             "department_transfer", self,
             department=job_type.sudo().display_name,
             actor=self.env.user.name,
+        )
+        return result
+
+    # ------------------------------------------------------------------
+    # customer push (FCM)
+    # ------------------------------------------------------------------
+    def _sudi_push_customer(self, title_tmpl, body_tmpl):
+        """One push to the customer's own phones about ``self``'s jangads.
+
+        The WhatsApp messages keep going regardless; this is the tray
+        notification for the customer app. Quietly nothing for a customer
+        who never installed it.
+        """
+        Device = self.env["sudi.api.device"]
+        Users = self.env["res.users"].sudo()
+        for picking in self.sudo():
+            partner = picking.partner_id
+            if not partner:
+                continue
+            users = Users.search([
+                ("partner_id", "in", (partner | partner.child_ids).ids),
+                ("share", "=", True),
+            ])
+            reference = (
+                picking.sudi_origin_receipt_id.name
+                if picking.sudi_origin_receipt_id else picking.name
+            )
+            Device._sudi_push(
+                users, "customer",
+                title_tmpl % reference,
+                body_tmpl,
+                data={"picking_id": picking.id},
+            )
+
+    def action_sudi_take_for_delivery(self, *args, **kwargs):
+        result = super().action_sudi_take_for_delivery(*args, **kwargs)
+        self._sudi_push_customer(
+            self.env._("%s is out for delivery"),
+            self.env._("Your parcel has left with our delivery person."),
+        )
+        return result
+
+    def action_sudi_mark_delivered(self, *args, **kwargs):
+        result = super().action_sudi_mark_delivered(*args, **kwargs)
+        self._sudi_push_customer(
+            self.env._("%s delivered"),
+            self.env._("Your parcel has been delivered. Thank you for choosing SDPPL."),
         )
         return result

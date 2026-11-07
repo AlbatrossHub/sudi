@@ -14,6 +14,8 @@ from datetime import timedelta
 
 import psycopg2
 
+from functools import partial
+
 from odoo import api, fields, models
 from odoo.exceptions import AccessError
 from odoo.tools.translate import _
@@ -184,3 +186,35 @@ class SudiApiDevice(models.Model):
         if device.token_epoch != token_epoch:
             raise AccessError(_("This device's access has been reset."))
         return device
+
+    # ------------------------------------------------------------------
+    # push (FCM)
+    # ------------------------------------------------------------------
+    @api.model
+    def _sudi_push(self, users, audience, title, body, data=None):
+        """Queue one push to every live device ``users`` hold for ``audience``.
+
+        Delivery happens after the commit, so the business write this rides on
+        never waits for Google and never fails because of it. No credentials
+        file configured means pushes are quietly off.
+        """
+        from .. import fcm
+
+        if not users:
+            return
+        creds = fcm.credentials(self.env)
+        if not creds:
+            return
+        devices = self.sudo().search([
+            ("user_id", "in", users.ids),
+            ("audience", "=", audience),
+            ("revoked", "=", False),
+            ("push_token", "!=", False),
+        ])
+        tokens = list(set(devices.mapped("push_token")))
+        if not tokens:
+            return
+        self.env.cr.postcommit.add(partial(
+            fcm.deliver, self.env.cr.dbname, creds, tokens,
+            title, body or "", dict(data or {}),
+        ))

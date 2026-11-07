@@ -127,6 +127,19 @@ class SudiAppNotice(models.Model):
                     return self.browse()
                 notices = self.sudo().create(vals_list)
                 notices.flush_recordset()
+                # Push rides on the very rows just raised, so the tray and the
+                # bell can never disagree about what somebody was told.
+                Device = self.env["sudi.api.device"]
+                by_text = {}
+                for notice in notices:
+                    key = (notice.title, notice.body or "", notice.scope or "")
+                    by_text.setdefault(key, self.env["res.users"].browse())
+                    by_text[key] |= notice.user_id
+                for (title, body, scope_), users in by_text.items():
+                    Device._sudi_push(
+                        users, "field", title, body,
+                        data={"scope": scope_},
+                    )
                 return notices
         except Exception:
             _logger.exception(

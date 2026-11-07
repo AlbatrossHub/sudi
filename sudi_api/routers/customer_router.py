@@ -4,6 +4,7 @@ GST is auto-accepted from the GSTIN and the customer may skip it (decision
 D3), so these two routes are the whole of it: submit a number, or say not now.
 """
 
+import uuid
 from typing import Annotated
 
 from odoo.exceptions import ValidationError
@@ -69,6 +70,11 @@ def delete_account(
     user = caller_obj.user.sudo()
     user.sudi_api_device_ids.write({"push_token": False})
     # Deactivation bumps the token epoch and revokes every device by itself.
-    user.write({"active": False})
+    # The login is renamed away at the same time: logins are unique across
+    # inactive users too, and this number must be able to sign up afresh.
+    user.write({
+        "active": False,
+        "login": f"deleted-{user.id}-{uuid.uuid4().hex[:8]}",
+    })
     user.partner_id.email = False
     return AccountDeleteResult()
