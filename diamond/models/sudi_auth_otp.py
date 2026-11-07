@@ -178,11 +178,46 @@ class SudiAuthOtp(models.Model):
             ))
 
     @api.model
+    def _sudi_review_credentials(self):
+        """The app-store review number and its fixed code, if configured.
+
+        Store reviewers cannot receive a WhatsApp message, so one designated
+        number may sign in with a fixed code: parameters
+        ``sudi_auth.review_phone`` and ``sudi_auth.review_code`` (6+ chars).
+        Unset on a normal day; nothing else changes for real numbers.
+        """
+        ICP = self.env["ir.config_parameter"].sudo()
+        phone = self.env["stock.picking"]._sudi_normalize_phone(
+            ICP.get_str("sudi_auth.review_phone") or "")
+        code = (ICP.get_str("sudi_auth.review_code") or "").strip()
+        if len(phone) == 10 and len(code) >= 6:
+            return phone, code
+        return None
+
+    @api.model
     def _sudi_issue(self, identifier, purpose, partner=None):
         """Create, send and return an OTP. The plaintext never leaves here."""
         identifier = self.env["stock.picking"]._sudi_normalize_phone(identifier)
         if len(identifier) != 10:
             raise SudiOtpError(_("Enter a valid ten-digit phone number."))
+        review = self._sudi_review_credentials()
+        if review and identifier == review[0]:
+            # The row is hashed from the fixed review code, so verification and
+            # the attempt limits run exactly as for a real code - but nothing
+            # is sent anywhere, and the rate limits don't lock a reviewer out.
+            salt = secrets.token_hex(16)
+            return self.sudo().create({
+                "channel": CHANNEL_WHATSAPP,
+                "identifier": identifier,
+                "purpose": purpose,
+                "salt": salt,
+                "code_hash": self._sudi_hash_code(review[1], salt),
+                "expires_at": fields.Datetime.now()
+                + timedelta(minutes=self._sudi_param(PARAM_TTL)),
+                "partner_id": partner.id if partner else False,
+                "delivery_state": "sent",
+                "delivery_error": "Store-review number: fixed code, nothing sent.",
+            })
         self._sudi_assert_can_issue(identifier, purpose)
 
         code = self._sudi_generate_code()

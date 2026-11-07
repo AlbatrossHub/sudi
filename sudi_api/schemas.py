@@ -557,6 +557,14 @@ class GstInput(BaseModel):
     vat: str = Field(..., min_length=15, max_length=20)
 
 
+class AccountDeleteResult(BaseModel):
+    deleted: bool = Field(
+        True,
+        description="Always true on a 200: the account is closed and every "
+                    "token is dead the moment this returns.",
+    )
+
+
 class GstResult(BaseModel):
     gst_state: str = Field(
         ...,

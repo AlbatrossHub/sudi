@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends
 
 from ..dependencies import Caller, customer_caller
 from ..errors import validation
-from ..schemas import GstInput, GstResult
+from ..schemas import AccountDeleteResult, GstInput, GstResult
 
 router = APIRouter(tags=["customer"])
 
@@ -50,3 +50,25 @@ def skip_gst(
     partner = caller_obj.user.partner_id.sudo()
     partner._sudi_skip_gst()
     return _gst_result(partner)
+
+
+@router.post(
+    "/account/delete",
+    response_model=AccountDeleteResult,
+    summary="Close the caller's account (Play policy: in-app deletion)",
+)
+def delete_account(
+    caller_obj: Annotated[Caller, Depends(customer_caller)]
+) -> AccountDeleteResult:
+    """Close the account and sign out every phone, now.
+
+    The sign-in, registered devices and push tokens go; the jangads,
+    deliveries and invoices stay, as the business and tax records they are
+    (the same split the deletion page at sdppl.com/app/delete-account states).
+    """
+    user = caller_obj.user.sudo()
+    user.sudi_api_device_ids.write({"push_token": False})
+    # Deactivation bumps the token epoch and revokes every device by itself.
+    user.write({"active": False})
+    user.partner_id.email = False
+    return AccountDeleteResult()
